@@ -65,9 +65,9 @@ Recommended local model
 Architecture overview
 - `src/fetchers/` = source APIs (arXiv, Semantic Scholar, Crossref)
 - `src/llm/` = local Ollama integration
-- `src/analysis/` = relevance scoring and synthesis
-- `src/output/` = markdown and JSON report generation
-- `templates/` = reusable report templates and JSON schema templates
+- `src/analysis/` = relevance scoring, business context, synthesis
+- `src/output/` = markdown, JSON, and content-pack generation
+- `templates/` = reusable output formats
 
 Quick start
 
@@ -99,8 +99,9 @@ What the app does
 2. Fetches papers from several free public APIs
 3. Deduplicates and ranks the results by topic + business + engineering relevance
 4. Sends the selected set to a local LLM for synthesis
-5. Produces a strategic brief in markdown and JSON
-6. Creates a paper index for review and traceability
+5. Adds business context and signalling for enterprise decision-makers
+6. Produces a strategic brief in markdown and JSON
+7. Creates a paper index and structured content pack
 
 Report sections
 
@@ -108,20 +109,16 @@ The generated report includes:
 - Executive Summary
 - Research Scope and Questions
 - Search Strategy and Sources
+- Business Context
 - Papers Reviewed
 - Summary of Key Findings
 - Research Themes
 - Market Trends
 - Business Problems
 - Research Gaps
-- Strategic Implications
-- Adoption Barriers
-- Capability Requirements
 - Recommendations
 - Strategic Roadmap
-- Risks and Constraints
-- Opportunities for Innovation
-- Content Ideas for Professional Sharing
+- Professional Content Ideas
 - References
 - Appendix
 
@@ -136,6 +133,11 @@ The project outputs a JSON object shaped like this:
   "research_questions": ["..."],
   "sources": ["arXiv", "Semantic Scholar", "Crossref"],
   "time_window": "2019-2025",
+  "business_context": {
+    "focus_areas": {"ai": ["ai", "model"], "enterprise": ["enterprise"]},
+    "business_signal": "...",
+    "finding_summary": ["..."]
+  },
   "papers": [],
   "key_findings": ["..."],
   "themes": [],
@@ -144,7 +146,11 @@ The project outputs a JSON object shaped like this:
   "research_gaps": [],
   "recommendations": [],
   "strategic_roadmap": [],
-  "content_ideas": [],
+  "content_pack": {
+    "linkedin_post_ideas": [],
+    "article_topics": [],
+    "talk_outline": []
+  },
   "references": []
 }
 
@@ -156,7 +162,7 @@ Deep dive mode
 - Use a narrow topic
 - Fetch 20-30 papers
 - Keep top 8-15 for synthesis
-- Produce a detailed report with roadmap
+- Produce a detailed report with roadmap and content pack
 
 Quick scan mode
 - Use 5-10 papers
@@ -166,12 +172,12 @@ Quick scan mode
 Content mode
 - Create a professional brief with LinkedIn post ideas, article topics, and talk outlines
 
-Future extensions
+Next refinement opportunities
 - Add PubMed, IEEE Xplore, or Microsoft Academic support
-- Add citation extraction
 - Add PDF or full-text summarization
+- Add clustering for theme extraction
 - Add a web UI for topic submission
-- Add a more advanced clustering and scoring layer
+- Add structured comparisons across enterprise domains
 
 License
 

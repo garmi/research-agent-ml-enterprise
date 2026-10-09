@@ -5,14 +5,17 @@ import json
 import os
 from typing import Any, Dict, List
 
+from src.analysis.business_context import detect_focus_areas
+from src.analysis.insight_builder import derive_business_signal, summarize_findings
 from src.analysis.relevance import rank_papers
+from src.analysis.synthesizer import SynthesisEngine
 from src.config import ensure_directories, load_config
 from src.fetchers.arxiv_client import ArxivClient
 from src.fetchers.crossref_client import CrossrefClient
 from src.fetchers.semantic_scholar_client import SemanticScholarClient
 from src.llm.ollama_client import OllamaClient
+from src.output.content_pack import ContentPackBuilder
 from src.output.report_builder import ReportBuilder
-from src.analysis.synthesizer import SynthesisEngine
 
 
 def build_topic_queries(topic: str) -> List[str]:
@@ -87,6 +90,14 @@ def main() -> None:
     synthesizer = SynthesisEngine(ollama)
     synthesis = synthesizer.analyze(topic, deduped)
     synthesis["papers"] = deduped
+    synthesis["business_context"] = {
+        "focus_areas": detect_focus_areas(topic),
+        "business_signal": derive_business_signal(topic, deduped),
+        "finding_summary": summarize_findings(deduped),
+    }
+
+    content_builder = ContentPackBuilder(topic)
+    synthesis["content_pack"] = content_builder.build(synthesis)
 
     builder = ReportBuilder()
     builder.write_markdown(topic, synthesis, filename=args.report_name)

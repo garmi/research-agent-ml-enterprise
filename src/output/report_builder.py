@@ -16,6 +16,7 @@ class ReportBuilder:
         self.csv_dir.mkdir(parents=True, exist_ok=True)
 
     def build_markdown(self, topic: str, synthesis: Dict[str, Any]) -> str:
+        content_pack = synthesis.get("content_pack", {})
         sections = [
             f"# Research Brief: {topic}",
             "",
@@ -36,7 +37,18 @@ class ReportBuilder:
             "- Sources: " + ", ".join(synthesis.get("sources", ["Not specified"])),
             "- Time window: " + synthesis.get("time_window", "Not specified"),
             "",
-            "## 4. Papers Reviewed",
+            "## 4. Business Context",
+        ])
+
+        for key, value in synthesis.get("business_context", {}).items():
+            if isinstance(value, list):
+                sections.append(f"- {key}: {', '.join(str(v) for v in value[:3])}")
+            else:
+                sections.append(f"- {key}: {value}")
+
+        sections.extend([
+            "",
+            "## 5. Papers Reviewed",
         ])
 
         for paper in synthesis.get("papers", []):
@@ -44,7 +56,7 @@ class ReportBuilder:
 
         sections.extend([
             "",
-            "## 5. Summary of Key Findings",
+            "## 6. Summary of Key Findings",
         ])
 
         for idx, finding in enumerate(synthesis.get("key_findings", []), start=1):
@@ -53,7 +65,7 @@ class ReportBuilder:
 
         sections.extend([
             "",
-            "## 6. Research Themes",
+            "## 7. Research Themes",
         ])
         for theme in synthesis.get("themes", []):
             sections.append(f"### {theme.get('name', 'Theme')}")
@@ -61,49 +73,60 @@ class ReportBuilder:
 
         sections.extend([
             "",
-            "## 7. Market Trends",
+            "## 8. Market Trends",
         ])
         for trend in synthesis.get("market_trends", []):
             sections.append(f"- {trend}")
 
         sections.extend([
             "",
-            "## 8. Business Problems",
+            "## 9. Business Problems",
         ])
         for problem in synthesis.get("business_problems", []):
             sections.append(f"- {problem}")
 
         sections.extend([
             "",
-            "## 9. Gaps in Current Research and Practice",
+            "## 10. Gaps in Current Research and Practice",
         ])
         for gap in synthesis.get("research_gaps", []):
             sections.append(f"- {gap}")
 
         sections.extend([
             "",
-            "## 10. Recommendations",
+            "## 11. Recommendations",
         ])
         for rec in synthesis.get("recommendations", []):
             sections.append(f"- {rec}")
 
         sections.extend([
             "",
-            "## 11. Strategic Roadmap",
+            "## 12. Strategic Roadmap",
         ])
         for road in synthesis.get("strategic_roadmap", []):
-            sections.append(f"- {road}")
+            if isinstance(road, dict):
+                sections.append(f"### {road.get('stage', 'Stage')}")
+                sections.append(f"- Objective: {road.get('objective', 'N/A')}")
+                for action in road.get('actions', []):
+                    sections.append(f"  - {action}")
+                for kpi in road.get('kpis', []):
+                    sections.append(f"  - KPI: {kpi}")
+            else:
+                sections.append(f"- {road}")
 
         sections.extend([
             "",
-            "## 12. Content Ideas for Professional Sharing",
+            "## 13. Content Ideas for Professional Sharing",
         ])
-        for item in synthesis.get("content_ideas", []):
+        for item in content_pack.get("linkedin_post_ideas", []):
             sections.append(f"- {item}")
 
+        for item in content_pack.get("article_topics", []):
+            sections.append(f"- Article idea: {item}")
+
         sections.extend([
             "",
-            "## 13. References",
+            "## 14. References",
         ])
         for ref in synthesis.get("references", []):
             sections.append(f"- {ref}")
