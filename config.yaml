@@ -1,0 +1,29 @@
+project:
+  name: research-agent-ml-enterprise
+  environment: mac
+
+research:
+  default_topic: "AI adoption in enterprise software delivery"
+  max_papers: 20
+  min_relevance_score: 0.5
+  time_window: "2019-2025"
+  search_sources:
+    - arxiv
+    - semantic_scholar
+    - crossref
+
+ollama:
+  base_url: "http://localhost:11434"
+  model: "qwen2.5:7b-instruct"
+  timeout_seconds: 120
+
+output:
+  reports_dir: "outputs/reports"
+  json_dir: "outputs/json"
+  csv_dir: "outputs/csv"
+  markdown_filename: "research_report.md"
+  json_filename: "research_report.json"
+  csv_filename: "paper_index.csv"
+
+logging:
+  level: "INFO"
