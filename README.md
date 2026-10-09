@@ -17,7 +17,7 @@ Why this stack:
 
 Topography used
 
-The project uses a layered system topology that separates discovery, extraction, synthesis, and reporting.
+This project follows a layered topology that separates discovery, extraction, synthesis, and reporting.
 
 User input
   ↓
@@ -60,33 +60,14 @@ Project goals
 
 Recommended local model
 - Ollama model: qwen2.5:7b-instruct or llama3.1:8b-instruct
-- Reason: good balance of reasoning quality, speed, and memory usage on Apple Silicon
+- Reason: strong quality-speed tradeoff on Apple Silicon Macs
 
-Repository structure
-
-research-agent-ml-enterprise/
-  README.md
-  requirements.txt
-  config.yaml
-  .env.example
-  src/
-    __init__.py
-    app.py
-    config.py
-    fetchers/
-      __init__.py
-      arxiv_client.py
-      semantic_scholar_client.py
-    llm/
-      __init__.py
-      ollama_client.py
-    output/
-      __init__.py
-      report_builder.py
-  outputs/
-    reports/
-    json/
-    csv/
+Architecture overview
+- `src/fetchers/` = sources for arXiv, Semantic Scholar, and Crossref
+- `src/llm/` = local Ollama integration
+- `src/analysis/` = synthesis and structured extraction
+- `src/output/` = markdown and JSON report generation
+- `templates/` = report scaffolds and reusable output formats
 
 Quick start
 
@@ -104,24 +85,19 @@ Quick start
 
 4. Configure environment
    - cp .env.example .env
-   - update the values as needed
+   - update values as needed
 
 5. Run the app
    - python -m src.app --topic "AI adoption in enterprise software delivery"
 
 What the app does
 
-1. Builds queries for the topic
-2. Searches academic sources using free APIs
-3. Pulls paper metadata and abstracts
-4. Deduplicates and ranks relevant results
-5. Sends content to a local LLM for analysis
-6. Summarizes findings across papers
-7. Produces:
-   - markdown research brief
-   - structured JSON report
-   - paper index for traceability
-   - optional content pack
+1. Builds search queries from the topic
+2. Fetches papers from several public APIs
+3. Deduplicates and ranks results
+4. Sends content to a local LLM for synthesis
+5. Produces a strategic brief in markdown and JSON
+6. Creates a paper index for review and traceability
 
 Report sections
 
@@ -148,49 +124,28 @@ The generated report includes:
 
 JSON schema
 
-The project outputs structured data in the following shape:
+The project outputs a JSON object shaped like this:
 
 {
   "topic": "AI adoption in enterprise software delivery",
-  "research_scope": {
-    "objective": "...",
-    "questions": ["..."],
-    "sources": ["arXiv", "Semantic Scholar", "Crossref"],
-    "time_window": "2019-2025"
-  },
-  "papers_reviewed": {
-    "total_reviewed": 15,
-    "selected_for_synthesis": 8,
-    "papers": []
-  },
+  "executive_summary": "...",
+  "objective": "...",
+  "research_questions": ["..."],
+  "sources": ["arXiv", "Semantic Scholar", "Crossref"],
+  "time_window": "2019-2025",
+  "papers": [],
+  "key_findings": ["..."],
   "themes": [],
   "market_trends": [],
   "business_problems": [],
   "research_gaps": [],
   "recommendations": [],
-  "strategic_roadmap": {
-    "short_term": {},
-    "medium_term": {},
-    "long_term": {}
-  },
-  "content_pack": {
-    "linkedin_post_ideas": [],
-    "article_topics": [],
-    "talk_outline": []
-  },
+  "strategic_roadmap": [],
+  "content_ideas": [],
   "references": []
 }
 
-Example prompts used by the agent
-
-Paper analysis prompt:
-- "Read this research abstract and identify: problem statement, findings, business relevance, engineering implications, gaps, and strategic opportunity. Return JSON."
-
-Synthesis prompt:
-- "Given these research papers on [TOPIC], identify the main themes, recurring patterns, market trends, business problems, research gaps, and recommendations. Return structured Markdown."
-
-Roadmap prompt:
-- "Based on the synthesis, build a 12-month strategic roadmap with objectives, actions, KPIs, and risks. Return markdown."
+This is optimized for downstream processing by both humans and agents.
 
 Suggested usage patterns
 
@@ -203,253 +158,18 @@ Deep dive mode
 Quick scan mode
 - Use 5-10 papers
 - Emphasize trends and opportunities
-- Generate concise briefing
+- Generate a concise briefing
 
 Content mode
-- Create a professional brief with post ideas and talk outlines
-- Output in Markdown for immediate sharing
+- Create a professional brief with post ideas, article topics, and talk outlines
 
 Future extensions
-- Add PubMed or IEEE Xplore support
+- Add PubMed, IEEE Xplore, or Microsoft Academic support
 - Add citation extraction
-- Add PDF summarization via local tools
+- Add PDF or full-text summarization
 - Add a web UI for topic submission
-- Add multi-tenant workspace support
-- Add automatic LinkedIn/Medium style post generation
+- Add a more advanced scoring and clustering layer
 
 License
 
 This project is intended for personal research use and strategic synthesis.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

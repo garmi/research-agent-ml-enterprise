@@ -1,0 +1,33 @@
+{
+  "topic": "[TOPIC]",
+  "executive_summary": "[2-4 paragraph summary]",
+  "objective": "[Primary goal of the brief]",
+  "research_questions": [
+    "What are the dominant research themes?",
+    "What business problems and gaps are emerging?",
+    "What strategic roadmap should leaders prioritize?"
+  ],
+  "sources": [
+    "arXiv",
+    "Semantic Scholar",
+    "Crossref"
+  ],
+  "time_window": "2019-2025",
+  "papers_reviewed": {
+    "total_reviewed": 0,
+    "selected_for_synthesis": 0,
+    "papers": []
+  },
+  "themes": [],
+  "market_trends": [],
+  "business_problems": [],
+  "research_gaps": [],
+  "recommendations": [],
+  "strategic_roadmap": [],
+  "content_pack": {
+    "linkedin_post_ideas": [],
+    "article_topics": [],
+    "talk_outline": []
+  },
+  "references": []
+}
