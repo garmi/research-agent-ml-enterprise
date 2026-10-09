@@ -18,7 +18,7 @@ ollama:
   timeout_seconds: 120
 
 output:
-  reports_dir: "outputs/reports"
+  reports_dir: "outputs"
   json_dir: "outputs/json"
   csv_dir: "outputs/csv"
   markdown_filename: "research_report.md"

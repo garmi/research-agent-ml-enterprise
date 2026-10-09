@@ -5,13 +5,14 @@ import json
 import os
 from typing import Any, Dict, List
 
-from src.analysis.synthesizer import SynthesisEngine
+from src.analysis.relevance import rank_papers
 from src.config import ensure_directories, load_config
 from src.fetchers.arxiv_client import ArxivClient
 from src.fetchers.crossref_client import CrossrefClient
 from src.fetchers.semantic_scholar_client import SemanticScholarClient
 from src.llm.ollama_client import OllamaClient
 from src.output.report_builder import ReportBuilder
+from src.analysis.synthesizer import SynthesisEngine
 
 
 def build_topic_queries(topic: str) -> List[str]:
@@ -22,6 +23,7 @@ def build_topic_queries(topic: str) -> List[str]:
         f"{base} agile",
         f"{base} software engineering",
         f"{base} adoption",
+        f"{base} digital transformation",
     ]
 
 
@@ -43,6 +45,7 @@ def main() -> None:
     parser.add_argument("--topic", default=os.getenv("DEFAULT_TOPIC", "AI adoption in enterprise software delivery"), help="Research topic")
     parser.add_argument("--max-papers", type=int, default=int(os.getenv("MAX_PAPERS", "12")), help="Maximum papers to review")
     parser.add_argument("--report-name", default="research_report.md", help="Name of generated markdown report")
+    parser.add_argument("--mode", choices=["quick", "deep"], default="deep", help="Quick scan or deep dive")
     args = parser.parse_args()
 
     config = load_config("config.yaml")
@@ -50,22 +53,31 @@ def main() -> None:
 
     topic = args.topic
     queries = build_topic_queries(topic)
+    if args.mode == "quick":
+        query_limit = 2
+        max_per_query = 4
+    else:
+        query_limit = 5
+        max_per_query = 6
 
     arxiv_client = ArxivClient()
     sem_client = SemanticScholarClient()
     crossref_client = CrossrefClient()
 
-    papers: List[Dict[str, Any]] = []
-    for query in queries[:4]:
+    all_papers: List[Dict[str, Any]] = []
+    for query in queries[:query_limit]:
         try:
-            arxiv_results = arxiv_client.search(query, max_results=max(3, args.max_papers // 2))
-            sem_results = sem_client.search(query, limit=max(3, args.max_papers // 2))
-            crossref_results = crossref_client.search(query, max_results=max(3, args.max_papers // 2))
-            papers.extend(merge_papers([arxiv_results, sem_results, crossref_results]))
+            arxiv_results = arxiv_client.search(query, max_results=max_per_query)
+            sem_results = sem_client.search(query, limit=max_per_query)
+            crossref_results = crossref_client.search(query, max_results=max_per_query)
+            all_papers.extend(merge_papers([arxiv_results, sem_results, crossref_results]))
         except Exception as exc:
             print(f"Warning: fetch failed for query '{query}': {exc}")
 
-    deduped = merge_papers([papers])[: args.max_papers]
+    ranked = rank_papers(all_papers, topic)
+    min_score = float(config.get("research", {}).get("min_relevance_score", 0.5))
+    filtered = [paper for paper in ranked if float(paper.get("relevance_score", 0.0)) >= min_score]
+    deduped = filtered[: args.max_papers]
 
     ollama = OllamaClient(
         base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
@@ -74,15 +86,14 @@ def main() -> None:
 
     synthesizer = SynthesisEngine(ollama)
     synthesis = synthesizer.analyze(topic, deduped)
-
-    if not synthesis.get("papers"):
-        synthesis["papers"] = deduped
+    synthesis["papers"] = deduped
 
     builder = ReportBuilder()
     builder.write_markdown(topic, synthesis, filename=args.report_name)
     builder.write_json(synthesis, filename="research_report.json")
     builder.write_csv(deduped, filename="paper_index.csv")
 
+    print(f"Selected {len(deduped)} papers based on relevance scoring.")
     print(f"Saved report: {builder.reports_dir / args.report_name}")
     print(f"Saved JSON: {builder.json_dir / 'research_report.json'}")
     print(f"Saved CSV: {builder.csv_dir / 'paper_index.csv'}")

@@ -63,11 +63,11 @@ Recommended local model
 - Reason: strong quality-speed tradeoff on Apple Silicon Macs
 
 Architecture overview
-- `src/fetchers/` = sources for arXiv, Semantic Scholar, and Crossref
+- `src/fetchers/` = source APIs (arXiv, Semantic Scholar, Crossref)
 - `src/llm/` = local Ollama integration
-- `src/analysis/` = synthesis and structured extraction
+- `src/analysis/` = relevance scoring and synthesis
 - `src/output/` = markdown and JSON report generation
-- `templates/` = report scaffolds and reusable output formats
+- `templates/` = reusable report templates and JSON schema templates
 
 Quick start
 
@@ -88,14 +88,17 @@ Quick start
    - update values as needed
 
 5. Run the app
-   - python -m src.app --topic "AI adoption in enterprise software delivery"
+   - python -m src.app --topic "AI adoption in enterprise software delivery" --mode deep
+
+6. For a quick overview
+   - python -m src.app --topic "AI adoption in enterprise software delivery" --mode quick
 
 What the app does
 
 1. Builds search queries from the topic
-2. Fetches papers from several public APIs
-3. Deduplicates and ranks results
-4. Sends content to a local LLM for synthesis
+2. Fetches papers from several free public APIs
+3. Deduplicates and ranks the results by topic + business + engineering relevance
+4. Sends the selected set to a local LLM for synthesis
 5. Produces a strategic brief in markdown and JSON
 6. Creates a paper index for review and traceability
 
@@ -145,7 +148,7 @@ The project outputs a JSON object shaped like this:
   "references": []
 }
 
-This is optimized for downstream processing by both humans and agents.
+This is optimized for downstream processing by humans and future agents.
 
 Suggested usage patterns
 
@@ -153,7 +156,7 @@ Deep dive mode
 - Use a narrow topic
 - Fetch 20-30 papers
 - Keep top 8-15 for synthesis
-- Produce detailed report with roadmap
+- Produce a detailed report with roadmap
 
 Quick scan mode
 - Use 5-10 papers
@@ -161,14 +164,14 @@ Quick scan mode
 - Generate a concise briefing
 
 Content mode
-- Create a professional brief with post ideas, article topics, and talk outlines
+- Create a professional brief with LinkedIn post ideas, article topics, and talk outlines
 
 Future extensions
 - Add PubMed, IEEE Xplore, or Microsoft Academic support
 - Add citation extraction
 - Add PDF or full-text summarization
 - Add a web UI for topic submission
-- Add a more advanced scoring and clustering layer
+- Add a more advanced clustering and scoring layer
 
 License
 
