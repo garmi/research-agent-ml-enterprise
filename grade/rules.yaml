@@ -1,0 +1,49 @@
+# Deterministic Grading Rules for Research Engine v2
+# Thresholds and rules for assigning grades to atomic claims.
+
+grades:
+  strong:
+    value: 1.0
+    description: "Verified peer-reviewed venue with empirical study, or 2+ independent sources"
+  moderate:
+    value: 0.7
+    description: "Reputable preprint or peer-reviewed with narrow context, or 2+ independent customer claims"
+  weak:
+    value: 0.4
+    description: "Position paper, conceptual framework, unverified venue, or abstract-only extraction"
+  vendor_claim:
+    value: 0.3
+    description: "Source org has commercial stake (vendor blog, sponsored) without independent corroboration"
+  anecdote:
+    value: 0.2
+    description: "Single case study, practitioner observation, or social post"
+
+study_types:
+  empirical:
+    - field_experiment
+    - controlled_study
+    - survey_with_method
+  observational:
+    - case_study
+    - filing_disclosure
+    - practitioner_observation
+  non_empirical:
+    - position_paper
+    - conceptual_framework
+    - vendor_assertion
+
+caps:
+  # Abstract-only extraction cannot be graded strong
+  abstract_only_max_grade: moderate
+  # Unresolved contradiction caps claim at weak
+  contradiction_max_grade: weak
+  # Unverified venue cannot exceed weak
+  unverified_venue_max_grade: weak
+  # Commercial stake caps at vendor_claim unless corroborated
+  commercial_stake_max_grade: vendor_claim
+  # Entity mismatch restricts claim to topic_level only
+  entity_mismatch_restrict_topic: true
+
+corroboration:
+  min_independent_sources_for_strong: 2
+  min_independent_customers_for_moderate: 2

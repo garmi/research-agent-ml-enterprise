@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container resume-grid">
+  <!-- Left Column: Executive Summary & Metrics -->
+  <aside class="resume-sidebar">
+    <div class="profile-card">
+      <div style="width: 4rem; height: 4rem; border-radius: var(--radius-sm); background-color: var(--primary); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 1.75rem; font-weight: 800; margin-bottom: 1.25rem;">
+        {{ person.initials }}
+      </div>
+
+      <h1 style="font-size: 1.75rem; font-weight: 800; line-height: 1.2; margin-bottom: 0.25rem;">{{ person.name }}</h1>
+      <p style="color: var(--primary); font-weight: 600; margin-bottom: 1rem;">{{ person.role }}</p>
+      <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1.5rem;">{{ person.location }}</p>
+
+      <div style="border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 1.5rem 0; margin-bottom: 1.5rem;">
+        {% for hl in profile.highlights %}
+        <div class="stat-metric">
+          <div class="stat-value">{{ hl.value }}</div>
+          <div class="stat-label">{{ hl.label }}</div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <div style="font-size: 0.85rem; color: var(--text-subtle); margin-bottom: 1.5rem;">
+        <strong>Availability:</strong><br>
+        {{ person.availability }}
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+        {% if person.links.linkedin %}
+        <a href="{{ person.links.linkedin }}" target="_blank" rel="noopener noreferrer" class="btn btn-outline" style="width: 100%;">
+          LinkedIn Profile &rarr;
+        </a>
+        {% endif %}
+        <a href="{{ root }}resume.json" target="_blank" class="btn btn-outline" style="width: 100%;">
+          Download JSON Resume &rarr;
+        </a>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Right Column: Trajectory, Skills, and Thought Leadership Evidence -->
+  <div>
+    <!-- Executive Positioning -->
+    <section style="margin-bottom: 3.5rem;">
+      <h2 style="font-size: 2rem; font-weight: 800; margin-bottom: 1rem;">Executive Narrative</h2>
+      {% for para in person.summary %}
+      <p style="font-size: 1.1rem; color: var(--text-muted); line-height: 1.7; margin-bottom: 1rem;">
+        {{ para }}
+      </p>
+      {% endfor %}
+    </section>
+
+    <!-- Experience Timeline -->
+    <section style="margin-bottom: 3.5rem;">
+      <h2 style="font-size: 2rem; font-weight: 800; margin-bottom: 1.75rem;">Career Trajectory</h2>
+      <div>
+        {% for exp in profile.experience %}
+        <div class="timeline-item">
+          <div class="timeline-role">{{ exp.role }}</div>
+          <div class="timeline-company">{{ exp.company }} &bull; {{ exp.location }}</div>
+          <div class="timeline-period">{{ exp.period }}</div>
+          {% if exp.summary %}
+          <p style="font-size: 0.95rem; color: var(--text-muted); margin-bottom: 0.75rem;">{{ exp.summary }}</p>
+          {% endif %}
+          <ul style="padding-left: 1.25rem; font-size: 0.95rem; color: var(--text-muted);">
+            {% for ach in exp.achievements %}
+            <li style="margin-bottom: 0.4rem;">{{ ach }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <!-- Core Competencies -->
+    <section style="margin-bottom: 3.5rem;">
+      <h2 style="font-size: 2rem; font-weight: 800; margin-bottom: 1.5rem;">Core Competencies</h2>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.5rem;">
+        {% for s in profile.skills %}
+        <div style="background-color: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1.5rem;">
+          <h3 style="font-size: 1.1rem; font-weight: 700; color: var(--primary); margin-bottom: 0.75rem;">{{ s.group }}</h3>
+          <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+            {% for item in s['items'] %}
+            <span class="tag-badge secondary">{{ item }}</span>
+            {% endfor %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <!-- Contact & Advisory CTA -->
+    <section id="contact" style="background-color: var(--primary-subtle); border: 1px solid var(--primary); border-radius: var(--radius-lg); padding: 2.5rem; text-align: center;">
+      <h2 style="font-size: 1.75rem; font-weight: 800; margin-bottom: 0.75rem;">{{ profile.contact.heading }}</h2>
+      <p style="color: var(--text-muted); max-width: 600px; margin: 0 auto 1.5rem;">{{ profile.contact.body }}</p>
+      <a href="mailto:{{ person.email }}" class="btn btn-primary" style="font-size: 1rem; padding: 0.75rem 2rem;">
+        Get in Touch &rarr;
+      </a>
+    </section>
+  </div>
+</div>
+{% endblock %}

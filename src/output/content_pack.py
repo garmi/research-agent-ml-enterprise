@@ -13,7 +13,7 @@ class ContentPackBuilder:
         findings = synthesis.get("key_findings", [])
 
         return {
-            "linkedin_post_ideas": [
+            "linkedin_post_ideas": synthesis.get("content_ideas") or [
                 f"What recent research says about {self.topic} and why enterprise teams struggle to scale it.",
                 f"Three signals from the literature on {self.topic} that matter for engineering and business leaders.",
                 f"Why {self.topic} needs governance, platform maturity, and measurable value delivery—not just experimentation.",

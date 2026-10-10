@@ -1,0 +1,57 @@
+# Strength Verbs Hierarchy for Sentence-Level Claims
+# Sentences cannot use verbs stronger than the weakest cited claim's grade.
+
+levels:
+  strong:
+    rank: 5
+    verbs:
+      - "shows"
+      - "demonstrates"
+      - "finds"
+      - "proves"
+      - "establishes"
+      - "confirms"
+      - "reveals"
+      - "measured"
+
+  moderate:
+    rank: 4
+    verbs:
+      - "suggests"
+      - "indicates"
+      - "points to"
+      - "observes"
+      - "evidences"
+      - "reflects"
+      - "correlates"
+
+  weak:
+    rank: 3
+    verbs:
+      - "reports"
+      - "proposes"
+      - "one study claims"
+      - "hypothesizes"
+      - "argues"
+      - "posits"
+      - "describes"
+      - "asserts"
+
+  vendor_claim:
+    rank: 2
+    verbs:
+      - "states"
+      - "claims"
+      - "asserts"
+      - "announces"
+      - "promotes"
+      - "according to"
+
+  anecdote:
+    rank: 1
+    verbs:
+      - "in one case"
+      - "anecdotally"
+      - "in an observed instance"
+      - "practitioners report"
+      - "informally noted"

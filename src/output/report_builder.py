@@ -40,11 +40,19 @@ class ReportBuilder:
             "## 4. Business Context",
         ])
 
-        for key, value in synthesis.get("business_context", {}).items():
-            if isinstance(value, list):
-                sections.append(f"- {key}: {', '.join(str(v) for v in value[:3])}")
-            else:
-                sections.append(f"- {key}: {value}")
+        ctx = synthesis.get("business_context", {})
+        focus = ctx.get("focus_areas", {})
+        if focus:
+            sections.append("- Focus areas: " + ", ".join(focus.keys()))
+        signal = ctx.get("business_signal", {})
+        if isinstance(signal, dict) and signal:
+            sections.append(f"- Papers analysed: {signal.get('papers_analysed', 'n/a')}")
+            sections.append(f"- Year range: {signal.get('year_range', 'n/a')}")
+            mix = signal.get("source_mix", {})
+            if mix:
+                sections.append("- Source mix: " + ", ".join(f"{k} ({v})" for k, v in mix.items()))
+        for item in ctx.get("finding_summary", []):
+            sections.append(f"- {item}")
 
         sections.extend([
             "",
@@ -139,6 +147,26 @@ class ReportBuilder:
         path.write_text(content, encoding="utf-8")
         return path
 
+    def build_html_storyline(self, topic: str, synthesis: Dict[str, Any]) -> str:
+        from src.output.html_storyline_builder import HtmlStorylineBuilder
+        return HtmlStorylineBuilder(topic).build(synthesis)
+
+    def write_html_storyline(self, topic: str, synthesis: Dict[str, Any], filename: str = "strategic_storyline.html") -> Path:
+        content = self.build_html_storyline(topic, synthesis)
+        path = self.reports_dir / filename
+        path.write_text(content, encoding="utf-8")
+        return path
+
+    def build_linkedin_pack(self, topic: str, synthesis: Dict[str, Any]) -> str:
+        from src.output.linkedin_pack_builder import LinkedInPackBuilder
+        return LinkedInPackBuilder(topic).build(synthesis)
+
+    def write_linkedin_pack(self, topic: str, synthesis: Dict[str, Any], filename: str = "linkedin_professional_pack.md") -> Path:
+        content = self.build_linkedin_pack(topic, synthesis)
+        path = self.reports_dir / filename
+        path.write_text(content, encoding="utf-8")
+        return path
+
     def write_json(self, data: Dict[str, Any], filename: str = "research_report.json") -> Path:
         path = self.json_dir / filename
         path.write_text(json.dumps(data, indent=2), encoding="utf-8")
@@ -157,3 +185,4 @@ class ReportBuilder:
             lines.append(",".join(row))
         path.write_text("\n".join(lines) + "\n", encoding="utf-8")
         return path
+

@@ -1,0 +1,108 @@
+# ---------------------------------------------------------------------------
+# Personal brand profile — the single source of truth for the site AND resume.
+#
+# Edit this file, then run:   python -m src.publishing build
+# Anything in [square brackets] is a placeholder; `python -m src.publishing check`
+# lists every placeholder still left so nothing generic ships by accident.
+# ---------------------------------------------------------------------------
+
+site:
+  title: "Gaurav M — Insights on Enterprise AI"
+  # Public URL once deployed (no trailing slash). Enables canonical links,
+  # sitemap, RSS and the LinkedIn share button. Leave blank for local preview.
+  url: ""
+  description: >-
+    Research-backed perspectives on enterprise AI adoption, agentic software
+    delivery and engineering leadership — every claim traced to peer-reviewed evidence.
+  language: en
+  accent_hue: 258          # 0-360. Shifts the whole colour system.
+
+person:
+  name: "Gaurav M"                      # [TODO] full name as you want it shown
+  initials: "GM"
+  headline: "Turning AI research into enterprise decisions that work."
+  role: "[Your current title]"          # [TODO]
+  location: "[City, Country]"           # [TODO]
+  email: "[you@example.com]"            # [TODO]
+  availability: "Open to advisory, speaking and leadership conversations."
+  photo: ""                             # optional: path inside website/static/, e.g. img/me.jpg
+  links:
+    linkedin: "https://www.linkedin.com/in/[your-handle]"   # [TODO]
+    github: "https://github.com/[your-handle]"               # [TODO]
+  positioning: >-
+    I translate fast-moving AI and software-engineering research into clear,
+    evidence-backed guidance for technology leaders — what is real, what is
+    hype, and what to do on Monday morning.
+  summary:
+    - >-
+      [TODO] Two or three sentences on who you are, the problems you solve and for whom.
+      Lead with outcomes, not job titles.
+    - >-
+      [TODO] What makes your perspective distinctive — the industries, scale or
+      hard-won lessons that shape your point of view.
+
+# What you want to be known for. Drives the "Focus areas" section.
+focus_areas:
+  - title: Agentic software delivery
+    blurb: How autonomous coding agents change the SDLC — and the governance needed to scale them safely.
+  - title: AI adoption & operating models
+    blurb: Org design, talent and change patterns that separate pilots from enterprise-wide value.
+  - title: Measuring AI value
+    blurb: Practical ROI, productivity and quality metrics that survive a CFO's scrutiny.
+  - title: Responsible AI & governance
+    blurb: Guardrails, provenance and risk controls that let engineering teams move faster, not slower.
+
+# Headline numbers on the resume. Replace with real, defensible figures.
+highlights:
+  - value: "[00+]"
+    label: "Years in technology"
+  - value: "[00]"
+    label: "Enterprise programmes led"
+  - value: "[00%]"
+    label: "Delivery improvement achieved"
+
+experience:
+  - role: "[Current role]"
+    company: "[Company]"
+    period: "[Start] — Present"
+    location: "[Location]"
+    summary: "[One line on scope: team size, budget, or portfolio.]"
+    achievements:
+      - "[Outcome-first bullet: what changed, by how much, for whom.]"
+      - "[Outcome-first bullet: scale, scope and the lever you pulled.]"
+      - "[Outcome-first bullet: capability or team you built.]"
+  - role: "[Previous role]"
+    company: "[Company]"
+    period: "[Start] — [End]"
+    location: "[Location]"
+    summary: "[One line on scope.]"
+    achievements:
+      - "[Outcome-first bullet.]"
+      - "[Outcome-first bullet.]"
+
+skills:
+  - group: Strategy & leadership
+    items: [AI strategy, Operating-model design, Stakeholder alignment, Roadmapping]
+  - group: Engineering
+    items: [SDLC & DevEx, Platform engineering, CI/CD, Agentic workflows]
+  - group: Research & communication
+    items: [Literature synthesis, Executive briefings, Technical writing, Keynotes]
+
+education:
+  - degree: "[Degree, Discipline]"
+    school: "[University]"
+    period: "[Years]"
+
+certifications:
+  - "[Certification — Issuer, Year]"
+
+speaking:
+  - "[Talk or panel title — Event, Year]"
+
+recognition:
+  - "[Award, publication or notable mention]"
+
+# Optional public contact CTA text.
+contact:
+  heading: "Let's compare notes."
+  body: "Working on enterprise AI adoption or agentic delivery? I'm always keen to exchange evidence and war stories."

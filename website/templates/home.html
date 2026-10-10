@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="hero-section">
+  <div class="container hero-editorial">
+    <div>
+      <div class="hero-kicker">
+        <span>⚡ Executive Perspective</span>
+        {% if featured %}
+          <span>&bull; {{ featured.published | fdate }}</span>
+        {% endif %}
+      </div>
+      
+      {% if featured %}
+      <h1 class="hero-title"><a href="{{ root }}insights/{{ featured.slug }}/">{{ featured.title }}</a></h1>
+      <p class="hero-dek">{{ featured.dek }}</p>
+      
+      <div class="hero-meta">
+        <span class="meta-item">⏱️ {{ featured.read_minutes }} min read</span>
+        <span class="meta-item">🔬 {{ featured.provenance.papers_analysed }} peer-reviewed papers</span>
+        <span class="meta-item">🛡️ {{ featured.provenance.citations_verified }} verified citations</span>
+      </div>
+
+      <div class="provenance-strip">
+        {% for tag in featured.tags %}
+          <span class="tag-badge">{{ tag }}</span>
+        {% endfor %}
+      </div>
+      {% else %}
+      <h1 class="hero-title">{{ person.headline }}</h1>
+      <p class="hero-dek">{{ person.positioning }}</p>
+      {% endif %}
+    </div>
+
+    <div>
+      <div class="hero-card">
+        <h3 style="font-size: 1.15rem; font-weight: 700; margin-bottom: 0.5rem;">The Research-Led Advantage</h3>
+        <p style="font-size: 0.925rem; color: var(--text-muted); margin-bottom: 1.5rem;">
+          Bridging cutting-edge peer-reviewed research across IEEE, ACM, arXiv, and Crossref with enterprise boardroom strategy.
+        </p>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+          <div>
+            <div style="font-size: 1.75rem; font-weight: 800; color: var(--primary);">{{ stats.papers }}</div>
+            <div style="font-size: 0.8rem; color: var(--text-subtle);">Papers Synthesized</div>
+          </div>
+          <div>
+            <div style="font-size: 1.75rem; font-weight: 800; color: var(--primary);">0%</div>
+            <div style="font-size: 0.8rem; color: var(--text-subtle);">Hallucination Tolerance</div>
+          </div>
+        </div>
+
+        <a href="{{ root }}method/" class="btn btn-outline" style="width: 100%;">Explore Engine Architecture &rarr;</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="insights-feed">
+  <div class="container">
+    <div class="section-head">
+      <div>
+        <h2 class="section-title">Latest Perspectives & Briefs</h2>
+        <p class="section-subtitle">Actionable analysis derived from empirical literature.</p>
+      </div>
+      <a href="{{ root }}insights/" class="btn btn-outline">View All ({{ stats.insights }}) &rarr;</a>
+    </div>
+
+    <div class="grid-cards">
+      {% for item in latest %}
+      <div class="card-container">
+        <article class="editorial-card">
+          <div class="card-tag">{{ item.tags[0] if item.tags else 'Strategy' }}</div>
+          <h3 class="card-title"><a href="{{ root }}insights/{{ item.slug }}/">{{ item.title }}</a></h3>
+          <p class="card-dek">{{ item.dek }}</p>
+          <div class="card-foot">
+            <span>{{ item.published | fdate }} &bull; {{ item.read_minutes }}m</span>
+            <span>{{ item.provenance.papers_analysed }} sources</span>
+          </div>
+        </article>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<section style="background-color: var(--bg-surface); padding: 4rem 0; border-top: 1px solid var(--border);">
+  <div class="container" style="display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; align-items: center;">
+    <div>
+      <div class="hero-kicker">Professional Currency & Leadership</div>
+      <h2 style="font-size: 2rem; font-weight: 800; margin-bottom: 1rem;">From Research Rigor to Executive Delivery</h2>
+      <p style="color: var(--text-muted); margin-bottom: 1.5rem;">
+        {{ person.positioning }}
+      </p>
+      <a href="{{ root }}about/" class="btn btn-primary">View Executive Resume & Bio &rarr;</a>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem;">
+      {% for area in profile.focus_areas %}
+      <div style="background-color: var(--bg-card); padding: 1.5rem; border-radius: var(--radius-md); border: 1px solid var(--border);">
+        <h4 style="font-weight: 700; margin-bottom: 0.5rem; color: var(--primary);">{{ area.title }}</h4>
+        <p style="font-size: 0.875rem; color: var(--text-muted);">{{ area.blurb }}</p>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endblock %}

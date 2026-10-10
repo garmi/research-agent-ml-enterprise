@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section style="padding: 3.5rem 0 2rem; border-bottom: 1px solid var(--border);">
+  <div class="container">
+    <div class="hero-kicker">Archive & Perspectives</div>
+    <h1 style="font-size: 2.75rem; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 0.75rem;">
+      Thought Leadership & Strategic Briefs
+    </h1>
+    <p style="font-size: 1.15rem; color: var(--text-muted); max-width: 780px;">
+      Empirical findings, architectural blueprints, and boardroom roadmaps synthesized from peer-reviewed AI/ML literature.
+    </p>
+
+    <!-- Tag filter chips -->
+    <div class="filter-bar" style="margin-top: 2rem;">
+      <button class="filter-chip active" data-tag="all">All Perspectives ({{ insights | length }})</button>
+      {% for tag, count in topics %}
+      <button class="filter-chip" data-tag="{{ tag }}">{{ tag }} ({{ count }})</button>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<section class="insights-feed">
+  <div class="container">
+    <div class="grid-cards">
+      {% for item in insights %}
+      <div class="card-container insight-card-item" data-tags="{{ item.tags | join(',') }}">
+        <article class="editorial-card">
+          <div class="card-tag">{{ item.tags[0] if item.tags else 'Strategy' }}</div>
+          <h3 class="card-title"><a href="{{ root }}insights/{{ item.slug }}/">{{ item.title }}</a></h3>
+          <p class="card-dek">{{ item.dek }}</p>
+          
+          <div style="margin-bottom: 1rem;">
+            {% for t in item.tags[:3] %}
+              <span class="tag-badge secondary" style="font-size: 0.7rem;">{{ t }}</span>
+            {% endfor %}
+          </div>
+
+          <div class="card-foot">
+            <span>{{ item.published | fdate }} &bull; {{ item.read_minutes }} min read</span>
+            <span>🛡️ {{ item.provenance.papers_analysed }} papers</span>
+          </div>
+        </article>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endblock %}

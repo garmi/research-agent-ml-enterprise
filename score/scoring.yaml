@@ -1,0 +1,39 @@
+# Scoring Configuration for Research Engine v2
+# Thresholds, component weights, and gate definitions.
+
+weights:
+  S1_evidence_strength: 30
+  S2_corroboration_diversity: 15
+  S3_question_coverage: 15
+  S4_gap_disclosure: 10
+  S5_freshness_scope: 10
+  S6_human_review: 10
+  S7_reproducibility: 10
+
+bands:
+  publish_ready: 85
+  revise: 70
+
+time_windows:
+  academic_months: 36
+  enterprise_months: 24
+
+gates:
+  G1_traceability:
+    required: true
+    rule: "100% of assertive sentences cite at least one eligible claim ID"
+  G2_numeric_fidelity:
+    required: true
+    rule: "Every numeral in an assertive sentence appears in a cited claim or is tagged DERIVED"
+  G3_entity_fidelity:
+    required: true
+    rule: "If a sentence names an entity, every cited claim has entity_match exact or family"
+  G4_language_honesty:
+    required: true
+    rule: "No sentence strength verb exceeds the cap of its weakest cited claim"
+  G5_confidentiality:
+    required: true
+    rule: "Zero denylist hits and zero practitioner content not passed through abstraction"
+  G6_copyright:
+    required: true
+    rule: "No quote of 15+ words, max 1 quote per source, 0 verbatim runs of 8+ words outside quotes"

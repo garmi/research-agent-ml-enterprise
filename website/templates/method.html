@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section style="padding: 4rem 0 5rem;">
+  <div class="container" style="max-width: 900px;">
+    <div class="hero-kicker">Engine Architecture</div>
+    <h1 style="font-size: clamp(2.25rem, 4vw, 3.25rem); font-weight: 800; line-height: 1.15; letter-spacing: -0.03em; margin-bottom: 1.25rem;">
+      The Research Agent: Grounding Strategy in Science
+    </h1>
+    
+    <p style="font-size: 1.2rem; color: var(--text-muted); line-height: 1.6; margin-bottom: 2.5rem;">
+      Every insight and perspective published on this platform is powered by an autonomous research synthesis engine. We eliminate ungrounded hype by anchoring technology decisions in peer-reviewed empirical literature.
+    </p>
+
+    <div style="background-color: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 2rem; margin-bottom: 3.5rem;">
+      <h3 style="font-size: 1.3rem; font-weight: 700; margin-bottom: 1rem;">Multi-Stage Synthesis Pipeline</h3>
+      
+      <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+        <div style="display: flex; gap: 1rem; align-items: flex-start;">
+          <div style="width: 2rem; height: 2rem; border-radius: 50%; background-color: var(--primary); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; shrink-0;">1</div>
+          <div>
+            <h4 style="font-weight: 700;">Multi-Repository Discovery</h4>
+            <p style="font-size: 0.95rem; color: var(--text-muted);">
+              Queries live APIs across arXiv, Semantic Scholar, Crossref, and OpenAlex (over 250M open-access academic publications).
+            </p>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 1rem; align-items: flex-start;">
+          <div style="width: 2rem; height: 2rem; border-radius: 50%; background-color: var(--primary); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; shrink-0;">2</div>
+          <div>
+            <h4 style="font-weight: 700;">Deduplication & Enterprise Scoring</h4>
+            <p style="font-size: 0.95rem; color: var(--text-muted);">
+              Ranks papers by topical alignment, business impact indicators, and software engineering relevance scores.
+            </p>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 1rem; align-items: flex-start;">
+          <div style="width: 2rem; height: 2rem; border-radius: 50%; background-color: var(--primary); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; shrink-0;">3</div>
+          <div>
+            <h4 style="font-weight: 700;">Map-Reduce Synthesis (Zero Hallucination)</h4>
+            <p style="font-size: 0.95rem; color: var(--text-muted);">
+              Employs strict per-paper mapping followed by executive reduce synthesis. Every assertion is bound to explicit reference tokens [P1]..[Pn].
+            </p>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 1rem; align-items: flex-start;">
+          <div style="width: 2rem; height: 2rem; border-radius: 50%; background-color: var(--primary); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; shrink-0;">4</div>
+          <div>
+            <h4 style="font-weight: 700;">Automated Editorial Publishing</h4>
+            <p style="font-size: 0.95rem; color: var(--text-muted);">
+              Generates executive briefs, social content packs, and updates this personal-brand site automatically.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <h3 style="font-size: 1.5rem; font-weight: 800; margin-bottom: 1rem;">Why This Methodology Matters</h3>
+      <p style="color: var(--text-muted); margin-bottom: 1rem;">
+        Technology leadership is frequently saturated with vendor marketing and speculative commentary. By anchoring your strategic positioning in verified academic rigor, you build true <em>professional currency</em>—the trust that your recommendations have survived empirical scrutiny.
+      </p>
+      <a href="{{ root }}insights/" class="btn btn-primary" style="margin-top: 1rem;">Browse Grounded Insights &rarr;</a>
+    </div>
+  </div>
+</section>
+{% endblock %}

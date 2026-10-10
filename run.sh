@@ -17,11 +17,13 @@ source .venv/bin/activate
 echo "Installing dependencies..."
 pip install -q -r requirements.txt
 
-echo ""
-echo "Running research agent..."
-echo ""
-
-python -m src.app --topic "AI adoption in enterprise software delivery" --mode deep
-
-echo ""
-echo "Done! Check outputs/reports/ for your research brief."
+if [ "$1" = "--ui" ] || [ "$1" = "ui" ]; then
+    echo "Starting Web Frontend at http://localhost:8501 ..."
+    streamlit run web_app.py
+else
+    echo "Running research agent CLI..."
+    python -m src.app --topic "AI adoption in enterprise software delivery" --mode quick --max-papers 5 --map-provider gemini --reduce-provider gemini
+    echo ""
+    echo "Done! Check outputs/reports/ for your research brief."
+    echo "Tip: Run './run.sh --ui' to launch the interactive web dashboard."
+fi

@@ -1,0 +1,64 @@
+# Venue Tiers for Academic and Enterprise Literature
+# Maps publication venues and publishers to authoritative tiers.
+
+tiers:
+  verified:
+    description: "Top-tier peer-reviewed venues with rigorous refereeing"
+    matches:
+      - "acm"
+      - "ieee"
+      - "springer"
+      - "elsevier"
+      - "nature"
+      - "science"
+      - "usenix"
+      - "icse"
+      - "fse"
+      - "ase"
+      - "oopsla"
+      - "chi"
+      - "pldi"
+      - "neurips"
+      - "icml"
+      - "iclr"
+      - "empirical software engineering"
+      - "journal of systems and software"
+      - "transactions on software engineering"
+
+  reputable_preprint:
+    description: "Established preprint servers with subject screening"
+    matches:
+      - "arxiv"
+      - "biorxiv"
+      - "medrxiv"
+      - "ssrn"
+
+  unverified:
+    description: "Unverified, predatory, or low-refereeing publications"
+    matches:
+      - "wjarr"
+      - "world journal of advanced research and reviews"
+      - "ijsr"
+      - "international journal of science and research"
+      - "isjem"
+      - "international scientific journal of engineering and management"
+      - "eajit"
+      - "east african journal of information technology"
+
+  vendor:
+    description: "Vendor engineering blogs and corporate publications"
+    matches:
+      - "aws blog"
+      - "amazon web services"
+      - "google cloud blog"
+      - "microsoft engineering"
+      - "anthropic research"
+      - "openai research"
+      - "github blog"
+      - "meta engineering"
+
+  na:
+    description: "Not applicable (e.g. practitioner internal notes)"
+    matches:
+      - "practitioner_note"
+      - "internal"

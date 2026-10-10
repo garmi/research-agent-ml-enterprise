@@ -68,3 +68,25 @@ This log records all design choices, trade-offs, and deviations where prompt ass
 - **Context:** Hard Constraint 6 states that old outputs must be marked `legacy-ungraded` and can never be published.
 - **Decision:** Tag all pre-v2 outputs (such as `outputs/reports/*.md`, `outputs/reports/*.html`) with metadata header `status: legacy-ungraded`. Enforce in the Publish Gate (Gate 6) that any output with `status: legacy-ungraded` or missing Gate 1–5 sign-offs is strictly blocked from publication or website export.
 - **Rationale:** Protects author credibility by ensuring that unverified, hallucinated, or un-graded v1 outputs cannot inadvertently be exported or published.
+
+---
+
+### DEC-007: Term Integrity Verification and Normalization (R13)
+- **Context:** Previous v1 runs produced corrupted terms of art (e.g., "vibrate coding" instead of "vibe coding").
+- **Decision:** Implement `src/extract/term_normalizer.py` verifying that key technical domain terms appear in the source excerpt before accepting a claim. Any corrupted variation lowers extraction confidence to 0.50 and flags the claim for human review at Gate 3.
+- **Rationale:** Prevents corrupted or hallucinated terminology from entering the evidence ledger.
+
+---
+
+### DEC-008: Deterministic Venue Tiering and Unverified Venue Cap (R4)
+- **Context:** V1 outputs mixed high-rigour venues (ACM, IEEE) with unverified or predatory journals (WJARR, IJSR, EAJIT, ISJEM) without distinction.
+- **Decision:** Implement substring-matched venue tiers in `grade/venue_tiers.yaml`. Any venue not explicitly verified or recognised as a reputable preprint defaults to `unverified`. Claims from unverified venues are strictly capped at `weak`.
+- **Rationale:** Prevents weak, unrefereed publications from masquerading as authoritative empirical evidence.
+
+---
+
+### DEC-009: Strict Entity Fidelity and Grounded Numerics (R1, R2, G2, G3)
+- **Context:** V1 brief cited a generic 2023 paper on AI assistants to claim "up to 35%" productivity for Amazon Kiro, presenting an evidence gap as an answer.
+- **Decision:** Claims are tagged with `entity_match` (`exact`, `family`, `topic_level`, `mismatch`). Only sources explicitly evaluating the target entity qualify for `exact`. At Gate 3 / Gate 5, any assertive sentence naming an entity while citing non-exact claims fails Gate G3. All numerals must be present in cited claims or tagged `[DERIVED]` to satisfy G2.
+- **Rationale:** Guarantees that evidence gaps remain visible and prevents misleading attributions.
+

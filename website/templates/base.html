@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="{{ site.language or 'en' }}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% if page.title %}{{ page.title }} | {% endif %}{{ site.title }}</title>
+  <meta name="description" content="{{ page.description or site.description }}">
+  
+  <link rel="stylesheet" href="{{ root }}static/css/style.css">
+  {% if site_url %}
+  <link rel="canonical" href="{{ site_url }}/{{ page.path }}">
+  <link rel="alternate" type="application/rss+xml" title="{{ site.title }}" href="{{ site_url }}/feed.xml">
+  {% endif %}
+</head>
+<body>
+  <header class="site-header">
+    <div class="container nav-wrap">
+      <a href="{{ root }}" class="brand">
+        <span class="brand-badge">{{ person.initials or 'IN' }}</span>
+        <span>{{ person.name }} <span style="font-weight: 400; color: var(--text-subtle);">/ Insights</span></span>
+      </a>
+
+      <nav>
+        <ul class="nav-links">
+          <li><a href="{{ root }}" class="nav-link {% if page.path == '' %}active{% endif %}">Home</a></li>
+          <li><a href="{{ root }}insights/" class="nav-link {% if 'insights' in page.path %}active{% endif %}">Insights</a></li>
+          <li><a href="{{ root }}about/" class="nav-link {% if 'about' in page.path %}active{% endif %}">About & Resume</a></li>
+          <li><a href="{{ root }}method/" class="nav-link {% if 'method' in page.path %}active{% endif %}">Research Engine</a></li>
+        </ul>
+      </nav>
+
+      <div class="nav-actions">
+        <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">🌓</button>
+        <a href="{{ root }}about/#contact" class="btn btn-primary">Connect</a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-wrap">
+      <div>
+        <p><strong>{{ person.name }}</strong> — {{ person.headline }}</p>
+        <p style="font-size: 0.8rem; margin-top: 0.25rem;">
+          Powered by the peer-reviewed <a href="{{ root }}method/" style="text-decoration: underline;">Enterprise Research Agent</a>. Every claim traced to academic literature.
+        </p>
+      </div>
+      <div>
+        <a href="{{ root }}insights/">All Insights</a> &bull;
+        <a href="{{ root }}resume.json">resume.json</a> &bull;
+        <a href="{{ root }}feed.xml">RSS</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="{{ root }}static/js/main.js"></script>
+</body>
+</html>

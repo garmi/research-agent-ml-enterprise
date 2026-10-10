@@ -4,18 +4,28 @@ project:
 
 research:
   default_topic: "AI adoption in enterprise software delivery"
-  max_papers: 20
+  max_papers: 12
   min_relevance_score: 0.5
   time_window: "2019-2025"
   search_sources:
+    - openalex
+    - crossref
     - arxiv
     - semantic_scholar
-    - crossref
+
+# Provider per stage: "gemini" (free Google AI Studio) or "ollama" (free local model).
+llm:
+  map_provider: "gemini"
+  reduce_provider: "gemini"
 
 ollama:
   base_url: "http://localhost:11434"
-  model: "qwen2.5:7b-instruct"
-  timeout_seconds: 120
+  model: "qwen2.5:3b-instruct"
+  num_ctx: 4096
+  timeout_seconds: 180
+
+gemini:
+  model: "gemini-flash-latest"
 
 output:
   reports_dir: "outputs"

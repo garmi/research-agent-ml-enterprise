@@ -50,6 +50,13 @@ data/
 .env.local
 .env.*.local
 
-# OS
-.DS_Store
-*.log
+# Research Engine v2 - Durability and Confidentiality
+ledger/*.db
+ledger/practitioner.db
+practitioner.db
+denylist.txt
+ledger/backups/
+*.db-shm
+*.db-wal
+prompt_v2.txt
+
