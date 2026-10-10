@@ -484,5 +484,66 @@ def test_r14_raw_topic_boilerplate_lint():
     assert any("Repeated boilerplate sentence" in v for v in violations)
 
 
+def test_r12_practitioner_claim_unabstracted_blocked(test_env):
+    """R12: A practitioner claim exported without confirmed abstraction must fail Gate G5 and block publishing."""
+    checker, _ = test_env
+
+    # 1. Check GateChecker blocks un-abstracted practitioner claim
+    unabstracted_claim = Claim(
+        id="c_prac_unabstracted",
+        source_id="src_prac_1",
+        text="Practitioner observation shows 40% defect spike during pilot.",
+        source_excerpt="Observation shows defect spike during pilot.",
+        study_type="practitioner_observation",
+        context_json={
+            "situation": "Pilot at client Bank of America",
+            "lane": "practitioner",
+            "abstraction_confirmed": False,  # Not abstracted!
+        },
+        grade="anecdote",
+    )
+
+    sentence = OutputSentence(
+        id="s12",
+        output_id="out1",
+        ordinal=1,
+        text="Practitioner reports suggest defect spikes occur during early un-governed pilots.",
+        type="assertive",
+        claim_ids_json=["c_prac_unabstracted"],
+    )
+
+    res = checker.check_output([sentence], {"c_prac_unabstracted": unabstracted_claim})
+    assert not res.g5_pass, "Expected G5 failure for unabstracted practitioner claim"
+    assert not res.passed
+    assert any("without confirmed abstraction" in v for v in res.violations["G5"])
+
+    # 2. Check PractitionerCollector raises PermissionError when exporting unabstracted claim
+    from src.collectors.practitioner.collector import PractitionerCollector
+    from src.ledger.repository import LedgerRepository
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        prac_db = os.path.join(tmpdir, "test_prac.db")
+        ledger_db = os.path.join(tmpdir, "test_ledger.db")
+        collector = PractitionerCollector(db_path=prac_db)
+        ledger_repo = LedgerRepository(db_path=ledger_db)
+
+        # Record observation without abstraction
+        _, unabs_claim = collector.add_observation(
+            question_id="q1",
+            situation="Confidential project Titan rollout",
+            decision="Mandated spec",
+            action="Deployed gate",
+            outcome="Success",
+            sector="financial_services",
+            abstraction_confirmed=False,
+        )
+
+        with pytest.raises(PermissionError) as exc_info:
+            collector.export_abstracted_claim_to_ledger(unabs_claim.id, ledger_repo)
+
+        assert "Gate 6 Abstraction Violation" in str(exc_info.value)
+
+
+
 
 

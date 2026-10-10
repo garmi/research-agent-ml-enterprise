@@ -368,8 +368,12 @@ def render_publish_gate_view(service: LedgerService) -> None:
         "denylist scan is clean, and quality score meets the publication band."
     )
 
+    from src.publish.publisher import Publisher
+    publisher = Publisher(db_path=service.db_path)
+
     if "active_draft_summary" in st.session_state:
         summary = st.session_state["active_draft_summary"]
+        doc_id = summary["output_id"]
         score = summary["score_results"]
         gate_res = summary["gate_results"]
 
@@ -390,14 +394,138 @@ def render_publish_gate_view(service: LedgerService) -> None:
             st.warning(f"💡 {imp}")
 
         st.markdown("---")
-        if gate_res["passed"] and score["band"] == "PUBLISH_READY":
-            if st.button("🌟 Final Sign-Off & Publish to Repository", type="primary"):
-                st.balloons()
-                st.success("Output published successfully! Audit record logged.")
+        st.subheader("Gate Sign-Off & Website JSON Export")
+        reviewer_name = st.text_input("Reviewer Name", value="Senior Delivery Leader")
+        signoff_reason = st.text_input("Sign-Off Rationale", value="Empirical claims verified, practitioner abstraction confirmed")
+
+        if gate_res["passed"]:
+            can_publish = score["band"] == "PUBLISH_READY"
+            allow_force = st.checkbox("Allow human override publish for band 'REVISE' (logs reason to reviews)")
+            if can_publish or allow_force:
+                if st.button("🌟 Final Sign-Off & Export Website JSON", type="primary"):
+                    success, pub_res = publisher.publish_output(
+                        output_id=doc_id,
+                        reviewer=reviewer_name,
+                        signoff_reason=signoff_reason,
+                        force_publish_non_band=allow_force,
+                    )
+                    if success:
+                        st.balloons()
+                        st.success(f"Output published successfully! Exported website JSON to: `{pub_res['export_path']}` and `{pub_res['canonical_path']}`")
+                    else:
+                        st.error(f"Publish failed: {pub_res.get('reason')}")
+            else:
+                st.info("Score is in 'REVISE' band. Check 'Allow human override publish' above to proceed with formal sign-off.")
         else:
-            st.error("Publication is strictly BLOCKED until all hard gate violations are resolved and score meets band.")
+            st.error("Publication is strictly BLOCKED until all hard gate violations are resolved.")
+            with st.expander("Hard Gate Violations", expanded=True):
+                for g_id, g_info in gate_res.get("gates", {}).items():
+                    if not g_info.get("pass", True):
+                        st.write(f"**{g_id}:** {g_info.get('violations')}")
     else:
         st.info("Draft a document in Gate 5 to review the Publish Scorecard.")
+
+
+def render_practitioner_entry_view(service: LedgerService) -> None:
+    """Render View 7: Field Notes entry (Practitioner Lane)."""
+    st.header("🛠️ View 7: Practitioner Delivery Field Notes Entry")
+    st.markdown(
+        "Records operational multi-vendor enterprise delivery observations. "
+        "**Strictly stored in isolated `ledger/practitioner.db` (gitignored).** "
+        "Never exported or sent to remote models without explicit Gate 6 abstraction confirmation."
+    )
+
+    from src.collectors.practitioner.collector import PractitionerCollector
+    collector = PractitionerCollector()
+
+    questions = service.repo.list_questions()
+    q_options = [q.id for q in questions]
+
+    if not q_options:
+        st.info("No questions registered in Gate 1.")
+        return
+
+    selected_q = st.selectbox("Target Question to Ground", q_options)
+
+    with st.form("practitioner_entry_form"):
+        st.subheader("Structured Delivery Observation")
+        situation = st.text_area(
+            "Situation / Context",
+            placeholder="e.g. Legacy enterprise integration of AI code assistant into multi-vendor team...",
+        )
+        decision = st.text_input(
+            "Architectural / Governance Decision",
+            placeholder="e.g. Mandated architectural spec contracts before AI generation...",
+        )
+        action = st.text_area(
+            "Action Taken",
+            placeholder="e.g. Deployed pre-commit linters and required prompt spec reviews...",
+        )
+        outcome = st.text_area(
+            "Observed Outcome",
+            placeholder="e.g. Defect escape rate dropped 30%, PR rework cycles stabilized...",
+        )
+
+        col_sec, col_date, col_cnt = st.columns(3)
+        sector = col_sec.selectbox("Industry Sector", ["financial_services", "healthcare", "public_sector", "retail", "technology", "manufacturing"])
+        obs_date = col_date.date_input("Observation Date")
+        repeat_count = col_cnt.number_input("Repeat Observations Count", min_value=1, max_value=50, value=1)
+
+        metric_str = st.text_input("Observed Metric (Optional JSON or summary)", placeholder='{"metric": "defect_rate", "delta": -30, "unit": "%"}')
+
+        st.markdown("---")
+        st.subheader("🔒 Gate 6 Confidentiality & Abstraction Protocol")
+        abstraction_confirmed = st.checkbox(
+            "Abstraction Confirmed: All client names, internal program names, proprietary system IDs, and individuals have been removed or replaced with generic enterprise descriptors."
+        )
+
+        submitted = st.form_submit_button("💾 Save Observation to practitioner.db")
+        if submitted:
+            if not situation.strip() or not action.strip() or not outcome.strip():
+                st.error("Situation, Action, and Outcome are mandatory fields.")
+            else:
+                metric_json = None
+                if metric_str.strip():
+                    try:
+                        metric_json = json.loads(metric_str.strip())
+                    except Exception:
+                        metric_json = {"summary": metric_str.strip()}
+
+                source, claim = collector.add_observation(
+                    question_id=selected_q,
+                    situation=situation.strip(),
+                    decision=decision.strip(),
+                    action=action.strip(),
+                    outcome=outcome.strip(),
+                    sector=sector,
+                    date=obs_date.isoformat(),
+                    metric=metric_json,
+                    abstraction_confirmed=abstraction_confirmed,
+                    observations_count=int(repeat_count),
+                )
+                st.success(f"Observation recorded in `practitioner.db`! Claim ID: `{claim.id}` (Grade: `{claim.grade}`, Abstraction: `{abstraction_confirmed}`)")
+
+    st.markdown("---")
+    st.subheader("Recent Practitioner Observations (practitioner.db)")
+    claims = collector.list_observations(question_id=selected_q)
+    if claims:
+        for c in claims:
+            is_abs = c.context_json.get("abstraction_confirmed", False) if c.context_json else False
+            status_tag = ":green[ABSTRACTED]" if is_abs else ":red[UN-ABSTRACTED (BLOCKED)]"
+            with st.expander(f"Claim `{c.id}` | Grade: {c.grade.upper()} | {status_tag}"):
+                st.write(f"**Assertion:** {c.text}")
+                st.write(f"**Context:** {c.context_json}")
+                if is_abs:
+                    if st.button("Export Abstracted Claim to Main Ledger", key=f"exp_{c.id}"):
+                        try:
+                            collector.export_abstracted_claim_to_ledger(c.id, service.repo)
+                            st.success(f"Claim {c.id} exported to main ledger for synthesis!")
+                        except Exception as e:
+                            st.error(f"Export failed: {e}")
+                else:
+                    st.warning("Cannot export to main ledger: Abstraction has not been confirmed.")
+    else:
+        st.info("No observations recorded for this question yet.")
 
 
 def render_runs_and_scores_view(service: LedgerService) -> None:

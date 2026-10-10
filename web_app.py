@@ -27,6 +27,7 @@ from src.ledger.ui_views import (
     render_claim_review_queue,
     render_draft_review_view,
     render_gap_matrix_view,
+    render_practitioner_entry_view,
     render_publish_gate_view,
     render_question_register,
     render_runs_and_scores_view,
@@ -181,6 +182,7 @@ with st.sidebar:
             "⚖️ Gate 3: Claim Review Queue",
             "🔍 Gate 4: Strategic Gap Matrix",
             "📝 Gate 5: Evidence Draft Review",
+            "🛠️ View 7: Practitioner Field Notes",
             "🚀 Gate 6: Publish Gate & Scorecard",
             "📊 View 8: Runs & Audit Trail",
         ],
@@ -202,6 +204,9 @@ elif nav_option == "🔍 Gate 4: Strategic Gap Matrix":
     st.stop()
 elif nav_option == "📝 Gate 5: Evidence Draft Review":
     render_draft_review_view(ledger_service)
+    st.stop()
+elif nav_option == "🛠️ View 7: Practitioner Field Notes":
+    render_practitioner_entry_view(ledger_service)
     st.stop()
 elif nav_option == "🚀 Gate 6: Publish Gate & Scorecard":
     render_publish_gate_view(ledger_service)

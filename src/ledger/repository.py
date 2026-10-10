@@ -255,3 +255,32 @@ class LedgerRepository:
                     d["checks_json"] = json.loads(d["checks_json"])
                 res.append(OutputSentence(**d))
             return res
+
+    def get_output(self, output_id: str) -> Optional[OutputDoc]:
+        with self._conn() as conn:
+            cursor = conn.execute("SELECT * FROM outputs WHERE id = ?;", (output_id,))
+            row = cursor.fetchone()
+            if not row:
+                return None
+            d = dict(row)
+            if d.get("score_json"):
+                d["score_json"] = json.loads(d["score_json"])
+            if d.get("gates_json"):
+                d["gates_json"] = json.loads(d["gates_json"])
+            return OutputDoc(**d)
+
+    def list_outputs(self, run_id: Optional[str] = None) -> List[OutputDoc]:
+        with self._conn() as conn:
+            if run_id:
+                cursor = conn.execute("SELECT * FROM outputs WHERE run_id = ? ORDER BY created_at DESC;", (run_id,))
+            else:
+                cursor = conn.execute("SELECT * FROM outputs ORDER BY created_at DESC;")
+            res = []
+            for row in cursor.fetchall():
+                d = dict(row)
+                if d.get("score_json"):
+                    d["score_json"] = json.loads(d["score_json"])
+                if d.get("gates_json"):
+                    d["gates_json"] = json.loads(d["gates_json"])
+                res.append(OutputDoc(**d))
+            return res

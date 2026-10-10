@@ -105,6 +105,7 @@ This log records all design choices, trade-offs, and deviations where prompt ass
 
 | DEC-011 | 2026-10-10 | Architecture | Enterprise Lane Registry, Stake Tagging, & Search Log | Approved |
 | DEC-012 | 2026-10-10 | Synthesis | Gap Matrix, Strength-Capped Synthesis, & S1-S7 Scorer | Approved |
+| DEC-013 | 2026-10-10 | Governance | Practitioner Isolation, Abstraction Gate, & JSON Export | Approved |
 
 ---
 
@@ -123,6 +124,18 @@ This log records all design choices, trade-offs, and deviations where prompt ass
   3. Implemented `lint_output_text` catching raw topic string interpolation and repeated boilerplate sentences (R14).
   4. Wired Streamlit Views 4 (Gap Matrix), 5 (Draft Review), 6 (Publish Gate), and 8 (Runs & Audit Trail) into `web_app.py`.
 - **Rationale:** Eliminates hallucinated assertions and invented acronyms while giving executive readers transparent visibility into literature voids.
+
+---
+
+### DEC-013: Practitioner Lane Isolation, Abstraction Gate, and Website JSON Export (Phase 5)
+- **Context:** Section 2 (Hard Constraints), Section 6.C, Section 9 (View 7), and Section 10 mandate that confidential practitioner data live strictly in an isolated SQLite database (`practitioner.db`, gitignored), never reach any remote model, and be strictly blocked from export or publication unless verified through confirmed abstraction and clean denylist scanning.
+- **Decision:**
+  1. Implemented `PractitionerCollector` (`src/collectors/practitioner/collector.py`) operating strictly on `ledger/practitioner.db` with identical durable migrations and WAL mode. Observations default to `anecdote` grade.
+  2. Implemented Gate 6 Abstraction Protocol: `export_abstracted_claim_to_ledger` and `Publisher.publish_output` strictly block promotion or publication if `abstraction_confirmed` is False (R12).
+  3. Implemented automated scanner for `denylist.txt` (client, vendor, programme, and person names) blocking any output containing confidential terms (R5).
+  4. Implemented `Publisher` (`src/publish/publisher.py`) generating versioned website JSON exports (`outputs/json/publish_export_{output_id}.json` and `field_note_export.json`) upon 100% hard gate passage and human review sign-off.
+  5. Wired Streamlit View 7 (Practitioner Field Notes Entry) and enhanced View 6 (Publish Gate) in `web_app.py`.
+- **Rationale:** Guarantees absolute data sovereignty and client confidentiality for senior delivery leadership while allowing sanitized operational experience to enrich published thought leadership.
 
 
 

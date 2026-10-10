@@ -216,6 +216,21 @@ class GateChecker:
 
             # G5: Confidentiality
             self._check_confidentiality(s_text, result)
+            # R12 check: Any practitioner claim cited must have confirmed abstraction
+            for c in cited_claims:
+                is_practitioner = (
+                    getattr(c, "study_type", "") == "practitioner_observation"
+                    or (c.context_json and c.context_json.get("lane") == "practitioner")
+                )
+                if is_practitioner:
+                    abstraction_ok = bool(
+                        c.context_json and c.context_json.get("abstraction_confirmed") is True
+                    )
+                    if not abstraction_ok:
+                        result.g5_pass = False
+                        result.violations["G5"].append(
+                            f"Sentence {s.ordinal} cites practitioner claim '{c.id}' without confirmed abstraction (R12 violation)"
+                        )
 
             # G6: Copyright
             self._check_copyright(s_text, source_texts or {}, result)
