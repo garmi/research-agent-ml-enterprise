@@ -22,6 +22,13 @@ from src.llm.factory import build_llm
 from src.output.content_pack import ContentPackBuilder
 from src.output.report_builder import ReportBuilder
 
+from src.ledger.service import LedgerService
+from src.ledger.ui_views import (
+    render_claim_review_queue,
+    render_question_register,
+    render_venue_tiering,
+)
+
 # Page configuration
 st.set_page_config(
     page_title="Enterprise Research Agent",
@@ -156,9 +163,36 @@ def run_pipeline(
     return synthesis
 
 
+# --- NAVIGATION & GATES ---
+ledger_service = LedgerService()
+
+with st.sidebar:
+    st.title("🔬 Research Engine v2")
+    nav_option = st.radio(
+        "Navigation & Human Gates",
+        [
+            "🔬 Research Pipeline Runner",
+            "⚖️ Gate 3: Claim Review Queue",
+            "🏛️ Gate 2: Venue Tiering",
+            "📋 Gate 1: Question Register",
+        ],
+        index=0,
+    )
+    st.markdown("---")
+
+if nav_option == "⚖️ Gate 3: Claim Review Queue":
+    render_claim_review_queue(ledger_service)
+    st.stop()
+elif nav_option == "🏛️ Gate 2: Venue Tiering":
+    render_venue_tiering(ledger_service)
+    st.stop()
+elif nav_option == "📋 Gate 1: Question Register":
+    render_question_register(ledger_service)
+    st.stop()
+
 # --- SIDEBAR CONTROLS ---
 with st.sidebar:
-    st.title("🔬 Research Controls")
+    st.subheader("Pipeline Settings")
     st.markdown("Customize your literature search, tone, and strategic deliverables.")
 
     topic_suggestions = [

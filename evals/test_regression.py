@@ -277,3 +277,40 @@ def test_compliant_draft_passes_all_gates(test_env):
     assert result.g5_pass
     assert result.g6_pass
 
+
+def test_r13_corrupted_term_of_art():
+    """R13: Corrupted term of art ('vibrate coding' instead of 'vibe coding') must be flagged."""
+    from src.extract.term_normalizer import check_term_integrity
+    from src.extract.claim_extractor import extract_claims_from_paper
+
+    source_abstract = (
+        "Spec-Driven Development (SDD) reconstitutes the engineering contracts that "
+        "vibe coding dissolves: accountability, verifiability, and transferability."
+    )
+
+    # 1. Direct term integrity test
+    is_valid, warnings = check_term_integrity(
+        claim_text="SDD reconstitutes the contracts that vibrate coding dissolves.",
+        source_text=source_abstract,
+        key_terms=["vibrate coding"],
+    )
+
+    assert not is_valid, "Expected term integrity to fail on corrupted term 'vibrate coding'"
+    assert any("Corrupted term of art detected: 'vibrate coding'" in w for w in warnings)
+
+    # 2. Extraction-level flag and confidence penalty
+    paper = {
+        "title": "Spec-Driven Development for Agentic Software Engineering",
+        "abstract": "SDD reconstitutes the contracts that vibrate coding dissolves: accountability and verifiability.",
+        "year": 2026,
+        "source": "arXiv",
+    }
+    claims = extract_claims_from_paper(paper)
+    assert len(claims) > 0
+    flagged_claim = claims[0]
+    assert flagged_claim.extraction_confidence <= 0.50, "Extraction confidence must be penalized on corrupted terms"
+    assert flagged_claim.context_json is not None
+    assert "warnings" in flagged_claim.context_json
+    assert any("vibrate coding" in str(w) for w in flagged_claim.context_json["warnings"])
+
+

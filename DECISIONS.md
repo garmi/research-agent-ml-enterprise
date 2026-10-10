@@ -90,3 +90,15 @@ This log records all design choices, trade-offs, and deviations where prompt ass
 - **Decision:** Claims are tagged with `entity_match` (`exact`, `family`, `topic_level`, `mismatch`). Only sources explicitly evaluating the target entity qualify for `exact`. At Gate 3 / Gate 5, any assertive sentence naming an entity while citing non-exact claims fails Gate G3. All numerals must be present in cited claims or tagged `[DERIVED]` to satisfy G2.
 - **Rationale:** Guarantees that evidence gaps remain visible and prevents misleading attributions.
 
+---
+
+### DEC-010: Local Human Gates Architecture and Audit Protocol (Views 1, 2, 3)
+- **Context:** Hard Constraint 1 and Section 9 mandate local-first operation, human-in-the-loop gates (Gate 1 Question Register, Gate 2 Venue Tiering, Gate 3 Claim Review Queue), and an append-only audit trail in `reviews`.
+- **Decision:** Implemented `src/ledger/service.py` and `src/ledger/ui_views.py` integrated into `web_app.py`. Enforces:
+  1. Queue sorting by uncertainty (low extraction confidence <0.80, corrupted term warnings, grade boundaries).
+  2. Mandatory reviewer rationale for rejections, grade overrides, and entity match changes.
+  3. Strict bulk-approval validation requiring identical source, grade, and study type across the batch.
+  4. 100% of human review actions generate immutable audit rows in `reviews`.
+- **Rationale:** Provides high usability for the human reviewer while maintaining an uncompromised audit trail for every strategic claim in the knowledge base.
+
+
