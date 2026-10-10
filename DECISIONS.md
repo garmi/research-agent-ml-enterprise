@@ -101,4 +101,12 @@ This log records all design choices, trade-offs, and deviations where prompt ass
   4. 100% of human review actions generate immutable audit rows in `reviews`.
 - **Rationale:** Provides high usability for the human reviewer while maintaining an uncompromised audit trail for every strategic claim in the knowledge base.
 
+---
+
+### DEC-011: Enterprise Lane Registry, Stake Tagging, and Search Log Protocol (Phase 3)
+- **Context:** Section 6 mandates a curated `sources_registry.yaml` of five verified enterprise sources, speaker/stake tagging on all claims, and immutable `search_log` logging to prove "searched, nothing found".
+- **Decision:** Implemented `collectors/enterprise/sources_registry.yaml` with AWS Dev Blog, Microsoft Engineering Blog, Google Cloud Blog, SEC EDGAR filings (requiring declared User-Agent), and DORA Developer Survey. In `EnterpriseCollector`, every query writes to `search_log` with result counts. Commercial stake maps strictly to schema (`vendor`, `none`, `sponsored`, `unknown`) and speaker persona is recorded in claim context. Vendor assertions default to `vendor_claim`.
+- **Rationale:** Ensures enterprise evidence is transparently differentiated between vendor marketing, regulatory disclosures, and independent surveys without Web scraping paywalls.
+
+
 

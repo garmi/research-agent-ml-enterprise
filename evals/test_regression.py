@@ -314,3 +314,69 @@ def test_r13_corrupted_term_of_art():
     assert any("vibrate coding" in str(w) for w in flagged_claim.context_json["warnings"])
 
 
+def test_r8_stale_source_outside_time_window():
+    """R8: A stale source outside the question's time window drops component S5."""
+    from src.score.checker import GateCheckResult
+    from src.score.scorer import QualityScorer
+    from src.ledger.models import Question
+
+    scorer = QualityScorer()
+    gate_ok = GateCheckResult()
+
+    question = Question(
+        id="q-freshness-test",
+        text="What are current generative AI engineering practices?",
+        time_window_months=24,  # Requires claims within past 2 years (>= 2024/2025)
+    )
+
+    # Fresh claim from 2026
+    c_fresh = Claim(
+        id="c_fresh_1",
+        question_id=question.id,
+        source_id="src_fresh",
+        text="Recent empirical findings from 2026.",
+        source_excerpt="Findings from 2026.",
+        claim_date="2026",
+        grade="moderate",
+    )
+
+    # Stale claim from 2018 (way outside time window)
+    c_stale = Claim(
+        id="c_stale_1",
+        question_id=question.id,
+        source_id="src_stale",
+        text="Old findings from early machine learning studies.",
+        source_excerpt="Findings from 2018.",
+        claim_date="2018",
+        grade="moderate",
+    )
+
+    src_fresh = Source(id="src_fresh", lane="academic", source_type="peer_reviewed", title="Fresh Paper", pub_date="2026")
+    src_stale = Source(id="src_stale", lane="academic", source_type="peer_reviewed", title="Stale Paper", pub_date="2018")
+
+    sent_fresh = OutputSentence(id="sf", output_id="o1", ordinal=1, text="Modern AI systems show stability.", type="assertive", claim_ids_json=["c_fresh_1"])
+    sent_stale = OutputSentence(id="ss", output_id="o2", ordinal=1, text="Historic ML systems show stability.", type="assertive", claim_ids_json=["c_stale_1"])
+
+    score_fresh = scorer.calculate_score(
+        gate_result=gate_ok,
+        sentences=[sent_fresh],
+        ledger_claims={"c_fresh_1": c_fresh},
+        sources={"src_fresh": src_fresh},
+        questions=[question],
+    )
+
+    score_stale = scorer.calculate_score(
+        gate_result=gate_ok,
+        sentences=[sent_stale],
+        ledger_claims={"c_stale_1": c_stale},
+        sources={"src_stale": src_stale},
+        questions=[question],
+    )
+
+    # Fresh output receives full S5 score (10.0), stale output drops to 0.0
+    assert score_fresh["components"]["S5_freshness_scope"] == 10.0
+    assert score_stale["components"]["S5_freshness_scope"] == 0.0
+    assert score_fresh["total_score"] > score_stale["total_score"]
+
+
+

@@ -141,6 +141,59 @@ class LedgerRepository:
                 claims.append(Claim(**d))
             return claims
 
+    # --- Search Log ---
+    def insert_search_log(self, log: SearchLog) -> None:
+        with self._conn() as conn:
+            conn.execute(
+                """INSERT OR REPLACE INTO search_log
+                   (id, run_id, question_id, lane, query, source_api, result_count, executed_at, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);""",
+                (
+                    log.id, log.run_id, log.question_id, log.lane, log.query,
+                    log.source_api, log.result_count, log.executed_at, log.created_at,
+                ),
+            )
+
+    def list_search_logs(self, question_id: Optional[str] = None) -> List[SearchLog]:
+        with self._conn() as conn:
+            if question_id:
+                cursor = conn.execute("SELECT * FROM search_log WHERE question_id = ? ORDER BY executed_at DESC;", (question_id,))
+            else:
+                cursor = conn.execute("SELECT * FROM search_log ORDER BY executed_at DESC;")
+            return [SearchLog(**dict(row)) for row in cursor.fetchall()]
+
+    # --- Runs ---
+    def insert_run(self, run: Run) -> None:
+        with self._conn() as conn:
+            conn.execute(
+                """INSERT OR REPLACE INTO runs
+                   (id, started_at, config_json, code_version, model_ids, question_ids, seed, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?);""",
+                (
+                    run.id, run.started_at,
+                    json.dumps(run.config_json) if run.config_json else None,
+                    run.code_version,
+                    json.dumps(run.model_ids) if run.model_ids else None,
+                    json.dumps(run.question_ids) if run.question_ids else None,
+                    run.seed, run.created_at,
+                ),
+            )
+
+    def get_run(self, run_id: str) -> Optional[Run]:
+        with self._conn() as conn:
+            cursor = conn.execute("SELECT * FROM runs WHERE id = ?;", (run_id,))
+            row = cursor.fetchone()
+            if not row:
+                return None
+            d = dict(row)
+            if d.get("config_json"):
+                d["config_json"] = json.loads(d["config_json"])
+            if d.get("model_ids"):
+                d["model_ids"] = json.loads(d["model_ids"])
+            if d.get("question_ids"):
+                d["question_ids"] = json.loads(d["question_ids"])
+            return Run(**d)
+
     # --- Reviews (Append-only audit) ---
     def insert_review(self, r: Review) -> None:
         with self._conn() as conn:
