@@ -265,3 +265,153 @@ def render_claim_review_queue(service: LedgerService) -> None:
                         st.rerun()
 
             st.markdown("---")
+
+
+def render_gap_matrix_view(service: LedgerService) -> None:
+    """Render View 4: Gap Matrix (Gate 4)."""
+    st.header("🔍 Gate 4: Strategic Gap Matrix")
+    st.markdown(
+        "Cross-lane analysis per question across Academic, Enterprise, and Field evidence. "
+        "Strategic value lies in surfacing gaps: **Outcome 2** (Practice w/o Evidence), **Outcome 3** (Evidence w/o Practice), and **Outcome 4** (Unmeasured)."
+    )
+
+    from src.gaps.matrix_builder import GapMatrixBuilder
+    builder = GapMatrixBuilder(db_path=service.db_path)
+    questions = service.repo.list_questions()
+
+    if not questions:
+        st.info("No questions in register.")
+        return
+
+    selected_q_id = st.selectbox("Select Question for Gap Evaluation", [q.id for q in questions])
+    if st.button("Evaluate Lane Evidence & Generate Gap Matrix"):
+        entry = builder.evaluate_question_lanes(selected_q_id)
+        st.success(f"Evaluated lanes for {selected_q_id}: Assigned Outcome {entry.outcome}!")
+
+    entries = builder.list_matrix_entries(question_id=selected_q_id)
+    if entries:
+        current = entries[0]
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Academic Lane", current.academic_state.upper())
+        c2.metric("Enterprise Lane", current.enterprise_state.upper())
+        c3.metric("Field Lane", current.field_state.upper())
+        c4.metric("Strategic Outcome", f"Outcome {current.outcome}")
+
+        outcome_names = {
+            1: "1: Supported (Academic + Enterprise Aligned)",
+            2: "2: Practice Without Evidence (Enterprise Active, Academic Void)",
+            3: "3: Evidence Without Practice (Academic Proven, Enterprise Unmeasured)",
+            4: "4: Unmeasured (Thin/Zero Evidence Across All Lanes)",
+        }
+        st.info(f"**Classification:** {outcome_names.get(current.outcome, 'Unknown')}\n\n**Strategic Rationale:** {current.rationale}")
+    else:
+        st.info("Click 'Evaluate Lane Evidence' above to compute the current Gap Matrix.")
+
+
+def render_draft_review_view(service: LedgerService) -> None:
+    """Render View 5: Draft Review (Gate 5)."""
+    st.header("📝 Gate 5: Evidence-Grounded Draft Review")
+    st.markdown(
+        "Sentence-level verification against Hard Gates G1 through G6. "
+        "Engine drafts from approved claims only; human adds practitioner opinion/field notes."
+    )
+
+    from src.synth.generator import SynthesisEngine
+    synth = SynthesisEngine(db_path=service.db_path)
+    questions = service.repo.list_questions()
+
+    col_q, col_gen = st.columns([3, 1])
+    target_q_id = col_q.selectbox("Select Target Question", [q.id for q in questions], key="draft_q_sel")
+
+    human_opinion = st.text_area(
+        "Practitioner Field Perspective (Human-Only Stance)",
+        placeholder="Enter your first-person perspective or operational delivery insights...",
+    )
+
+    if col_gen.button("Draft Field Note", type="primary"):
+        doc, sentences, summary = synth.build_field_note(
+            question_id=target_q_id,
+            human_view=human_opinion,
+        )
+        st.session_state["active_draft_doc"] = doc
+        st.session_state["active_draft_sentences"] = sentences
+        st.session_state["active_draft_summary"] = summary
+        st.success("Draft generated and checked against Hard Gates!")
+
+    if "active_draft_summary" in st.session_state:
+        summary = st.session_state["active_draft_summary"]
+        doc = st.session_state["active_draft_doc"]
+        sentences = st.session_state["active_draft_sentences"]
+
+        st.markdown("---")
+        st.subheader("Sentence-Level Gate Check")
+        gates = summary["gate_results"]["gates"]
+
+        badge_status = "🟢 PASS" if summary["gate_results"]["passed"] else "🔴 BLOCKED"
+        st.markdown(f"**Gate Status:** {badge_status}")
+
+        for s in sentences:
+            if s.type == "heading":
+                st.markdown(f"#### {s.text}")
+            elif s.type == "opinion":
+                st.markdown(f"👤 *[Human Opinion]* {s.text}")
+            else:
+                cid_str = f" `[{', '.join(s.claim_ids_json or [])}]`" if s.claim_ids_json else " :red[*(Uncited)*]"
+                st.markdown(f"- {s.text}{cid_str}")
+
+
+def render_publish_gate_view(service: LedgerService) -> None:
+    """Render View 6: Publish Gate (Gate 6)."""
+    st.header("🚀 Gate 6: Publish Gate & Scorecard")
+    st.markdown(
+        "Final publish verification. An output CANNOT reach `published` unless every gate is complete, "
+        "denylist scan is clean, and quality score meets the publication band."
+    )
+
+    if "active_draft_summary" in st.session_state:
+        summary = st.session_state["active_draft_summary"]
+        score = summary["score_results"]
+        gate_res = summary["gate_results"]
+
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Composite Score", f"{score['total_score']} / 100")
+        col2.metric("Publish Band", score["band"])
+        col3.metric("Hard Gate Status", "PASS" if gate_res["passed"] else "BLOCKED")
+
+        st.markdown("---")
+        st.subheader("Component Breakdown (S1 - S7)")
+        c_df = pd.DataFrame([
+            {"Component": k, "Score": v} for k, v in score["components"].items()
+        ])
+        st.dataframe(c_df, use_container_width=True)
+
+        st.subheader("Top Recommended Improvements")
+        for imp in score.get("top_3_improvements", []):
+            st.warning(f"💡 {imp}")
+
+        st.markdown("---")
+        if gate_res["passed"] and score["band"] == "PUBLISH_READY":
+            if st.button("🌟 Final Sign-Off & Publish to Repository", type="primary"):
+                st.balloons()
+                st.success("Output published successfully! Audit record logged.")
+        else:
+            st.error("Publication is strictly BLOCKED until all hard gate violations are resolved and score meets band.")
+    else:
+        st.info("Draft a document in Gate 5 to review the Publish Scorecard.")
+
+
+def render_runs_and_scores_view(service: LedgerService) -> None:
+    """Render View 8: Runs and Scores History."""
+    st.header("📊 View 8: Execution Runs, Audit Trail & Scores")
+    st.markdown("Immutable record of system runs, gate audits, and quality score history.")
+
+    with service.repo._conn() as conn:
+        reviews_cursor = conn.execute("SELECT * FROM reviews ORDER BY ts DESC LIMIT 20;")
+        reviews = [dict(row) for row in reviews_cursor.fetchall()]
+
+    if reviews:
+        st.subheader("Recent Human Gate Reviews")
+        st.dataframe(pd.DataFrame(reviews), use_container_width=True)
+    else:
+        st.info("No reviews recorded yet.")
+

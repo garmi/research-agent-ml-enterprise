@@ -379,4 +379,110 @@ def test_r8_stale_source_outside_time_window():
     assert score_fresh["total_score"] > score_stale["total_score"]
 
 
+def test_r9_known_contradiction_omitted():
+    """R9: Omitting known contradictions from output drops component S4."""
+    from src.score.checker import GateCheckResult
+    from src.score.scorer import QualityScorer
+    from src.ledger.models import Question
+
+    scorer = QualityScorer()
+    gate_ok = GateCheckResult()
+    question = Question(id="q-test", text="Test Question")
+
+    # Output with full gap disclosure and contradiction recall
+    score_with_disclosure = scorer.calculate_score(
+        gate_result=gate_ok,
+        sentences=[],
+        ledger_claims={},
+        sources={},
+        questions=[question],
+        gap_outcomes_disclosed=1.0,
+    )
+
+    # Output where known contradictions/gaps were omitted (drop to 0.2)
+    score_omitted = scorer.calculate_score(
+        gate_result=gate_ok,
+        sentences=[],
+        ledger_claims={},
+        sources={},
+        questions=[question],
+        gap_outcomes_disclosed=0.2,
+    )
+
+    assert score_with_disclosure["components"]["S4_gap_disclosure"] == 10.0
+    assert score_omitted["components"]["S4_gap_disclosure"] == 2.0
+    assert score_with_disclosure["total_score"] > score_omitted["total_score"]
+
+
+def test_r11_rerun_reproducibility():
+    """R11: Re-running extraction and deterministic grading on cached inputs must achieve >= 0.90 reproducibility."""
+    from src.extract.claim_extractor import extract_claims_from_paper
+    from src.grade.grader import Grader
+    from src.score.scorer import QualityScorer
+    from src.score.checker import GateCheckResult
+
+    paper = {
+        "title": "Amazon Kiro: Transforming Software Development",
+        "abstract": "We evaluate Amazon Kiro across cloud engineering teams, measuring routine acceleration.",
+        "year": 2025,
+    }
+
+    # Run 1
+    claims_run1 = extract_claims_from_paper(paper)
+    # Run 2 on same cached input
+    claims_run2 = extract_claims_from_paper(paper)
+
+    # Jaccard similarity of extracted texts
+    set1 = {c.text for c in claims_run1}
+    set2 = {c.text for c in claims_run2}
+    jaccard = len(set1.intersection(set2)) / len(set1.union(set2)) if set1 else 1.0
+
+    assert jaccard >= 0.90, f"Expected reproducibility >= 0.90, got {jaccard}"
+
+    scorer = QualityScorer()
+    score = scorer.calculate_score(
+        gate_result=GateCheckResult(),
+        sentences=[],
+        ledger_claims={},
+        sources={},
+        questions=[],
+        reproducibility_agreement=jaccard,
+    )
+    assert score["components"]["S7_reproducibility"] >= 9.0
+
+
+def test_r14_raw_topic_boilerplate_lint():
+    """R14: Raw topic string interpolated into boilerplate prose or repeated sentences must fail linting."""
+    from src.synth.generator import lint_output_text
+
+    raw_topic = "how Kiro is being used for development by engineering teams"
+
+    # Bad sentence with raw topic string interpolated verbatim into boilerplate
+    bad_sentences = [
+        OutputSentence(
+            id="s_bad1",
+            output_id="out1",
+            ordinal=1,
+            text=f"In this strategy brief we explore how Kiro is being used for development by engineering teams across enterprises.",
+            type="assertive",
+            claim_ids_json=["c1"],
+        ),
+        # Repeated boilerplate sentence
+        OutputSentence(
+            id="s_bad2",
+            output_id="out1",
+            ordinal=2,
+            text=f"In this strategy brief we explore how Kiro is being used for development by engineering teams across enterprises.",
+            type="assertive",
+            claim_ids_json=["c1"],
+        ),
+    ]
+
+    is_clean, violations = lint_output_text(bad_sentences, raw_topic=raw_topic)
+    assert not is_clean, "Expected R14 lint failure for raw topic interpolation and boilerplate repetition"
+    assert any("R14 Lint Violation: Raw topic string" in v for v in violations)
+    assert any("Repeated boilerplate sentence" in v for v in violations)
+
+
+
 

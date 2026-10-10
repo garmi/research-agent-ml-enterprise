@@ -25,7 +25,11 @@ from src.output.report_builder import ReportBuilder
 from src.ledger.service import LedgerService
 from src.ledger.ui_views import (
     render_claim_review_queue,
+    render_draft_review_view,
+    render_gap_matrix_view,
+    render_publish_gate_view,
     render_question_register,
+    render_runs_and_scores_view,
     render_venue_tiering,
 )
 
@@ -172,22 +176,38 @@ with st.sidebar:
         "Navigation & Human Gates",
         [
             "🔬 Research Pipeline Runner",
-            "⚖️ Gate 3: Claim Review Queue",
-            "🏛️ Gate 2: Venue Tiering",
             "📋 Gate 1: Question Register",
+            "🏛️ Gate 2: Venue Tiering",
+            "⚖️ Gate 3: Claim Review Queue",
+            "🔍 Gate 4: Strategic Gap Matrix",
+            "📝 Gate 5: Evidence Draft Review",
+            "🚀 Gate 6: Publish Gate & Scorecard",
+            "📊 View 8: Runs & Audit Trail",
         ],
         index=0,
     )
     st.markdown("---")
 
-if nav_option == "⚖️ Gate 3: Claim Review Queue":
-    render_claim_review_queue(ledger_service)
+if nav_option == "📋 Gate 1: Question Register":
+    render_question_register(ledger_service)
     st.stop()
 elif nav_option == "🏛️ Gate 2: Venue Tiering":
     render_venue_tiering(ledger_service)
     st.stop()
-elif nav_option == "📋 Gate 1: Question Register":
-    render_question_register(ledger_service)
+elif nav_option == "⚖️ Gate 3: Claim Review Queue":
+    render_claim_review_queue(ledger_service)
+    st.stop()
+elif nav_option == "🔍 Gate 4: Strategic Gap Matrix":
+    render_gap_matrix_view(ledger_service)
+    st.stop()
+elif nav_option == "📝 Gate 5: Evidence Draft Review":
+    render_draft_review_view(ledger_service)
+    st.stop()
+elif nav_option == "🚀 Gate 6: Publish Gate & Scorecard":
+    render_publish_gate_view(ledger_service)
+    st.stop()
+elif nav_option == "📊 View 8: Runs & Audit Trail":
+    render_runs_and_scores_view(ledger_service)
     st.stop()
 
 # --- SIDEBAR CONTROLS ---
