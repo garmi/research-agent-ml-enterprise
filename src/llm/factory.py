@@ -8,8 +8,12 @@ from src.llm.ollama_client import OllamaClient
 
 
 def build_llm(provider: str, config: Dict[str, Any]):
-    """Return an LLM client. provider: 'ollama' or 'gemini'."""
-    if provider == "gemini":
+    """Return an LLM client. provider: 'ollama', 'gemini', or 'stub'."""
+    p_clean = str(provider).strip().lower()
+    if p_clean in ("stub", "fake", "mock"):
+        from src.llm.stub_client import StubLLM
+        return StubLLM()
+    if p_clean == "gemini":
         cfg = config.get("gemini", {})
         raw_model = os.getenv("GEMINI_MODEL") or cfg.get("model", "gemini-3.8-flash")
         model = str(raw_model).strip()
@@ -23,3 +27,4 @@ def build_llm(provider: str, config: Dict[str, Any]):
         num_ctx=int(os.getenv("OLLAMA_NUM_CTX") or cfg.get("num_ctx", 4096)),
         timeout=int(cfg.get("timeout_seconds", 180)),
     )
+
