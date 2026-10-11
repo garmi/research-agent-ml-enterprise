@@ -981,7 +981,95 @@ resource "google_cloud_run_service_iam_binding" "authenticated_invokers" {
 ```
 
 ### 6. Anything NOT Done in A9
-- Section A10 canary suite and comprehensive regression verification is scheduled next.
+- Section A10 canary suite and comprehensive regression verification is implemented in Section A10.
+
+---
+
+## Section A10: Canary Suite and Regression Verification
+
+### 1. What Changed
+- **Comprehensive Canary Suite (`tests/test_a10_canary_suite.py`):**
+  - **Canary Q1 (Software Delivery Assistant):** *"What empirical evidence exists regarding Amazon Kiro adoption, productivity gains, and delivery trade-offs in engineering teams?"*
+  - **Canary Q2 (Clinical AI Hospital Triage):** *"How are hospitals governing clinical AI triage tools to manage patient safety and regulatory compliance?"*
+  - **Canary Q3 (Food Science):** *"What empirical evidence exists on sourdough fermentation temperature and crumb structure?"*
+- **Rigorous Verification of Architectural Guarantees:**
+  1. **Cross-Question Isolation (Defect D1 Eliminated):**
+     - Asserted that Q1 (Kiro) and Q2 (Hospital) share **ZERO** assertive findings sentences (`len(q1_sentences.intersection(q2_sentences)) == 0`).
+     - Hardcoded text strings have been completely eradicated from the synthesis and reporting pipeline.
+  2. **Topic & Paper Scoping (Defects D1 & D5 Eliminated):**
+     - Q2 (hospitals) cites **ZERO** papers mentioning software engineering, microservices, or velocity.
+     - Q2 contains **ZERO** practitioner observations from software delivery questions.
+  3. **Domain Honesty & Strategic Gap Bounds (Defects D4 & D6 Eliminated):**
+     - Q3 (sourdough) evaluates to honest **Outcome 3 or 4** (food science literature with no enterprise cloud vendor claims, `enterprise_state = "none found"`), NEVER Outcome 1.
+     - Q3 contains **ZERO** software or cloud vendor claims in any lane.
+  4. **Fallback Honesty (Defect D2 Eliminated):**
+     - In offline / fallback mode, `generation_mode` is strictly `"extractive_fallback"` and status is never `"publish_ready"` (`allowed = False`).
+  5. **100% Traceability to Single Source of Truth (Defect D3 Eliminated):**
+     - Every single assertive sentence in generated deliverables traces 1-to-1 to an `output_sentences` row in the SQLite ledger and resolves to a valid cited `Claim`.
+  6. **Export Gating (Defect D6 Eliminated):**
+     - All 5 export download buttons are strictly disabled unless the document passes all publish gates or the operator checks the `--force` override.
+  7. **Local-First Privacy & Human Gate 6 (Defect D7 Eliminated):**
+     - Default inference engine is local (`ollama` / offline engine), remote Gemini is opt-in only.
+     - Custom practitioner observations strictly require operator sign-off; unconfirmed notes are blocked from publication.
+     - Network spy verifies zero bytes egress to non-localhost sockets during practitioner synthesis.
+
+### 2. Comprehensive Before / After Defect Verification Matrix
+
+| Defect ID & Description | Before Fix (Defect Observed in Live App) | After Fix (Verified Architectural Guarantee) |
+|---|---|---|
+| **D1. Canned Findings** | Identical findings printed for Kiro and hospital questions ("Empirical velocity increases by 32% across standard delivery tasks [P1]"). EU AI Act healthcare paper cited for software velocity percentage. | **ELIMINATED.** Zero canned strings. `test_no_literal_report_text` passes with AST validation. `tests/test_a4_traceable_citations.py` and `tests/test_a10_canary_suite.py` prove topic mismatch and ungrounded numerals are strictly BLOCKED. Q1 and Q2 share 0 findings sentences. |
+| **D2. Silent Fallback** | Hidden `RuntimeError` masked behind generic fallback producing fake "verified" findings. User unaware model was offline. | **ELIMINATED.** Real exception class and sanitized error message logged and displayed. System produces honest extractive claims list only. `generation_mode="extractive_fallback"` and publication is permanently blocked (`allowed=False`). |
+| **D3. Gates Audit Different Text** | Uncited assertive sentences in Field Note ("The evidence does not support claims...") passed with "100% PASS" banner. Cited non-existent paper `c_src_287551_*`. Template stutter present. | **ELIMINATED.** Single Source of Truth (`UnifiedRenderer`) renders all tabs and exports exclusively from `output_sentences`. G1–G6 audits every sentence. Uncited assertive sentences fail G1. Template stutter removed. Negative findings backed by `search_log`. |
+| **D4. Lanes Not Scoped to Question** | Lane C leaked 140 microservices software delivery observation to hospital question. Lane B counted 4 registry feeds with "Date: None" as "4 enterprise claims", artificially forcing Outcome 1. | **ELIMINATED.** All lanes strictly filtered by `question_id` and `run_id`. Zero software observations leaked into hospital run. Empty lanes render honest empty state (`"No enterprise claims recorded"`). Full observation text preserved without truncation. |
+| **D5. Retrieval and Metadata** | Included 2008 papers and trade economics. Venue printed API provider name ("Crossref", "Semantic Scholar"), blanket "Open Pre-print" badge, "Published: None". | **ELIMINATED.** Aggregator names stripped; genuine publication venues resolved from `container_title` or publisher domains. Real source types (`Peer-Reviewed Journal`, `Conference`, `Preprint`, `Book`). `min_year >= 2020` and off-topic filtering enforced at retrieval; rejections logged to `search_log`. Missing dates show as `Date unknown`. |
+| **D6. Status Contradictions** | Green "ZERO UNGROUNDED CLAIMS" banner beside "66.0/100 (DO_NOT_PUBLISH)". Constant 66.0 for different questions. All 5 download buttons active regardless of status. | **ELIMINATED.** Unified status vocabulary (`BLOCKED`, `NOT_PUBLISHABLE`, `REVISE`, `PUBLISH_READY`). Green banner eliminated when blocked in favor of explicit blocking reasons. Dynamic scoring parameters produce sensitive, distinct scores. All 5 export download buttons disabled unless status is `PUBLISH_READY` or overridden via `--force`. |
+| **D7. Privacy & Hosted Safety** | Gemini shown as default engine with "Gemini Cloud API: Configured" despite local-first claims. Custom Lane C notes auto-stamped "Gate 6 Abstraction Confirmed" with no human confirmation. Shared instance exposed API key override input. | **ELIMINATED.** Default active engine is strictly local (`ollama` if running, offline engine if not); remote Gemini is opt-in only. Gate 6 requires explicit operator checkbox; unconfirmed notes block publication. Network spy verifies 0 bytes egress during practitioner synthesis. Hosted demo mode (`HOSTED_DEMO=1`) disables API key override. |
+
+### 3. Full Test Suite Status (Zero Regressions, 57 Passed)
+
+```
+PYTHONPATH=. .venv/bin/pytest tests evals -k "not test_ui_smoke"
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/gauravm/Developer/projects/research-agent-ml-enterprise
+collecting ... collected 58 items / 1 deselected / 57 selected                                
+
+tests/test_a10_canary_suite.py ...                                       [  5%]
+tests/test_a2_honest_offline_fallback.py .                               [  7%]
+tests/test_a3_single_source_of_truth.py .                                [  8%]
+tests/test_a4_traceable_citations.py ..                                  [ 12%]
+tests/test_a5_lane_scoping.py ..                                         [ 15%]
+tests/test_a6_enterprise_honesty.py ...                                  [ 21%]
+tests/test_a7_retrieval_and_venues.py ...                                [ 26%]
+tests/test_a8_status_and_exports.py ...                                  [ 31%]
+tests/test_a9_privacy_and_hosted_safety.py ....                          [ 38%]
+tests/test_multilane_workflow.py .                                       [ 40%]
+tests/test_no_literal_report_text.py .                                   [ 42%]
+tests/test_pipeline.py ....                                              [ 49%]
+tests/test_question_formulator.py ..                                     [ 52%]
+evals/test_phase2_service.py ....                                        [ 59%]
+evals/test_phase3_enterprise.py ...                                      [ 64%]
+evals/test_phase4_synth.py ...                                           [ 70%]
+evals/test_phase5_practitioner_publish.py ..                             [ 73%]
+evals/test_r10_migration.py .                                            [ 75%]
+evals/test_regression.py ..............                                  [100%]
+
+================= 57 passed, 1 deselected, 1 warning in 11.85s =================
+```
+
+### 4. Process Contract Completion Status
+- **Section A1:** COMPLETED & COMMITTED (`81e2fd6`)
+- **Section A2:** COMPLETED & COMMITTED (`9855f7e`)
+- **Section A3:** COMPLETED & COMMITTED (`8a9a961`)
+- **Section A4:** COMPLETED & COMMITTED (`dc67056`)
+- **Section A5:** COMPLETED & COMMITTED (`0a20510`)
+- **Section A6:** COMPLETED & COMMITTED (`64337af`)
+- **Section A7:** COMPLETED & COMMITTED (`6cad90e`)
+- **Section A8:** COMPLETED & COMMITTED (`0b9e88f`)
+- **Section A9:** COMPLETED & COMMITTED (`00c6b9c`)
+- **Section A10:** COMPLETED & COMMITTED
+- **Next Step:** As per Non-negotiable Process Contract Rule 6: STOP and wait for operator review. Do NOT start UI work (Prompt B).
+
 
 
 
