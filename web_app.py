@@ -382,12 +382,22 @@ tone_mapping = {
 depth_mapping = {"⚡ Fast (2 Rounds)": "quick", "🔬 Deep (4 Rounds)": "deep"}
 
 # Optional advanced tuning (cleanly tucked away)
-with st.expander("⚙️ Optional Inference Settings", expanded=False):
+has_gemini_key = bool(os.getenv("GEMINI_API_KEY"))
+with st.expander("⚙️ Optional Inference & API Key Settings", expanded=not has_gemini_key):
     col_t1, col_t2 = st.columns(2)
     with col_t1:
         map_prov = st.selectbox("Reading Model", ["gemini", "ollama"], index=0)
     with col_t2:
         reduce_prov = st.selectbox("Synthesis Model", ["gemini", "ollama"], index=0)
+
+    custom_key = st.text_input(
+        "Gemini API Key (Google AI Studio)",
+        value=os.getenv("GEMINI_API_KEY", ""),
+        type="password",
+        help="If not configured in Cloud Run environment variables, you can paste your key here.",
+    )
+    if custom_key.strip():
+        os.environ["GEMINI_API_KEY"] = custom_key.strip()
 
 st.markdown("---")
 
@@ -396,8 +406,11 @@ st.markdown("---")
 # 3. PIPELINE EXECUTION
 # ==============================================================================
 if run_btn:
-    progress_status = st.status("🚀 Running Research Engine Pipeline...", expanded=True)
-    try:
+    if (map_prov == "gemini" or reduce_prov == "gemini") and not os.getenv("GEMINI_API_KEY"):
+        st.error("🔑 **Gemini API Key missing:** Please enter your Google AI Studio key in the settings above, or set `GEMINI_API_KEY` in Cloud Run environment variables.")
+    else:
+        progress_status = st.status("🚀 Running Research Engine Pipeline...", expanded=True)
+        try:
         synthesis_result = run_pipeline(
             topic=topic_input,
             max_papers=5,
