@@ -23,3 +23,19 @@ questions:
   status: active
   version: 1
   created_at: '2026-10-11T13:05:28.293528+00:00'
+- id: q-roi-productivity-882a
+  text: What empirical evidence measures the true developer productivity, cycle time,
+    and ROI impact of Amazon Kiro in enterprise delivery?
+  scope: productivity
+  time_window_months: 36
+  status: active
+  version: 1
+  created_at: '2026-10-11T13:56:40.750035+00:00'
+- id: q-evaluating-devex-and-cycle
+  text: Evaluating DevEx and cycle time impact of platform engineering in regulated
+    enterprises
+  scope: architecture
+  time_window_months: 36
+  status: active
+  version: 1
+  created_at: '2026-10-11T14:23:16.341088+00:00'

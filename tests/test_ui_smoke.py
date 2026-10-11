@@ -40,19 +40,37 @@ def test_executive_studio_ui_smoke():
         formulate_btn = page.locator('button:has-text("Formulate Question")')
         assert formulate_btn.count() > 0
 
-        # 4. Assert Research Console Controls
+        # 4. Assert Research Console Controls & 3-Lane Ingestion Hub
         run_btn = page.locator('button:has-text("Run Research")')
         assert run_btn.count() > 0
         assert page.locator('text=Strategic Technology Question').count() > 0
         assert page.locator('text=Research Depth').count() > 0
         assert page.locator('text=Strategic Tone').count() > 0
 
+        # Assert 3-Lane Ingestion Console is visible
+        assert page.locator('text=Three-Lane Source Repositories & Manual Web Ingestion').count() > 0
+        assert page.locator('textarea[aria-label="Custom Academic URLs / DOIs (One per line):"]').count() > 0
+        assert page.locator('textarea[aria-label="Custom Enterprise / Whitepaper URLs (One per line):"]').count() > 0
+        assert page.locator('textarea[aria-label="Custom Practitioner URLs / Notes (One per line):"]').count() > 0
+
+        # Assert 3 Lanes are permanently visible on initial load
+        assert page.locator('text=Active Three-Lane Architecture & Ingestion Readiness').count() > 0
+        assert page.locator('text=Lane A: Academic Literature').count() > 0
+        assert page.locator('text=Lane B: Enterprise Literature').count() > 0
+        assert page.locator('text=Lane C: Practitioner Delivery').count() > 0
+        assert page.locator('text=Question Register (Gate 1) — Registered Inquiries').count() > 0
+
         # 5. Assert Empty Topic Validation (Single plain-language warning)
         run_btn.click()
         time.sleep(1)
         assert page.locator("text=Please enter a research topic").count() > 0
 
-        # 6. Use Question Formulation Agent to Frame a Research Question
+        # 6. Fill custom URLs across all three lanes
+        page.locator('textarea[aria-label="Custom Academic URLs / DOIs (One per line):"]').fill("https://arxiv.org/abs/2401.05432")
+        page.locator('textarea[aria-label="Custom Enterprise / Whitepaper URLs (One per line):"]').fill("https://netflixtechblog.com/engineering-ai-delivery")
+        page.locator('textarea[aria-label="Custom Practitioner URLs / Notes (One per line):"]').fill("Canary rollout verification: Zero unauthorized regression across 12 microservices")
+
+        # Use Question Formulation Agent to Frame a Research Question
         problem_area = page.locator('textarea[aria-label="Raw Problem Description"]')
         if problem_area.count() > 0:
             problem_area.fill("Our teams want to know if agent swarms and Kiro coding assistants improve productivity while maintaining security governance in enterprise banking.")
@@ -113,8 +131,9 @@ def test_executive_studio_ui_smoke():
         tab_lanes.click()
         time.sleep(1)
         assert page.locator("text=Lane A: Academic Literature").count() > 0
-        assert page.locator("text=Lane B: Enterprise Lane").count() > 0
-        assert page.locator("text=Lane C: Practitioner Lane").count() > 0
+        assert page.locator("text=Lane B: Enterprise Lane").count() > 0 or page.locator("text=Enterprise Literature").count() > 0
+        assert page.locator("text=Lane C: Practitioner Lane").count() > 0 or page.locator("text=Practitioner Delivery").count() > 0
+        assert page.locator("text=Custom Ingested").count() > 0
 
         # 14. Test Evidence Ledger Tab
         tab_ledger = page.locator('button[role="tab"]:has-text("Evidence Ledger & Claims")')

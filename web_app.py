@@ -76,9 +76,16 @@ def is_ollama_reachable(timeout: float = 0.5) -> bool:
 def get_available_models() -> Dict[str, str]:
     """Map human-friendly model labels to internal provider identifiers."""
     options = {}
-    options["Google Gemini 3.8 Flash (Cloud)"] = "gemini"
-    if is_ollama_reachable():
-        options["Local Ollama Qwen 2.5 3B (Local)"] = "ollama"
+    has_key = bool(os.getenv("GEMINI_API_KEY", "").strip())
+    ollama_ok = is_ollama_reachable()
+
+    if has_key:
+        options["Google Gemini 3.8 Flash (Cloud API) [Configured]"] = "gemini"
+    if ollama_ok:
+        options["Local Ollama Qwen 2.5 3B (Local Offline) [Active]"] = "ollama"
+    if not has_key:
+        options["Google Gemini 3.8 Flash (Cloud API) [API Key Required]"] = "gemini"
+    options["Deterministic Offline Engine (Zero-API Fallback)"] = "stub"
     return options
 
 
@@ -614,6 +621,15 @@ if "history" not in st.session_state:
 if "is_running" not in st.session_state:
     st.session_state["is_running"] = False
 
+if "custom_acad_urls" not in st.session_state:
+    st.session_state["custom_acad_urls"] = ""
+
+if "custom_ent_urls" not in st.session_state:
+    st.session_state["custom_ent_urls"] = ""
+
+if "custom_prac_urls" not in st.session_state:
+    st.session_state["custom_prac_urls"] = ""
+
 
 # --- CITATION FORMATTER ---
 def format_citation_pills(text: str, paper_map: Dict[str, Any]) -> str:
@@ -705,6 +721,7 @@ def run_production_pipeline(
     reduce_provider: str,
     progress_box: Any,
     papers_override: Optional[List[Dict[str, Any]]] = None,
+    custom_lane_urls: Optional[Dict[str, List[str]]] = None,
 ) -> Dict[str, Any]:
     """Execute the formal 8-stage research engine workflow across Academic, Enterprise, and Practitioner lanes."""
     stage_titles = {
@@ -744,6 +761,7 @@ def run_production_pipeline(
         reduce_provider=reduce_provider,
         on_progress=on_progress,
         academic_papers_override=papers_override,
+        custom_lane_urls=custom_lane_urls,
     )
     progress_box.empty()
     return results
@@ -992,7 +1010,102 @@ with col_btn:
     st.markdown("<div style='height: 1.7rem;'></div>", unsafe_allow_html=True)
     run_submitted = st.button("🚀 Run Research", type="primary", use_container_width=True)
 
-# Advanced Governance & Source Selection
+# ------------------------------------------------------------------------------
+# THREE-LANE SOURCE REPOSITORIES & MANUAL INGESTION CONSOLE
+# ------------------------------------------------------------------------------
+st.markdown("<div style='margin-top: 1rem; padding-top: 0.85rem; border-top: 1px solid #E2E8F0;'></div>", unsafe_allow_html=True)
+st.markdown(
+    """
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.65rem;">
+        <div style="font-weight: 700; font-size: 0.96rem; color: #0F172A; display: flex; align-items: center; gap: 0.5rem;">
+            <span>🌐</span> Three-Lane Source Repositories & Manual Web Ingestion
+        </div>
+        <span style="font-size: 0.74rem; background: #EEF2F6; color: #334155; padding: 0.2rem 0.6rem; border-radius: 9999px; font-weight: 600;">
+            YAML & SQLite Evidence Architecture
+        </span>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+lane_input_col1, lane_input_col2, lane_input_col3 = st.columns(3)
+
+with lane_input_col1:
+    st.markdown(
+        """
+        <div style="background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 8px; padding: 0.6rem 0.8rem; margin-bottom: 0.5rem;">
+            <div style="font-weight: 700; color: #1E40AF; font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center;">
+                <span>🎓 Lane A: Academic Literature</span>
+                <span style="font-size: 0.7rem; background: #DBEAFE; color: #1E40AF; padding: 0.1rem 0.4rem; border-radius: 4px; font-weight: 700;">Active</span>
+            </div>
+            <div style="font-size: 0.74rem; color: #3B82F6; margin-top: 0.2rem;">
+                arXiv • OpenAlex • Crossref • Semantic Scholar
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    custom_acad_input = st.text_area(
+        "Custom Academic URLs / DOIs (One per line):",
+        value=st.session_state.get("custom_acad_urls", ""),
+        key="custom_acad_urls_input",
+        placeholder="https://arxiv.org/abs/2401.05432\nhttps://doi.org/10.1145/3611643\nhttps://openalex.org/W...",
+        height=90,
+        help="Paste custom arXiv URLs, DOIs, or academic links. Ingested into Lane A with atomic claim extraction.",
+    )
+    st.session_state["custom_acad_urls"] = custom_acad_input
+
+with lane_input_col2:
+    st.markdown(
+        """
+        <div style="background: #F5F3FF; border: 1px solid #DDD6FE; border-radius: 8px; padding: 0.6rem 0.8rem; margin-bottom: 0.5rem;">
+            <div style="font-weight: 700; color: #6D28D9; font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center;">
+                <span>🏢 Lane B: Enterprise Literature</span>
+                <span style="font-size: 0.7rem; background: #EDE9FE; color: #6D28D9; padding: 0.1rem 0.4rem; border-radius: 4px; font-weight: 700;">Commercial Cap</span>
+            </div>
+            <div style="font-size: 0.74rem; color: #7C3AED; margin-top: 0.2rem;">
+                Engineering Blogs • SEC EDGAR • DORA Benchmarks
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    custom_ent_input = st.text_area(
+        "Custom Enterprise / Whitepaper URLs (One per line):",
+        value=st.session_state.get("custom_ent_urls", ""),
+        key="custom_ent_urls_input",
+        placeholder="https://netflixtechblog.com/...\nhttps://www.sec.gov/edgar/...\nhttps://aws.amazon.com/blogs/...",
+        height=90,
+        help="Paste corporate engineering blogs, SEC filings, or vendor whitepapers. Commercial claim capping strictly enforced.",
+    )
+    st.session_state["custom_ent_urls"] = custom_ent_input
+
+with lane_input_col3:
+    st.markdown(
+        """
+        <div style="background: #ECFDF5; border: 1px solid #A7F3D0; border-radius: 8px; padding: 0.6rem 0.8rem; margin-bottom: 0.5rem;">
+            <div style="font-weight: 700; color: #047857; font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center;">
+                <span>🛠️ Lane C: Practitioner Delivery</span>
+                <span style="font-size: 0.7rem; background: #D1FAE5; color: #047857; padding: 0.1rem 0.4rem; border-radius: 4px; font-weight: 700;">🔒 Local Only</span>
+            </div>
+            <div style="font-size: 0.74rem; color: #059669; margin-top: 0.2rem;">
+                ledger/practitioner.db • Gate 6 Privacy Isolated
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    custom_prac_input = st.text_area(
+        "Custom Practitioner URLs / Notes (One per line):",
+        value=st.session_state.get("custom_prac_urls", ""),
+        key="custom_prac_urls_input",
+        placeholder="https://github.com/org/repo/issues/102\nIncident note: Platform migration latency regression...\nDelivery note: Canary rollout verified 0-downtime",
+        height=90,
+        help="Paste local incident links or field observation notes. Stored locally in practitioner.db; Gate 6 abstraction verified.",
+    )
+    st.session_state["custom_prac_urls"] = custom_prac_input
+
+# Advanced Governance & Model Selection
 with st.expander("⚙️ Advanced Settings & Deterministic Governance Hub", expanded=False):
     adv_col1, adv_col2, adv_col3 = st.columns(3)
     with adv_col1:
@@ -1005,15 +1118,24 @@ with st.expander("⚙️ Advanced Settings & Deterministic Governance Hub", expa
             or st.query_params.get("mock") == "1"
             or os.getenv("STUB_LLM") == "1"
         )
-        if is_stub_requested and "Deterministic Offline Stub" not in model_names:
-            available_models["Deterministic Offline Stub"] = "stub"
-            model_names.append("Deterministic Offline Stub")
+        if is_stub_requested and "Deterministic Offline Engine (Zero-API Fallback)" not in model_names:
+            available_models["Deterministic Offline Engine (Zero-API Fallback)"] = "stub"
+            model_names.append("Deterministic Offline Engine (Zero-API Fallback)")
 
-        default_idx = model_names.index("Deterministic Offline Stub") if is_stub_requested else 0
+        # Compute sensible default index based on availability
+        if is_stub_requested:
+            default_idx = next((i for i, k in enumerate(model_names) if available_models.get(k) == "stub"), 0)
+        elif bool(os.getenv("GEMINI_API_KEY", "").strip()):
+            default_idx = next((i for i, k in enumerate(model_names) if available_models.get(k) == "gemini"), 0)
+        elif is_ollama_reachable():
+            default_idx = next((i for i, k in enumerate(model_names) if available_models.get(k) == "ollama"), 0)
+        else:
+            default_idx = next((i for i, k in enumerate(model_names) if available_models.get(k) == "stub"), 0)
+
         sel_model_label = st.selectbox("Inference Model", model_names, index=default_idx)
         st.slider("Minimum Publication Horizon", min_value=2018, max_value=2026, value=2020)
     with adv_col3:
-        st.multiselect("Source Repositories", ["arXiv", "OpenAlex", "Crossref", "Semantic Scholar", "ACM / IEEE"], default=["arXiv", "OpenAlex", "Crossref", "Semantic Scholar"])
+        st.multiselect("Active Academic Repositories", ["arXiv", "OpenAlex", "Crossref", "Semantic Scholar", "ACM / IEEE"], default=["arXiv", "OpenAlex", "Crossref", "Semantic Scholar"])
         st.slider("Evidence Confidence Floor", min_value=0.7, max_value=0.99, value=0.92, step=0.01)
 
     st.markdown("##### Session API Key Override")
@@ -1039,28 +1161,40 @@ if run_submitted:
     active_query = query_input.strip()
     if not active_query:
         st.warning("⚠️ Please enter a research topic or click one of the suggested topic chips above to begin.")
-    elif selected_provider == "gemini" and not os.getenv("GEMINI_API_KEY", "").strip():
-
-        st.error(
-            "**Gemini API Key Required**\n\n"
-            "• **What happened:** No Google Gemini API key is configured.\n\n"
-            "• **What completed:** Search query preparation.\n\n"
-            "• **What to do next:** Enter a temporary API key in the 'Advanced Settings' panel above, or configure `GEMINI_API_KEY` in environment variables."
-        )
     else:
+        # Collect custom lane URLs
+        lane_urls = {
+            "academic": [u.strip() for u in custom_acad_input.splitlines() if u.strip()],
+            "enterprise": [u.strip() for u in custom_ent_input.splitlines() if u.strip()],
+            "practitioner": [u.strip() for u in custom_prac_input.splitlines() if u.strip()],
+        }
+
+        # Auto-fallback for model provider if Gemini key is missing
+        target_provider = selected_provider
+        if target_provider == "gemini" and not os.getenv("GEMINI_API_KEY", "").strip():
+            if is_ollama_reachable():
+                st.info("ℹ️ **Gemini API Key Not Configured:** Automatically routed synthesis to **Local Ollama Qwen 2.5 3B** so research proceeds without disruption.")
+                target_provider = "ollama"
+            else:
+                st.info("ℹ️ **Gemini API Key Not Configured:** Automatically routed synthesis to **Deterministic Offline Synthesis Engine** so research proceeds without disruption.")
+                target_provider = "stub"
+
         st.session_state["current_question"] = active_query
         progress_placeholder = st.empty()
         eta_desc = "~45–60 seconds" if "Fast" in depth_option else "~3–5 minutes"
-        eta_banner = st.info(f"⏱️ Estimated runtime: **{eta_desc}**. Initiating multi-repository literature synthesis...")
+        total_custom = sum(len(v) for v in lane_urls.values())
+        custom_note = f" (including {total_custom} custom web sources)" if total_custom else ""
+        eta_banner = st.info(f"⏱️ Estimated runtime: **{eta_desc}**. Initiating multi-lane literature synthesis{custom_note}...")
         try:
             results = run_production_pipeline(
                 topic=active_query,
                 depth=depth_option,
                 tone=tone_option,
-                map_provider=selected_provider,
-                reduce_provider=selected_provider,
+                map_provider=target_provider,
+                reduce_provider=target_provider,
                 progress_box=progress_placeholder,
                 papers_override=_generate_mock_papers(active_query) if is_stub_requested else None,
+                custom_lane_urls=lane_urls,
             )
             eta_banner.empty()
             st.session_state["research_results"] = results
@@ -1132,6 +1266,10 @@ if results:
         """,
         unsafe_allow_html=True,
     )
+
+    fallback_note = results.get("synthesis", {}).get("llm_fallback_notice")
+    if fallback_note:
+        st.info(f"🛡️ **Synthesis Continuity:** {fallback_note}")
 
     # Strategic Signal & Executive Verdict with Gap Matrix Outcome
     st.markdown(
@@ -1337,12 +1475,16 @@ if results:
 
         for p in results["papers"]:
             with st.container():
+                custom_tag = '<span style="font-size: 0.72rem; background: #DBEAFE; color: #1E40AF; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 700; margin-left: 0.4rem;">🏷️ Custom Ingested URL</span>' if p.get("is_custom") else ""
                 st.markdown(
                     f"""
                     <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px; padding: 1rem 1.25rem; margin-bottom: 0.75rem;">
                         <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.35rem;">
                             <a href="{p['url']}" target="_blank" class="cite-pill" style="font-size: 0.82rem; padding: 0.15rem 0.5rem;">[{p['key']}]</a>
-                            <span style="font-size: 0.76rem; background: #F1F5F9; color: #475569; padding: 0.15rem 0.55rem; border-radius: 4px; font-weight: 600;">{p['type']}</span>
+                            <div>
+                                {custom_tag}
+                                <span style="font-size: 0.76rem; background: #F1F5F9; color: #475569; padding: 0.15rem 0.55rem; border-radius: 4px; font-weight: 600;">{p['type']}</span>
+                            </div>
                         </div>
                         <div style="font-size: 0.98rem; font-weight: 700; color: #0F172A; margin-bottom: 0.25rem;">
                             <a href="{p['url']}" target="_blank" style="color: #0F172A; text-decoration: none;">{p['title']} ↗</a>
@@ -1354,6 +1496,63 @@ if results:
                     """,
                     unsafe_allow_html=True,
                 )
+
+        # Lane B: Enterprise Sources & Filings
+        st.markdown("---")
+        st.markdown("#### 🏢 Enterprise Literature & Curated Feeds (Lane B)")
+        ent_sources = results.get("enterprise_sources", [])
+        if ent_sources:
+            for es in ent_sources:
+                custom_ent_tag = '<span style="font-size: 0.72rem; background: #EDE9FE; color: #6D28D9; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 700; margin-left: 0.4rem;">🏷️ Custom Ingested URL</span>' if es.get("is_custom") else ""
+                st.markdown(
+                    f"""
+                    <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px; padding: 0.9rem 1.15rem; margin-bottom: 0.65rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+                            <span style="font-size: 0.78rem; font-weight: 700; color: #6D28D9; background: #F5F3FF; padding: 0.15rem 0.5rem; border-radius: 4px;">{es.get('source_type', 'enterprise').upper()}</span>
+                            <span style="font-size: 0.74rem; color: #64748B;">Commercial Stake: <strong>{es.get('commercial_stake', 'vendor').upper()}</strong></span>
+                        </div>
+                        <div style="font-weight: 700; font-size: 0.94rem; color: #0F172A; margin-bottom: 0.25rem;">
+                            <a href="{es.get('url', '#')}" target="_blank" style="color: #0F172A; text-decoration: none;">{es.get('title')} ↗</a> {custom_ent_tag}
+                        </div>
+                        <div style="font-size: 0.8rem; color: #64748B;">
+                            Org/Venue: <strong>{es.get('venue')}</strong> &nbsp;•&nbsp; Date: <strong>{es.get('pub_date')}</strong>
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+        else:
+            st.caption("No enterprise sources harvested yet.")
+
+        # Lane C: Practitioner Delivery Observations
+        st.markdown("---")
+        st.markdown("#### 🛠️ Practitioner Delivery Observations (Lane C — Local Only)")
+        prac_obs = results.get("practitioner_observations", [])
+        if prac_obs:
+            for po in prac_obs:
+                custom_obs_tag = '<span style="font-size: 0.72rem; background: #D1FAE5; color: #047857; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 700; margin-left: 0.4rem;">🏷️ Custom Ingested Note</span>' if po.get("is_custom") else ""
+                st.markdown(
+                    f"""
+                    <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px; padding: 0.9rem 1.15rem; margin-bottom: 0.65rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+                            <span style="font-size: 0.76rem; font-weight: 700; color: #047857; background: #ECFDF5; padding: 0.15rem 0.5rem; border-radius: 4px;">PRACTITIONER OBSERVATION</span>
+                            <span style="font-size: 0.74rem; color: #059669; font-weight: 600;">🔒 Gate 6 Abstraction Confirmed</span>
+                        </div>
+                        <div style="font-weight: 700; font-size: 0.92rem; color: #0F172A; margin-bottom: 0.25rem;">
+                            {po.get('situation')} {custom_obs_tag}
+                        </div>
+                        <div style="font-size: 0.82rem; color: #334155; margin-bottom: 0.25rem;">
+                            <strong>Action / Telemetry:</strong> {po.get('action')}
+                        </div>
+                        <div style="font-size: 0.8rem; color: #047857; font-weight: 600;">
+                            <strong>Outcome:</strong> {po.get('outcome')} &nbsp;•&nbsp; Date: {po.get('date')}
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+        else:
+            st.caption("No local practitioner observations exported yet.")
 
         # Paper exclusion and re-synthesis action
         st.markdown("---")
@@ -1639,17 +1838,144 @@ if results:
         )
 
 else:
+    # --------------------------------------------------------------------------
+    # THREE-LANE ARCHITECTURE & INGESTION READINESS (PERMANENTLY VISIBLE)
+    # --------------------------------------------------------------------------
     st.markdown(
         """
-        <div style="background: #F8FAFC; border: 1px dashed #CBD5E1; border-radius: 12px; padding: 2.5rem 1.5rem; text-align: center; margin-top: 1rem;">
-            <div style="font-size: 2.2rem; margin-bottom: 0.75rem;">💡</div>
-            <div style="font-size: 1.05rem; font-weight: 700; color: #1E293B; margin-bottom: 0.35rem;">
-                Ready for Executive Literature Synthesis
-            </div>
-            <div style="font-size: 0.88rem; color: #64748B; max-width: 540px; margin: 0 auto;">
-                Enter a strategic technology inquiry above, or select one of the suggested topic chips to generate evidence-backed dossiers, citation audits, and executive decks.
-            </div>
+        <div class="workflow-banner">
+            <div style="font-weight: 700; color: #0F172A; margin-right: 0.35rem;">WORKFLOW TRACE:</div>
+            <span class="workflow-step-pill active">📋 Gate 1: Question Register</span>
+            <span>➔</span>
+            <span class="workflow-step-pill active">🌐 3 Lanes: Academic • Enterprise • Practitioner</span>
+            <span>➔</span>
+            <span class="workflow-step-pill active">🔍 Atomic Claim Extraction</span>
+            <span>➔</span>
+            <span class="workflow-step-pill active">⚖️ Evidence Ledger (SQLite)</span>
+            <span>➔</span>
+            <span class="workflow-step-pill active">📐 Deterministic Grading</span>
+            <span>➔</span>
+            <span class="workflow-step-pill active">📊 Gap Matrix (Gate 4)</span>
+            <span>➔</span>
+            <span class="workflow-step-pill active">📝 Ledger-Only Synthesis</span>
+            <span>➔</span>
+            <span class="workflow-step-pill active">🛡️ Gates G1–G6 Audit</span>
+            <span>➔</span>
+            <span class="workflow-step-pill active">🚀 Publish Gate & Deliverables</span>
         </div>
         """,
         unsafe_allow_html=True,
     )
+
+    st.markdown("### 🌐 Active Three-Lane Architecture & Ingestion Readiness")
+    st.markdown("The research engine harvests evidence across three physically separated lanes to eliminate bias and isolate corporate assertions:")
+
+    init_col_a, init_col_b, init_col_c = st.columns(3)
+
+    with init_col_a:
+        st.markdown(
+            """
+            <div style="background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 10px; padding: 1.15rem; min-height: 250px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                    <span style="font-weight: 700; color: #1E40AF; font-size: 0.98rem;">🎓 Lane A: Academic Literature</span>
+                    <span class="lane-badge-a">INGESTION READY</span>
+                </div>
+                <div style="font-size: 0.84rem; color: #1E293B; margin-bottom: 0.65rem;">
+                    Harvests peer-reviewed journals, conferences, and reputable preprints with deterministic venue tiering.
+                </div>
+                <div style="font-size: 0.78rem; color: #475569; background: white; padding: 0.65rem; border-radius: 6px; border: 1px solid #DBEAFE;">
+                    <strong>Connected Repositories:</strong><br>
+                    • arXiv API (Open preprints)<br>
+                    • OpenAlex API (Global academic index)<br>
+                    • Crossref (DOI registry)<br>
+                    • Semantic Scholar (Citation graph)<br>
+                    • <em>+ Custom Academic URLs / DOIs</em>
+                </div>
+                <div style="font-size: 0.76rem; color: #2563EB; margin-top: 0.5rem; font-weight: 600;">
+                    ✓ Atomic claims extracted with excerpts capped at ≤ 25 words
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with init_col_b:
+        st.markdown(
+            """
+            <div style="background: #F5F3FF; border: 1px solid #DDD6FE; border-radius: 10px; padding: 1.15rem; min-height: 250px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                    <span style="font-weight: 700; color: #6D28D9; font-size: 0.98rem;">🏢 Lane B: Enterprise Literature</span>
+                    <span class="lane-badge-b">COMMERCIAL CAP</span>
+                </div>
+                <div style="font-size: 0.84rem; color: #1E293B; margin-bottom: 0.65rem;">
+                    Captures engineering blogs, regulatory filings, and industry surveys with strict commercial bias isolation.
+                </div>
+                <div style="font-size: 0.78rem; color: #475569; background: white; padding: 0.65rem; border-radius: 6px; border: 1px solid #EDE9FE;">
+                    <strong>Connected Feeds:</strong><br>
+                    • DORA State of DevOps (Empirical surveys)<br>
+                    • SEC EDGAR 10-K / 10-Q (Regulatory disclosures)<br>
+                    • Engineering Blogs (Netflix, Uber, AWS, etc.)<br>
+                    • <em>+ Custom Enterprise / Whitepaper URLs</em>
+                </div>
+                <div style="font-size: 0.76rem; color: #7C3AED; margin-top: 0.5rem; font-weight: 600;">
+                    ✓ Commercial claims capped; vendor assertions isolated
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with init_col_c:
+        st.markdown(
+            """
+            <div style="background: #ECFDF5; border: 1px solid #A7F3D0; border-radius: 10px; padding: 1.15rem; min-height: 250px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                    <span style="font-weight: 700; color: #047857; font-size: 0.98rem;">🛠️ Lane C: Practitioner Delivery</span>
+                    <span class="lane-badge-c">🔒 LOCAL ISOLATED</span>
+                </div>
+                <div style="font-size: 0.84rem; color: #1E293B; margin-bottom: 0.65rem;">
+                    Integrates field telemetry, post-mortems, and incident observations strictly from local SQLite database.
+                </div>
+                <div style="font-size: 0.78rem; color: #475569; background: white; padding: 0.65rem; border-radius: 6px; border: 1px solid #D1FAE5;">
+                    <strong>Local Isolation Architecture:</strong><br>
+                    • <code>ledger/practitioner.db</code> (Local, gitignored)<br>
+                    • Zero cloud network leakage<br>
+                    • Gate 6 human privacy abstraction required<br>
+                    • <em>+ Custom Practitioner Notes & URLs</em>
+                </div>
+                <div style="font-size: 0.76rem; color: #059669; margin-top: 0.5rem; font-weight: 600;">
+                    ✓ Grades default to anecdote; no unverified promotion
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    st.markdown("<div style='height: 1.25rem;'></div>", unsafe_allow_html=True)
+
+    # Question Register (Gate 1) & Registered Inquiries Preview
+    st.markdown("### 📋 Question Register (Gate 1) — Registered Inquiries")
+    st.caption("Select a registered research question below or type your inquiry in the console above to run the 3-lane pipeline:")
+
+    reg_questions = ledger_service.repo.list_questions()
+    if reg_questions:
+        for q in reg_questions:
+            q_col1, q_col2 = st.columns([4.2, 0.8])
+            with q_col1:
+                st.markdown(
+                    f"""
+                    <div style="background: white; border: 1px solid #E2E8F0; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 0.5rem;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.2rem;">
+                            <code style="font-size: 0.76rem; color: #1E40AF; background: #DBEAFE; padding: 0.1rem 0.35rem; border-radius: 4px;">{q.id}</code>
+                            <span style="font-size: 0.72rem; color: #64748B; text-transform: uppercase; font-weight: 700;">{q.scope}</span>
+                        </div>
+                        <div style="font-size: 0.92rem; font-weight: 600; color: #0F172A;">{q.text}</div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+            with q_col2:
+                if st.button("Load Question", key=f"load_q_{q.id}", use_container_width=True):
+                    st.session_state["current_question"] = q.text
+                    st.rerun()
+
