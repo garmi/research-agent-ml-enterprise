@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 import yaml
 
+from src.analysis.relevance import STOPWORDS, normalize_text
 from src.ledger.models import Claim, OutputSentence
 
 logger = logging.getLogger(__name__)
@@ -151,6 +152,9 @@ class GateChecker:
         sentences: List[OutputSentence],
         ledger_claims: Dict[str, Claim],
         source_texts: Optional[Dict[str, str]] = None,
+        sources: Optional[Dict[str, Any]] = None,
+        question: Optional[Any] = None,
+        papers: Optional[List[Dict[str, Any]]] = None,
     ) -> GateCheckResult:
         """Run all hard gates against a draft output."""
         result = GateCheckResult()
@@ -159,6 +163,17 @@ class GateChecker:
 
         for s in sentences:
             s_text = s.text.strip()
+
+            # [P#] run-scoped resolution check
+            p_matches = re.findall(r"\[P(\d+)\]", s_text)
+            for p_str in p_matches:
+                p_num = int(p_str)
+                if papers is not None and (p_num < 1 or p_num > len(papers)):
+                    result.g1_pass = False
+                    result.violations["G1"].append(
+                        f"Sentence [{s.id}] (ordinal {s.ordinal}) cites [P{p_num}] which does not resolve to any source in run's Lane A list"
+                    )
+
             if s.type not in ("assertive", "finding"):
                 # Opinions and field notes are checked for confidentiality and copyright only
                 self._check_confidentiality(s_text, result)
@@ -188,17 +203,79 @@ class GateChecker:
             if not cited_claims:
                 continue
 
-            # G2: Numeric fidelity
+            # Support Check (2): Excerpt overlap - sentence must share >= 2 non-stopword terms with claim excerpt
+            s_words = {
+                w for w in normalize_text(s_text).split()
+                if w not in STOPWORDS and len(w) > 2
+            }
+            for c in cited_claims:
+                excerpt_raw = c.source_excerpt or c.text or ""
+                e_words = {
+                    w for w in normalize_text(excerpt_raw).split()
+                    if w not in STOPWORDS and len(w) > 2
+                }
+                overlap = s_words.intersection(e_words)
+                if len(overlap) < 2:
+                    result.g2_pass = False
+                    result.violations["G2"].append(
+                        f"Sentence [{s.id}] (ordinal {s.ordinal}) failed citation support check: Insufficient excerpt overlap ({len(overlap)} < 2 non-stopword terms) with claim {c.id}: '{s_text}'"
+                    )
+
+            # Support Check (3): Claim's source shares >= 1 term with the question
+            if question is not None:
+                q_text = f"{getattr(question, 'text', str(question or ''))} {getattr(question, 'scope', '')}".strip()
+                q_terms = {
+                    w for w in normalize_text(q_text).split()
+                    if w not in STOPWORDS and len(w) >= 3
+                }
+                if q_terms:
+                    for c in cited_claims:
+                        src_obj = (sources or {}).get(c.source_id)
+                        src_text = ""
+                        if src_obj:
+                            src_text = f"{getattr(src_obj, 'title', '')} {getattr(src_obj, 'venue', '')} {getattr(src_obj, 'url', '')}"
+                        elif source_texts and c.source_id in source_texts:
+                            src_text = source_texts[c.source_id]
+
+                        if src_text:
+                            src_terms = {
+                                w for w in normalize_text(src_text).split()
+                                if w not in STOPWORDS and len(w) >= 3
+                            }
+                            has_match = bool(q_terms.intersection(src_terms))
+                            if not has_match:
+                                for qt in q_terms:
+                                    for st in src_terms:
+                                        if len(qt) >= 4 and len(st) >= 4:
+                                            if qt in st or st in qt:
+                                                has_match = True
+                                                break
+                                            # Stem / common root check (e.g. develop-er and develop-ment)
+                                            prefix_len = sum(1 for a, b in zip(qt, st) if a == b)
+                                            if prefix_len >= 4 and qt[:prefix_len] == st[:prefix_len]:
+                                                has_match = True
+                                                break
+                                    if has_match:
+                                        break
+                            if not has_match:
+                                result.g3_pass = False
+                                src_title = getattr(src_obj, "title", c.source_id) if src_obj else c.source_id
+                                result.violations["G3"].append(
+                                    f"Sentence [{s.id}] (ordinal {s.ordinal}) failed citation support check: Source topic mismatch between source '{src_title}' and question '{getattr(question, 'text', q_text)}' (0 shared terms)"
+                                )
+
+            # G2: Numeric fidelity (Support Check 1)
             numerals = self.extract_numerals(s_text)
             if numerals and "DERIVED" not in s_text:
                 for num in numerals:
-                    # Check if numeral appears in any cited claim value_json or text
+                    # Check if numeral appears in any cited claim value_json or excerpt
                     num_found = False
                     for c in cited_claims:
                         c_num_str = ""
                         if c.value_json:
                             c_num_str = str(c.value_json)
-                        if num in c_num_str.lower() or num in c.text.lower() or num in c.source_excerpt.lower():
+                        excerpt_str = str(c.source_excerpt or "")
+                        if num in c_num_str.lower() or num in excerpt_str.lower() or (not excerpt_str and num in c.text.lower()):
                             num_found = True
                             break
                     if not num_found:

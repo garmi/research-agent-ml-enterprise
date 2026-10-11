@@ -305,4 +305,92 @@ evals/test_regression.py ..............                                  [100%]
 - Run-scoped citation checks and source-to-question term overlap are scheduled in Section A4.
 - Question-scoping of practitioner observations and enterprise sources is scheduled in Section A5.
 
+---
+
+## Section A4: Citation Support Check (Run-Scoped)
+
+### 1. What Changed
+- Extended `GateChecker.check_output` signature in `src/score/checker.py` to accept `sources`, `question`, and `papers`.
+- **Support Check 1 (G2 Numeric Fidelity):** Strictly verifies that any numerals present in assertive sentences appear in cited claim `value_json` or `source_excerpt` (fallback to `text` only if excerpt is absent). Reports `"Ungrounded numeral '<num>'"` upon violation.
+- **Support Check 2 (G2 Extended Excerpt Overlap):** Requires assertive sentences to share at least 2 non-stopword terms with the cited claim's `source_excerpt`. Reports `"Insufficient excerpt overlap (<count> < 2 non-stopword terms)"`.
+- **Support Check 3 (G3 Extended Source Topic Support):** Requires cited claim sources to share at least 1 substantive term or common morphological stem (prefix $\ge 4$ characters) with the research question text/scope. Reports `"Source topic mismatch between source '<title>' and question '<text>' (0 shared terms)"`.
+- **Run-Scoped `[P#]` Resolution:** Asserts that every `[P#]` token in output sentences resolves strictly to a source in that run's Lane A list ($1 \le \# \le \text{len}(papers)$); invalid or out-of-range references fail Gate G1.
+- Updated `src/synth/generator.py`: eliminated silent fallbacks that previously masked unresolvable `[P#]` tags with default claims, and passed `sources`, `question`, and `papers` to `self.checker.check_output`.
+
+### 2. Files Touched
+- `src/score/checker.py`
+- `src/synth/generator.py`
+- `tests/test_a4_traceable_citations.py` (new)
+- `INTEGRITY_REPORT.md`
+
+### 3. Tests Added & Executed
+- Added `tests/test_a4_traceable_citations.py` with:
+  1. `test_d1_defect_blocked_source_topic_mismatch_and_ungrounded_numeral`: Plants the exact D1 case (EU healthcare regulation paper cited for 32% software delivery velocity). Verifies document is BLOCKED and reports all 3 support violations.
+  2. `test_valid_citation_matching_numeral_and_topic_passes`: Verifies legitimate software engineering paper citation with grounded numerals and topic overlap passes all gates cleanly.
+
+### 4. Verification & Pasted Evidence
+
+#### Failing Test Output (Before Fix):
+```
+PYTHONPATH=. .venv/bin/pytest tests/test_a4_traceable_citations.py
+============================= test session starts ==============================
+rootdir: /Users/gauravm/Developer/projects/research-agent-ml-enterprise
+collected 2 items                                                              
+
+tests/test_a4_traceable_citations.py FF                                  [100%]
+
+=================================== FAILURES ===================================
+_____ test_d1_defect_blocked_source_topic_mismatch_and_ungrounded_numeral ______
+...
+>       result = checker.check_output(
+            sentences=[bad_sentence],
+            ledger_claims=ledger_claims,
+            source_texts=source_texts,
+            sources=sources,
+            question=question,
+        )
+E       TypeError: check_output() got an unexpected keyword argument 'sources'
+============================== 2 failed in 0.14s ===============================
+```
+
+#### Passing Test Output (After Fix):
+```
+PYTHONPATH=. .venv/bin/pytest tests/test_a4_traceable_citations.py
+============================= test session starts ==============================
+rootdir: /Users/gauravm/Developer/projects/research-agent-ml-enterprise
+collected 2 items                                                              
+
+tests/test_a4_traceable_citations.py ..                                  [100%]
+
+============================== 2 passed in 0.11s ===============================
+```
+
+#### Full Test Suite Status (Zero Regressions, 39 Passed):
+```
+PYTHONPATH=. .venv/bin/pytest tests evals -k "not test_ui_smoke"
+============================= test session starts ==============================
+rootdir: /Users/gauravm/Developer/projects/research-agent-ml-enterprise
+collected 40 items / 1 deselected / 39 selected                                
+
+tests/test_a2_honest_offline_fallback.py .                               [  2%]
+tests/test_a3_single_source_of_truth.py .                                [  5%]
+tests/test_a4_traceable_citations.py ..                                  [ 10%]
+tests/test_multilane_workflow.py .                                       [ 12%]
+tests/test_no_literal_report_text.py .                                   [ 15%]
+tests/test_pipeline.py ....                                              [ 25%]
+tests/test_question_formulator.py ..                                     [ 30%]
+evals/test_phase2_service.py ....                                        [ 41%]
+evals/test_phase3_enterprise.py ...                                      [ 48%]
+evals/test_phase4_synth.py ...                                           [ 56%]
+evals/test_phase5_practitioner_publish.py ..                             [ 61%]
+evals/test_r10_migration.py .                                            [ 64%]
+evals/test_regression.py ..............                                  [100%]
+
+================= 39 passed, 1 deselected, 1 warning in 8.80s ==================
+```
+
+### 5. Anything NOT Done in A4
+- Scoping of enterprise and practitioner observations to run and question is scheduled in Section A5.
+
+
 

@@ -147,12 +147,17 @@ class SynthesisEngine:
             for f_text in executive_synthesis["key_findings"]:
                 cited_cids = []
                 p_match = re.search(r"\[P(\d+)\]", f_text)
+                c_match = re.search(r"\[(c_[^\]]+)\]", f_text)
                 if p_match and papers:
                     p_idx = int(p_match.group(1)) - 1
                     if 0 <= p_idx < len(papers):
                         target_paper_id = papers[p_idx].get("id")
                         cited_cids = [c.id for c in eligible_claims if c.source_id == target_paper_id]
-                if not cited_cids:
+                elif c_match:
+                    target_cid = c_match.group(1)
+                    if target_cid in claims_by_id:
+                        cited_cids = [target_cid]
+                if not cited_cids and not p_match and not c_match:
                     cited_cids = default_claim_ids
 
                 sentences.append(
@@ -415,6 +420,9 @@ class SynthesisEngine:
             sentences=sentences,
             ledger_claims=claims_by_id,
             source_texts=source_texts,
+            sources=sources,
+            question=question,
+            papers=papers,
         )
 
         # 6. Run Quality Scorer
