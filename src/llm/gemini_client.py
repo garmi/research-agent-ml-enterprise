@@ -14,7 +14,7 @@ class GeminiClient:
         self.api_key = (api_key or os.getenv("GEMINI_API_KEY", "")).strip()
         if not self.api_key:
             raise RuntimeError("GEMINI_API_KEY is not set. Add it to .env (AI Studio key).")
-        raw_model = model or os.getenv("GEMINI_MODEL") or "gemini-3.8-flash"
+        raw_model = model or os.getenv("GEMINI_MODEL") or "gemini-2.5-flash"
         self.model = str(raw_model).strip()
         self.retries = retries
         self.timeout = timeout
@@ -36,6 +36,8 @@ class GeminiClient:
         if json_mode:
             body["generationConfig"]["responseMimeType"] = "application/json"
 
+        import re
+
         clean_model = self.model.strip()
         url = f"{self.base_url}/{clean_model}:generateContent"
         headers = {"x-goog-api-key": self.api_key, "Content-Type": "application/json"}
@@ -47,11 +49,16 @@ class GeminiClient:
                 if response.status_code == 429:
                     time.sleep(5 * (attempt + 1))
                     continue
-                response.raise_for_status()
+                if not response.ok:
+                    err_text = response.text
+                    err_clean = re.sub(r"AIza[0-9A-Za-z-_]{35}", "[REDACTED_KEY]", err_text)
+                    raise requests.HTTPError(f"HTTP {response.status_code} ({response.reason}): {err_clean}", response=response)
                 data = response.json()
                 parts = data["candidates"][0]["content"]["parts"]
                 return "".join(part.get("text", "") for part in parts)
-            except (requests.RequestException, KeyError, IndexError) as exc:
+            except Exception as exc:
                 last_exc = exc
                 time.sleep(2 ** attempt)
-        raise RuntimeError(f"Gemini request failed after retries: {last_exc}")
+        if last_exc:
+            raise last_exc
+        raise RuntimeError("Gemini request failed: unknown error.")

@@ -1251,21 +1251,38 @@ if results:
         unsafe_allow_html=True,
     )
 
-    # Success synthesis banner
-    gap_info = results.get("gap_matrix", {})
-    st.markdown(
-        f"""
-        <div style="background: #F0FDF4; border: 1px solid #86EFAC; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1.25rem; font-size: 0.88rem; color: #166534; display: flex; align-items: center; justify-content: space-between;">
-            <div>
-                <strong>✓ Multi-lane synthesis complete</strong> in {results['duration']} ({len(results.get('papers', []))} papers • {len(results.get('claims', []))} atomic ledger claims)
+    if results.get("is_fallback"):
+        blocking_msg = results.get(
+            "blocking_banner",
+            "EXTRACTIVE FALLBACK MODE • Primary model unavailable. Output contains extractive claims only and is blocked from publication.",
+        )
+        st.error(f"🛑 {blocking_msg}")
+        err_det = results.get("error_details") or {}
+        if err_det:
+            with st.expander("Diagnostic Error Details (LLM Provider Exception)", expanded=False):
+                st.code(
+                    f"Error Class: {err_det.get('error_class')}\n"
+                    f"HTTP Status: {err_det.get('http_status')}\n"
+                    f"Message: {err_det.get('error_message')}\n"
+                    f"Masked URL: {err_det.get('masked_url')}",
+                    language="text",
+                )
+    else:
+        # Success synthesis banner
+        gap_info = results.get("gap_matrix", {})
+        st.markdown(
+            f"""
+            <div style="background: #F0FDF4; border: 1px solid #86EFAC; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1.25rem; font-size: 0.88rem; color: #166534; display: flex; align-items: center; justify-content: space-between;">
+                <div>
+                    <strong>✓ Multi-lane synthesis complete</strong> in {results['duration']} ({len(results.get('papers', []))} papers • {len(results.get('claims', []))} atomic ledger claims)
+                </div>
+                <div style="font-size: 0.78rem; background: #DCFCE7; padding: 0.2rem 0.6rem; border-radius: 6px; font-weight: 700;">
+                    G1–G6 AUDITED • ZERO UNGROUNDED CLAIMS
+                </div>
             </div>
-            <div style="font-size: 0.78rem; background: #DCFCE7; padding: 0.2rem 0.6rem; border-radius: 6px; font-weight: 700;">
-                G1–G6 AUDITED • ZERO UNGROUNDED CLAIMS
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+            """,
+            unsafe_allow_html=True,
+        )
 
     fallback_note = results.get("synthesis", {}).get("llm_fallback_notice")
     if fallback_note:

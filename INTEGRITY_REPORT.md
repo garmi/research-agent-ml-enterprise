@@ -9,7 +9,7 @@ This document records the systematic verification and enforcement of integrity g
 | Defect ID | Description | Status | Evidence Summary |
 |-----------|-------------|--------|------------------|
 | **D1** | Canned findings, risks, business signals, roadmap steps, content ideas identical across unrelated questions | **Fixed in A1** | Removed 45 hardcoded content strings; zero-hit grep verified; `test_no_literal_report_text` passing. |
-| **D2** | Silent fallback on model error swallowed as generic RuntimeError; fallback produces normal-looking findings | In progress (A2) | Next section. |
+| **D2** | Silent fallback on model error swallowed as generic RuntimeError; fallback produces normal-looking findings | **Fixed in A2** | Extractive fallback implemented; error details captured; publication blocked; `test_a2_honest_offline_fallback` passing. |
 | **D3** | Gates audit shadow copy rather than final text; template verb stutter; uncited assertions passing G1 | Pending (A3) | Next section. |
 | **D4** | Lanes not scoped to current question; practitioner observations and enterprise registry leakage across runs | Pending (A4, A5) | Seed purged in A1; question-scoping in A5. |
 | **D5** | Off-topic and stale papers admitted; venue equals API provider name; blanket "Open Pre-print" tagging | Pending (A6, A7) | Next section. |
@@ -117,3 +117,86 @@ PYTHONPATH=. .venv/bin/pytest tests evals -k "not test_ui_smoke"
 - Did not modify Cloud Run settings or deploy.
 - Did not change existing gate weights or thresholds.
 - Dynamic extractive fallback synthesis is specified for implementation in A2.
+
+---
+
+## Section A2: Honest Offline Path, Error Logging, and Extractive Fallback
+
+### 1. What Changed
+- **Diagnosed LLM Failures & Credentials:**
+  - Evaluated local environment: `GEMINI_API_KEY` was populated with an OAuth token prefix (`AQ.A...`) rather than an AI Studio key (`AIza...`), causing HTTP 401 Unauthorized errors against Google generative language endpoints.
+  - Corrected model naming: The configured model was `gemini-3.8-flash `, which is non-existent in the Gemini Developer API and had trailing whitespace. Replaced default with canonical `gemini-2.5-flash` in `config.yaml` and `src/llm/factory.py`, and added `.strip()` to model sanitization.
+  - Sanitized Error Logging: Updated `src/llm/gemini_client.py` to preserve raw HTTP status codes, capture sanitized error response bodies, mask all API key patterns matching `AIza[0-9A-Za-z-_]{35}`, and surface transparent error metadata instead of swallowing errors into generic `RuntimeError`.
+- **Honest Extractive Fallback Implementation:**
+  - Implemented `_build_extractive_fallback_synthesis` in `src/analysis/multilane_runner.py`:
+    * When the primary language model is offline, encounters authentication failures, or raises an exception, the runner does not pretend synthesis succeeded or emit canned inferences.
+    * Generates findings verbatim from verified ledger claims: `[P#] Academic claim <verb> that <claim text>`, `[source_id] Enterprise evidence <verb> that <text>`, `[source_id] Field observation <verb> that <text>`.
+    * Leaves `recommendations: []`, `strategic_roadmap: []`, `themes: []`, and `market_trends: []` empty with an explicit message that recommendations require LLM synthesis.
+    * Sets `generation_mode: "extractive_fallback"`, `is_fallback: True`, and captures structured `error_details` (class, http_status, message, masked_url).
+    * Enforces publication block: Sets `publish_success = False`, `pub_res = {"allowed": False, "status": "blocked", "reason": "extractive_fallback_only"}`, `score_results["band"] = "NOT_PUBLISHABLE"`, and `doc.status = "blocked"`.
+    * Persists `generation_mode`, `is_fallback`, and `error_details` into `runs.config_json` in the SQLite ledger.
+- **UI Error & Fallback Presentation:**
+  - Updated `web_app.py` (lines 1253–1280):
+    * If `is_fallback` is True, suppresses the green "G1–G6 AUDITED • ZERO UNGROUNDED CLAIMS" banner and instead renders `st.error(f"🛑 {results['blocking_banner']}")`.
+    * Adds an expandable drawer `Diagnostic Error Details (LLM Provider Exception)` displaying the exact error class, HTTP status, sanitized error message, and masked URL without leaking sensitive secrets.
+
+### 2. Files Touched
+- `config.yaml`
+- `src/llm/factory.py`
+- `src/llm/gemini_client.py`
+- `src/analysis/multilane_runner.py`
+- `web_app.py`
+- `tests/test_a2_honest_offline_fallback.py` (new)
+- `INTEGRITY_REPORT.md`
+
+### 3. Tests Added & Executed
+- Added `tests/test_a2_honest_offline_fallback.py`:
+  - Simulates provider exception (`invalid_provider_that_raises`).
+  - Asserts `generation_mode == "extractive_fallback"`, `is_fallback is True`.
+  - Asserts structured `error_details` populated in payload and ledger `run_record.config_json`.
+  - Asserts quality band is NOT `PUBLISH_READY`.
+  - Asserts `recommendations` and `strategic_roadmap` are empty.
+  - Asserts all findings are verbatim extractive claims with valid citation tags `[P#]`.
+  - Result: **PASSED** in 7.47s.
+
+### 4. Verification & Pasted Evidence
+
+#### A2 Test Execution:
+```
+PYTHONPATH=. .venv/bin/pytest tests/test_a2_honest_offline_fallback.py
+============================= test session starts ==============================
+rootdir: /Users/gauravm/Developer/projects/research-agent-ml-enterprise
+collected 1 item                                                               
+
+tests/test_a2_honest_offline_fallback.py .                               [100%]
+
+========================= 1 passed, 1 warning in 7.47s =========================
+```
+
+#### Full Test Suite Status (Zero Regressions):
+```
+PYTHONPATH=. .venv/bin/pytest tests evals -k "not test_ui_smoke"
+============================= test session starts ==============================
+rootdir: /Users/gauravm/Developer/projects/research-agent-ml-enterprise
+collected 37 items / 1 deselected / 36 selected                                
+
+tests/test_a2_honest_offline_fallback.py .                               [  2%]
+tests/test_multilane_workflow.py .                                       [  5%]
+tests/test_no_literal_report_text.py .                                   [  8%]
+tests/test_pipeline.py ....                                              [ 19%]
+tests/test_question_formulator.py ..                                     [ 25%]
+evals/test_phase2_service.py ....                                        [ 36%]
+evals/test_phase3_enterprise.py ...                                      [ 44%]
+evals/test_phase4_synth.py ...                                           [ 52%]
+evals/test_phase5_practitioner_publish.py ..                             [ 58%]
+evals/test_r10_migration.py .                                            [ 61%]
+evals/test_regression.py ..............                                  [100%]
+
+================= 36 passed, 1 deselected, 1 warning in 8.58s ==================
+```
+
+### 5. Anything NOT Done in A2
+- Single output renderer unification across export formats (.md, .json, .csv, linkedin, html) is scheduled in Section A3.
+- Source-to-question term overlap and run-scoped citations are scheduled in Section A4.
+- Cloud Run environment variable updates are scheduled in Section A9.
+

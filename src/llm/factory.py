@@ -15,7 +15,7 @@ def build_llm(provider: str, config: Dict[str, Any]):
         return StubLLM()
     if p_clean == "gemini":
         cfg = config.get("gemini", {})
-        raw_model = os.getenv("GEMINI_MODEL") or cfg.get("model", "gemini-3.8-flash")
+        raw_model = os.getenv("GEMINI_MODEL") or cfg.get("model", "gemini-2.5-flash")
         model = str(raw_model).strip()
         return GeminiClient(model=model)
     cfg = config.get("ollama", {})

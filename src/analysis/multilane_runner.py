@@ -229,7 +229,22 @@ class MultiLaneResearchRunner:
             map_provider=map_provider,
             reduce_provider=reduce_provider,
             question_obj=question_obj,
+            academic_claims=academic_claims,
+            enterprise_claims=enterprise_claims,
+            practitioner_claims=practitioner_claims,
         )
+
+        gen_mode = executive_synthesis.get("generation_mode", "model")
+        is_fallback = (gen_mode == "extractive_fallback")
+        err_details = executive_synthesis.get("error_details")
+
+        run_record.config_json = {
+            "generation_mode": gen_mode,
+            "is_fallback": is_fallback,
+            "error_details": err_details,
+            "model_ids": {"map": map_provider, "reduce": reduce_provider},
+        }
+        self.repo.insert_run(run_record)
 
         # ----------------------------------------------------------------------
         # STAGE 7: GATE AUDIT (G1-G6) & QUALITY SCORING (S1-S7)
@@ -242,12 +257,26 @@ class MultiLaneResearchRunner:
         # STAGE 8: PUBLISH GATE & EXPORT DELIVERABLES
         # ----------------------------------------------------------------------
         report(8, "Publish Gate: Running denylist audit and packaging website deliverables...", 0.98)
-        publish_success, pub_res = self.publisher.publish_output(
-            output_id=doc.id,
-            reviewer="Research Studio Automated Gate",
-            signoff_reason="Multi-lane evidence ledger validated across Academic, Enterprise, and Field lanes.",
-            force_publish_non_band=True,
-        )
+        if is_fallback:
+            publish_success = False
+            pub_res = {
+                "allowed": False,
+                "status": "blocked",
+                "reasons": [
+                    "Outputs generated via extractive fallback cannot be published."
+                ],
+            }
+            score_results["band"] = "NOT_PUBLISHABLE"
+            score_results["total_score"] = min(float(score_results.get("total_score", 50.0)), 65.0)
+            doc.status = "blocked"
+            self.repo.insert_output(doc)
+        else:
+            publish_success, pub_res = self.publisher.publish_output(
+                output_id=doc.id,
+                reviewer="Research Studio Automated Gate",
+                signoff_reason="Multi-lane evidence ledger validated across Academic, Enterprise, and Field lanes.",
+                force_publish_non_band=False,
+            )
 
         elapsed = int(time.time() - start_time)
 
@@ -597,8 +626,12 @@ class MultiLaneResearchRunner:
         map_provider: str,
         reduce_provider: str,
         question_obj: Question,
+        academic_claims: List[Claim],
+        enterprise_claims: List[Claim],
+        practitioner_claims: List[Claim],
     ) -> Dict[str, Any]:
         """Generate high-level executive report, storylines, and packs."""
+        import re
         from src.analysis.business_context import detect_focus_areas
         from src.analysis.insight_builder import derive_business_signal, summarize_findings
         from src.analysis.synthesizer import SynthesisEngine as AnalysisSynthesisEngine
@@ -610,26 +643,133 @@ class MultiLaneResearchRunner:
         cfg = load_config("config.yaml") if Path("config.yaml").exists() else {}
         tone_key = "executive" if "Executive" in tone else "engineering" if "Architectural" in tone else "thought_leadership"
 
+        error_details = None
+        generation_mode = "model"
+
         try:
             map_llm = build_llm(map_provider, cfg)
             reduce_llm = map_llm if reduce_provider == map_provider else build_llm(reduce_provider, cfg)
             synthesizer = AnalysisSynthesisEngine(map_llm, reduce_llm, on_progress=lambda _: None)
             synth = synthesizer.analyze(topic, papers, tone=tone_key, length="detailed")
+            if map_provider == "stub" or reduce_provider == "stub":
+                generation_mode = "extractive_fallback"
+                synth["generation_mode"] = "extractive_fallback"
+                synth["is_fallback"] = True
+            else:
+                synth["generation_mode"] = "model"
+                synth["is_fallback"] = False
         except Exception as e:
+            exc_class = type(e).__name__
+            raw_msg = str(e)
+            clean_msg = re.sub(r"AIza[0-9A-Za-z-_]{35}", "[REDACTED_KEY]", raw_msg)
             logger.warning(
-                "Primary model '%s' synthesis encountered %s (%s). Executing graceful fallback to Deterministic Offline Engine.",
+                "Primary model '%s' synthesis encountered %s (%s). Executing graceful fallback to Extractive Claims Engine.",
                 map_provider,
-                type(e).__name__,
-                e,
+                exc_class,
+                clean_msg,
             )
-            map_llm = build_llm("stub", cfg)
-            reduce_llm = map_llm
-            synthesizer = AnalysisSynthesisEngine(map_llm, reduce_llm, on_progress=lambda _: None)
-            synth = synthesizer.analyze(topic, papers, tone=tone_key, length="detailed")
-            synth["llm_fallback_notice"] = (
-                f"Notice: Primary model '{map_provider}' was unavailable ({type(e).__name__}). "
-                "The report was automatically generated using the Deterministic Offline Synthesis Engine."
+            error_details = {"error_class": exc_class, "error_message": clean_msg}
+            generation_mode = "extractive_fallback"
+            synth = self._build_extractive_fallback_synthesis(
+                topic=topic,
+                papers=papers,
+                question_obj=question_obj,
+                academic_claims=academic_claims,
+                enterprise_claims=enterprise_claims,
+                practitioner_claims=practitioner_claims,
+                error_details=error_details,
             )
+
+        synth["generation_mode"] = generation_mode
+        synth["is_fallback"] = (generation_mode == "extractive_fallback")
+        synth["error_details"] = error_details
+
+        synth["papers"] = papers
+        synth["business_context"] = {
+            "focus_areas": detect_focus_areas(topic),
+            "business_signal": derive_business_signal(topic, papers),
+            "finding_summary": summarize_findings(synth.get("paper_summaries", [])),
+        }
+        synth["content_pack"] = ContentPackBuilder(topic).build(synth)
+
+        # Write output files
+        builder = ReportBuilder()
+        builder.write_markdown(topic, synth, filename="research_report.md")
+        builder.write_html_storyline(topic, synth, filename="strategic_storyline.html")
+        builder.write_linkedin_pack(topic, synth, filename="linkedin_professional_pack.md")
+        builder.write_json(synth, filename="research_report.json")
+        builder.write_csv(papers, filename="paper_index.csv")
+
+        return synth
+
+    def _build_extractive_fallback_synthesis(
+        self,
+        topic: str,
+        papers: List[Dict[str, Any]],
+        question_obj: Question,
+        academic_claims: List[Claim],
+        enterprise_claims: List[Claim],
+        practitioner_claims: List[Claim],
+        error_details: Dict[str, str],
+    ) -> Dict[str, Any]:
+        """Build strictly extractive claims list without inferred conclusions when model is unavailable."""
+        from src.synth.generator import SynthesisEngine
+        temp_engine = SynthesisEngine(db_path=self.db_path)
+
+        paper_id_map = {p.get("id"): f"P{idx}" for idx, p in enumerate(papers, 1)}
+
+        extractive_findings = []
+        for c in academic_claims:
+            p_tag = paper_id_map.get(c.source_id, "P1")
+            verb = temp_engine._select_verb_for_grade(c.grade)
+            c_text = c.text.strip().rstrip(".")
+            for prefix in ("the study reports that ", "the study finds that ", "the authors find that ", "empirical analysis shows that ", "research indicates that "):
+                if c_text.lower().startswith(prefix):
+                    c_text = c_text[len(prefix):]
+                    break
+            extractive_findings.append(f"[{p_tag}] Academic claim {verb} that {c_text}.")
+
+        for c in enterprise_claims:
+            verb = temp_engine._select_verb_for_grade(c.grade)
+            extractive_findings.append(f"[{c.source_id}] Enterprise evidence {verb} that {c.text.strip().rstrip('.')}.")
+
+        for c in practitioner_claims:
+            verb = temp_engine._select_verb_for_grade(c.grade)
+            extractive_findings.append(f"[{c.source_id}] Field observation {verb} that {c.text.strip().rstrip('.')}.")
+
+        if not extractive_findings:
+            extractive_findings = ["[None] No verified atomic claims available in evidence ledger."]
+
+        return {
+            "topic": topic,
+            "executive_summary": (
+                f"Synthesis unavailable: primary language model encountered {error_details.get('error_class', 'Error')} "
+                f"({error_details.get('error_message', 'unavailable')}). "
+                "The report presents verified extractive ledger claims only with zero inferred conclusions."
+            ),
+            "objective": f"Extractive evidence inventory for {topic}",
+            "research_questions": [question_obj.text],
+            "sources": sorted({p.get("source", "") for p in papers if p.get("source")}),
+            "time_window": "Not specified",
+            "papers": papers,
+            "paper_summaries": [],
+            "key_findings": extractive_findings,
+            "themes": [],
+            "market_trends": [],
+            "business_problems": [],
+            "research_gaps": [],
+            "recommendations": [],
+            "strategic_roadmap": [],
+            "content_ideas": [],
+            "references": [
+                f"[P{i}] {p.get('title', '')} ({p.get('year', 'n/a')}) {p.get('url') or p.get('link') or ''}".strip()
+                for i, p in enumerate(papers, start=1)
+            ],
+            "citation_check": {"total_citations": len(extractive_findings), "invalid_ids": []},
+            "generation_mode": "extractive_fallback",
+            "is_fallback": True,
+            "error_details": error_details,
+        }
 
         synth["papers"] = papers
         synth["business_context"] = {
@@ -809,7 +949,13 @@ class MultiLaneResearchRunner:
             "claims": claims_formatted,
             "sentence_traces": sentence_traces,
             "roadmap": roadmap_steps,
-            "content_ideas": executive_synthesis.get("content_ideas") or [],
+            "generation_mode": executive_synthesis.get("generation_mode", "model"),
+            "is_fallback": bool(executive_synthesis.get("is_fallback", False)),
+            "error_details": executive_synthesis.get("error_details"),
+            "blocking_banner": (
+                f"EXTRACTIVE FALLBACK MODE • Primary model unavailable ({(executive_synthesis.get('error_details') or {}).get('error_class', 'Offline')}). "
+                "Output generated from verified extractive claims only and is blocked from publication."
+            ) if executive_synthesis.get("is_fallback") else None,
             "gates_audit": gate_results,
             "quality_scorecard": score_results,
             "publish_res": publish_res,
