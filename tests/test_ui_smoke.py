@@ -77,42 +77,41 @@ def test_executive_studio_ui_smoke():
         # 10. Assert Executive Summary Card & Top 3 Findings
         assert page.locator("text=Strategic Signal & Executive Verdict").count() > 0
         assert page.locator("text=Top 3 Strategic Takeaways").count() > 0
-        assert page.locator("text=Key Signal 1").count() > 0
-        assert page.locator("text=Key Signal 2").count() > 0
-        assert page.locator("text=Key Signal 3").count() > 0
+        assert page.locator("text=KEY SIGNAL 1").count() > 0
+        assert page.locator("text=KEY SIGNAL 2").count() > 0
+        assert page.locator("text=KEY SIGNAL 3").count() > 0
 
         # 11. Assert 4 Metric Cards
         assert page.locator("text=Literature Volume").count() > 0
-        assert page.locator("text=Distinct Sources").count() > 0
+        assert page.locator("text=Distinct Repositories").count() > 0
         assert page.locator("text=Publication Horizon").count() > 0
         assert page.locator("text=Evidence Quality").count() > 0
 
         # 12. Assert All 7 Tabs are Present
         tab_names = [
-            "Findings",
-            "Papers",
-            "Themes & Trends",
-            "Gaps & Recommendations",
-            "Roadmap",
-            "Content Ideas",
-            "Citations & Quality",
+            "Findings & Risks",
+            "Empirical Papers",
+            "Thematic Landscape",
+            "Strategic Recommendations",
+            "Implementation Roadmap",
+            "LinkedIn & Executive Pack",
+            "Citation Audit & Quality",
         ]
         for name in tab_names:
             assert page.locator(f'button[role="tab"]:has-text("{name}")').count() > 0
 
-        # 13. Assert Papers Tab Dataframe & Re-synthesis Section
-        papers_tab = page.locator('button[role="tab"]:has-text("Papers")')
+        # 13. Assert Papers Tab & Re-synthesis Section
+        papers_tab = page.locator('button[role="tab"]:has-text("Empirical Papers")')
         papers_tab.click()
         time.sleep(1)
-        assert page.locator("text=Evaluated Academic Literature").count() > 0
+        assert page.locator("text=Empirical Reference Index").count() > 0
         assert page.locator("text=Exclude Papers & Re-Synthesize").count() > 0
 
         # 14. Assert Citations & Quality Tab
-        cit_tab = page.locator('button[role="tab"]:has-text("Citations & Quality")')
+        cit_tab = page.locator('button[role="tab"]:has-text("Citation Audit & Quality")')
         cit_tab.click()
         time.sleep(1)
         assert page.locator("text=Citation Audit Passed").count() > 0
-        assert page.locator("text=Empirical Reference Index").count() > 0
 
         # 15. Assert All 5 Labeled Download Buttons
         assert page.locator('button:has-text("Executive Brief (.md)")').count() > 0
@@ -120,5 +119,6 @@ def test_executive_studio_ui_smoke():
         assert page.locator('button:has-text("Paper Index (.csv)")').count() > 0
         assert page.locator('button:has-text("LinkedIn Pack (.md)")').count() > 0
         assert page.locator('button:has-text("Presentation Deck (.html)")').count() > 0
+
 
         browser.close()
