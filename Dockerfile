@@ -14,14 +14,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
+# Install Python dependencies first (layer cached)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application source and configuration files
-COPY src/ ./src/
-COPY questions/ ./questions/
-COPY web_app.py config.yaml ./
+# Copy all application source code, configs, grade rules, and schemas
+COPY . .
 
 # Pre-create runtime directories for outputs and database storage
 RUN mkdir -p outputs/reports outputs/json outputs/markdown outputs/csv ledger/backups
