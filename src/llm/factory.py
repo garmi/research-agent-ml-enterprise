@@ -11,7 +11,7 @@ def build_llm(provider: str, config: Dict[str, Any]):
     """Return an LLM client. provider: 'ollama' or 'gemini'."""
     if provider == "gemini":
         cfg = config.get("gemini", {})
-        model = os.getenv("GEMINI_MODEL") or cfg.get("model", "gemini-2.5-flash")
+        model = os.getenv("GEMINI_MODEL") or cfg.get("model", "gemini-3.8-flash")
         return GeminiClient(model=model)
     cfg = config.get("ollama", {})
     return OllamaClient(

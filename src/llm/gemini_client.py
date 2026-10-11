@@ -14,7 +14,7 @@ class GeminiClient:
         self.api_key = api_key or os.getenv("GEMINI_API_KEY", "")
         if not self.api_key:
             raise RuntimeError("GEMINI_API_KEY is not set. Add it to .env (AI Studio key).")
-        self.model = model or os.getenv("GEMINI_MODEL", "gemini-flash-latest")
+        self.model = model or os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
         self.retries = retries
         self.timeout = timeout
         self.base_url = "https://generativelanguage.googleapis.com/v1beta/models"

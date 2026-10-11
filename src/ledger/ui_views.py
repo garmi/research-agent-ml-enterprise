@@ -8,10 +8,24 @@ All user actions write immutable audit logs to the SQLite reviews table.
 from __future__ import annotations
 
 import streamlit as st
-import pandas as pd
 from typing import Any, Dict, List, Optional
 
-from src.ledger.service import LedgerService
+def render_safe_table(records: List[Dict[str, Any]], use_container_width: bool = True) -> None:
+    """Render a table safely using st.dataframe, falling back to markdown if pyarrow fails."""
+    if not records:
+        return
+    try:
+        st.dataframe(records, use_container_width=use_container_width)
+    except Exception:
+        # Fallback to pure markdown table if pyarrow / dylib linking issue occurs
+        keys = list(records[0].keys())
+        header = "| " + " | ".join(keys) + " |"
+        sep = "| " + " | ".join(["---"] * len(keys)) + " |"
+        rows = [
+            "| " + " | ".join(str(r.get(k, "")).replace("\n", " ").replace("|", "\\|") for k in keys) + " |"
+            for r in records
+        ]
+        st.markdown("\n".join([header, sep] + rows))
 
 
 def render_question_register(service: LedgerService) -> None:
@@ -45,7 +59,7 @@ def render_question_register(service: LedgerService) -> None:
             }
             for q in questions
         ]
-        st.dataframe(pd.DataFrame(q_data), use_container_width=True)
+        render_safe_table(q_data, use_container_width=True)
     else:
         st.info("No questions in register. Syncing default questions from YAML...")
         service.sync_questions_from_yaml()
@@ -119,7 +133,7 @@ def render_venue_tiering(service: LedgerService) -> None:
     st.markdown("---")
     st.subheader("Venues in Database")
     if venues:
-        st.dataframe(pd.DataFrame(venues), use_container_width=True)
+        render_safe_table(venues, use_container_width=True)
     else:
         st.info("No venues recorded yet in ledger. Ingest papers to view venue tiering.")
 
@@ -384,10 +398,10 @@ def render_publish_gate_view(service: LedgerService) -> None:
 
         st.markdown("---")
         st.subheader("Component Breakdown (S1 - S7)")
-        c_df = pd.DataFrame([
+        c_df = [
             {"Component": k, "Score": v} for k, v in score["components"].items()
-        ])
-        st.dataframe(c_df, use_container_width=True)
+        ]
+        render_safe_table(c_df, use_container_width=True)
 
         st.subheader("Top Recommended Improvements")
         for imp in score.get("top_3_improvements", []):
@@ -539,7 +553,7 @@ def render_runs_and_scores_view(service: LedgerService) -> None:
 
     if reviews:
         st.subheader("Recent Human Gate Reviews")
-        st.dataframe(pd.DataFrame(reviews), use_container_width=True)
+        render_safe_table(reviews, use_container_width=True)
     else:
         st.info("No reviews recorded yet.")
 
