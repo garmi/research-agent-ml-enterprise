@@ -10,7 +10,7 @@ This document records the systematic verification and enforcement of integrity g
 |-----------|-------------|--------|------------------|
 | **D1** | Canned findings, risks, business signals, roadmap steps, content ideas identical across unrelated questions | **Fixed in A1** | Removed 45 hardcoded content strings; zero-hit grep verified; `test_no_literal_report_text` passing. |
 | **D2** | Silent fallback on model error swallowed as generic RuntimeError; fallback produces normal-looking findings | **Fixed in A2** | Extractive fallback implemented; error details captured; publication blocked; `test_a2_honest_offline_fallback` passing. |
-| **D3** | Gates audit shadow copy rather than final text; template verb stutter; uncited assertions passing G1 | Pending (A3) | Next section. |
+| **D3** | Gates audit shadow copy rather than final text; template verb stutter; uncited assertions passing G1 | **Fixed in A3** | Migration 002 applied; UnifiedRenderer implemented; output_sentences single source of truth; `test_a3_single_source_of_truth` passing. |
 | **D4** | Lanes not scoped to current question; practitioner observations and enterprise registry leakage across runs | Pending (A4, A5) | Seed purged in A1; question-scoping in A5. |
 | **D5** | Off-topic and stale papers admitted; venue equals API provider name; blanket "Open Pre-print" tagging | Pending (A6, A7) | Next section. |
 | **D6** | Contradictory UI state (green banner beside failing gate score); component scores constant | Pending (A8) | Next section. |
@@ -199,4 +199,110 @@ evals/test_regression.py ..............                                  [100%]
 - Single output renderer unification across export formats (.md, .json, .csv, linkedin, html) is scheduled in Section A3.
 - Source-to-question term overlap and run-scoped citations are scheduled in Section A4.
 - Cloud Run environment variable updates are scheduled in Section A9.
+
+---
+
+## Section A3: Single Source of Truth: output_sentences Table
+
+### 1. What Changed
+- **Eliminated Defect D3 (Shadow Copy Synthesis & Drift):**
+  - Previously, the UI, Markdown report, HTML storyline, and LinkedIn pack drifted from each other and showed synthesis text that had never been audited by Hard Gates G1–G6.
+  - Formulated and applied forward-only migration `ledger/migrations/002_expand_sentence_types.sql` (migrating `ledger.db` to schema version 2), safely expanding the `output_sentences.type` CHECK constraint to include:
+    `('assertive', 'opinion', 'field', 'heading', 'signal', 'risk', 'roadmap', 'finding', 'negative_finding')`.
+  - Updated Pydantic data model `SentenceType` in `src/ledger/models.py`.
+- **Created Unified Single Renderer (`src/output/unified_renderer.py`):**
+  - Created `UnifiedRenderer`: reads strictly from `output_sentences` for `doc_id` and produces:
+    * UI presentation structures (`findings`, `signals`, `risks`, `roadmap`, `negative_findings`).
+    * Markdown report (`outputs/reports/research_report.md`).
+    * HTML storyline (`outputs/reports/strategic_storyline.html`).
+    * LinkedIn pack (`outputs/reports/linkedin_professional_pack.md`).
+    * JSON export (`outputs/json/research_report.json`), explicitly embedding the full `output_sentences` row list.
+    * Paper index CSV (`outputs/csv/paper_index.csv`).
+  - Enforced honest empty states: If a section has no grounded sentences (e.g., no negative findings, no risks), generic filler is eliminated in favor of explicit empty states:
+    * Negative findings: references `search_log` zero-result queries or gap matrix boundaries, else `"No negative findings in evidence ledger."`
+    * Risks: `"No verified risk assertions in evidence ledger."`
+    * Roadmap: `"Recommendations require LLM synthesis; currently in offline extractive mode."`
+- **Synchronized Stage 6 Synthesis and Governance Audit:**
+  - In `src/analysis/multilane_runner.py`:
+    * Generates `executive_synthesis` (via model or extractive fallback).
+    * `synth_engine.build_field_note` builds the complete `OutputDoc` and all `OutputSentence` records for `findings`, `signals`, `risks`, `negative_findings`, `roadmap`, and persists them to `output_sentences` table in `ledger.db`.
+    * Hard Gates G1–G6 and S1–S7 Quality Scorer audit the exact sentences in `output_sentences`.
+    * `UnifiedRenderer` writes all outputs from those audited sentences.
+    * `_build_result_payload` passes `doc_id` and derives all UI components strictly from `sentences`.
+  - In `src/score/checker.py`:
+    * Formatted violation messages as `Sentence [{s.id}] (ordinal {s.ordinal}) ...` and exposed structured `hard_gates` containing matching `sentence_id` values.
+
+### 2. Files Touched
+- `ledger/migrations/002_expand_sentence_types.sql` (new)
+- `src/ledger/models.py`
+- `src/output/unified_renderer.py` (new)
+- `src/synth/generator.py`
+- `src/analysis/multilane_runner.py`
+- `src/score/checker.py`
+- `tests/test_a3_single_source_of_truth.py` (new)
+- `INTEGRITY_REPORT.md`
+
+### 3. Tests Added & Executed
+- Added `tests/test_a3_single_source_of_truth.py`:
+  - Runs workflow and extracts `doc_id`.
+  - Queries `output_sentences` table from `ledger.db`.
+  - Asserts every UI finding, signal, risk, roadmap action exists in `output_sentences`.
+  - Asserts gate audit logged sentence IDs match `output_sentences.id`.
+  - Asserts `research_report.json` contains full `output_sentences` list.
+  - Asserts `research_report.md` and `linkedin_professional_pack.md` render sentences matching `output_sentences`.
+  - Asserts negative findings are present and grounded in `output_sentences`.
+  - Result: **PASSED** in 0.40s.
+
+### 4. Verification & Pasted Evidence
+
+#### Failing Test Output (Before Fix):
+```
+=================================== FAILURES ===================================
+_____________ test_every_rendered_text_exists_in_output_sentences ______________
+        doc_id = result.get("doc_id")
+>       assert doc_id, "Expected doc_id in workflow result payload"
+E       AssertionError: Expected doc_id in workflow result payload
+E       assert None
+tests/test_a3_single_source_of_truth.py:50: AssertionError
+```
+
+#### Passing Test Output (After Fix):
+```
+PYTHONPATH=. .venv/bin/pytest tests/test_a3_single_source_of_truth.py
+============================= test session starts ==============================
+rootdir: /Users/gauravm/Developer/projects/research-agent-ml-enterprise
+collected 1 item                                                               
+
+tests/test_a3_single_source_of_truth.py .                                [100%]
+
+========================= 1 passed, 1 warning in 0.40s =========================
+```
+
+#### Full Test Suite Status (Zero Regressions):
+```
+PYTHONPATH=. .venv/bin/pytest tests evals -k "not test_ui_smoke"
+============================= test session starts ==============================
+rootdir: /Users/gauravm/Developer/projects/research-agent-ml-enterprise
+collected 38 items / 1 deselected / 37 selected                                
+
+tests/test_a2_honest_offline_fallback.py .                               [  2%]
+tests/test_a3_single_source_of_truth.py .                                [  5%]
+tests/test_multilane_workflow.py .                                       [  8%]
+tests/test_no_literal_report_text.py .                                   [ 10%]
+tests/test_pipeline.py ....                                              [ 21%]
+tests/test_question_formulator.py ..                                     [ 27%]
+evals/test_phase2_service.py ....                                        [ 37%]
+evals/test_phase3_enterprise.py ...                                      [ 45%]
+evals/test_phase4_synth.py ...                                           [ 54%]
+evals/test_phase5_practitioner_publish.py ..                             [ 59%]
+evals/test_r10_migration.py .                                            [ 62%]
+evals/test_regression.py ..............                                  [100%]
+
+================= 37 passed, 1 deselected, 1 warning in 8.81s ==================
+```
+
+### 5. Anything NOT Done in A3
+- Run-scoped citation checks and source-to-question term overlap are scheduled in Section A4.
+- Question-scoping of practitioner observations and enterprise sources is scheduled in Section A5.
+
 

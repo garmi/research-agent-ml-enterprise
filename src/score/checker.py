@@ -52,6 +52,14 @@ class GateCheckResult:
         )
 
     def to_dict(self) -> Dict[str, Any]:
+        def _parse_violations(gate_key: str) -> List[Dict[str, Any]]:
+            parsed = []
+            for v in self.violations.get(gate_key, []):
+                m = re.search(r"Sentence \[([^\]]+)\]", str(v))
+                sent_id = m.group(1) if m else None
+                parsed.append({"sentence_id": sent_id, "message": str(v)})
+            return parsed
+
         return {
             "passed": self.passed,
             "status": "PASS" if self.passed else "BLOCKED",
@@ -62,6 +70,14 @@ class GateCheckResult:
                 "G4_language_honesty": {"pass": self.g4_pass, "violations": self.violations["G4"]},
                 "G5_confidentiality": {"pass": self.g5_pass, "violations": self.violations["G5"]},
                 "G6_copyright": {"pass": self.g6_pass, "violations": self.violations["G6"]},
+            },
+            "hard_gates": {
+                "G1": {"pass": self.g1_pass, "violations": _parse_violations("G1")},
+                "G2": {"pass": self.g2_pass, "violations": _parse_violations("G2")},
+                "G3": {"pass": self.g3_pass, "violations": _parse_violations("G3")},
+                "G4": {"pass": self.g4_pass, "violations": _parse_violations("G4")},
+                "G5": {"pass": self.g5_pass, "violations": _parse_violations("G5")},
+                "G6": {"pass": self.g6_pass, "violations": _parse_violations("G6")},
             },
         }
 
@@ -143,7 +159,7 @@ class GateChecker:
 
         for s in sentences:
             s_text = s.text.strip()
-            if s.type != "assertive":
+            if s.type not in ("assertive", "finding"):
                 # Opinions and field notes are checked for confidentiality and copyright only
                 self._check_confidentiality(s_text, result)
                 self._check_copyright(s_text, source_texts or {}, result)
@@ -154,7 +170,7 @@ class GateChecker:
             if not claim_ids:
                 result.g1_pass = False
                 result.violations["G1"].append(
-                    f"Sentence {s.ordinal} lacks citation: '{s_text}'"
+                    f"Sentence [{s.id}] (ordinal {s.ordinal}) lacks citation: '{s_text}'"
                 )
                 continue
 
@@ -164,7 +180,7 @@ class GateChecker:
                 if not c or c.status == "rejected":
                     result.g1_pass = False
                     result.violations["G1"].append(
-                        f"Sentence {s.ordinal} cites invalid or rejected claim '{cid}'"
+                        f"Sentence [{s.id}] (ordinal {s.ordinal}) cites invalid or rejected claim '{cid}'"
                     )
                 else:
                     cited_claims.append(c)
@@ -188,7 +204,7 @@ class GateChecker:
                     if not num_found:
                         result.g2_pass = False
                         result.violations["G2"].append(
-                            f"Sentence {s.ordinal} contains ungrounded numeral '{num}': '{s_text}'"
+                            f"Sentence [{s.id}] (ordinal {s.ordinal}) contains ungrounded numeral '{num}': '{s_text}'"
                         )
 
             # G3: Entity fidelity
@@ -198,7 +214,7 @@ class GateChecker:
                     if c.entity_match not in ("exact", "family"):
                         result.g3_pass = False
                         result.violations["G3"].append(
-                            f"Sentence {s.ordinal} names Kiro but cites claim {c.id} with '{c.entity_match}' match: '{s_text}'"
+                            f"Sentence [{s.id}] (ordinal {s.ordinal}) names Kiro but cites claim {c.id} with '{c.entity_match}' match: '{s_text}'"
                         )
 
             # G4: Language honesty
@@ -211,7 +227,7 @@ class GateChecker:
                     result.g4_pass = False
                     weakest_claim = min(cited_claims, key=lambda c: self.get_max_allowed_rank(c.grade))
                     result.violations["G4"].append(
-                        f"Sentence {s.ordinal} uses verb '{verb}' (level {verb_rank}) exceeding weakest claim {weakest_claim.id} grade '{weakest_claim.grade}' (max level {min_allowed})"
+                        f"Sentence [{s.id}] (ordinal {s.ordinal}) uses verb '{verb}' (level {verb_rank}) exceeding weakest claim {weakest_claim.id} grade '{weakest_claim.grade}' (max level {min_allowed})"
                     )
 
             # G5: Confidentiality
@@ -229,7 +245,7 @@ class GateChecker:
                     if not abstraction_ok:
                         result.g5_pass = False
                         result.violations["G5"].append(
-                            f"Sentence {s.ordinal} cites practitioner claim '{c.id}' without confirmed abstraction (R12 violation)"
+                            f"Sentence [{s.id}] (ordinal {s.ordinal}) cites practitioner claim '{c.id}' without confirmed abstraction (R12 violation)"
                         )
 
             # G6: Copyright

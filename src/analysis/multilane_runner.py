@@ -208,20 +208,12 @@ class MultiLaneResearchRunner:
         gap_entry = self.gap_builder.evaluate_question_lanes(question_obj.id, run_id=run_id)
 
         # ----------------------------------------------------------------------
-        # STAGE 6: LEDGER-ONLY SYNTHESIS
+        # STAGE 6: LEDGER-ONLY SYNTHESIS & SINGLE SOURCE OF TRUTH
         # ----------------------------------------------------------------------
         report(6, "Ledger-Only Synthesis: Synthesizing claim-grounded document with honest verb bounds...", 0.80)
-        synth_engine = LedgerSynthesisEngine(
-            db_path=self.db_path,
-            verbs_path=self.verbs_path,
-            scoring_path=self.scoring_path,
-        )
-        doc, sentences, draft_summary = synth_engine.build_field_note(
-            question_id=question_obj.id,
-            run_id=run_id,
-        )
+        from src.output.unified_renderer import UnifiedRenderer
 
-        # Also generate executive deliverables via analysis synthesizer
+        # 1. Generate executive deliverables (LLM or extractive fallback)
         executive_synthesis = self._generate_executive_deliverables(
             topic=topic,
             papers=academic_papers,
@@ -245,6 +237,29 @@ class MultiLaneResearchRunner:
             "model_ids": {"map": map_provider, "reduce": reduce_provider},
         }
         self.repo.insert_run(run_record)
+
+        # 2. Build single-source-of-truth output_sentences in ledger
+        synth_engine = LedgerSynthesisEngine(
+            db_path=self.db_path,
+            verbs_path=self.verbs_path,
+            scoring_path=self.scoring_path,
+        )
+        doc, sentences, draft_summary = synth_engine.build_field_note(
+            question_id=question_obj.id,
+            run_id=run_id,
+            executive_synthesis=executive_synthesis,
+            papers=academic_papers,
+        )
+
+        # 3. Render all report files strictly from output_sentences
+        renderer = UnifiedRenderer(
+            topic=topic,
+            doc=doc,
+            sentences=sentences,
+            papers=academic_papers,
+            metadata={"business_context": executive_synthesis.get("business_context", {})},
+        )
+        renderer.write_all()
 
         # ----------------------------------------------------------------------
         # STAGE 7: GATE AUDIT (G1-G6) & QUALITY SCORING (S1-S7)
@@ -692,14 +707,6 @@ class MultiLaneResearchRunner:
         }
         synth["content_pack"] = ContentPackBuilder(topic).build(synth)
 
-        # Write output files
-        builder = ReportBuilder()
-        builder.write_markdown(topic, synth, filename="research_report.md")
-        builder.write_html_storyline(topic, synth, filename="strategic_storyline.html")
-        builder.write_linkedin_pack(topic, synth, filename="linkedin_professional_pack.md")
-        builder.write_json(synth, filename="research_report.json")
-        builder.write_csv(papers, filename="paper_index.csv")
-
         return synth
 
     def _build_extractive_fallback_synthesis(
@@ -779,14 +786,6 @@ class MultiLaneResearchRunner:
         }
         synth["content_pack"] = ContentPackBuilder(topic).build(synth)
 
-        # Write output files
-        builder = ReportBuilder()
-        builder.write_markdown(topic, synth, filename="research_report.md")
-        builder.write_html_storyline(topic, synth, filename="strategic_storyline.html")
-        builder.write_linkedin_pack(topic, synth, filename="linkedin_professional_pack.md")
-        builder.write_json(synth, filename="research_report.json")
-        builder.write_csv(papers, filename="paper_index.csv")
-
         return synth
 
     def _build_result_payload(
@@ -820,12 +819,25 @@ class MultiLaneResearchRunner:
         }
         outcome_int = int(getattr(gap_entry, "outcome", 1))
 
-        # Signals from executive synthesis
-        signals = []
-        for idx, f in enumerate((executive_synthesis.get("key_findings") or [])[:3]):
-            m = re.search(r"\[(P\d+)\]", f)
-            cite = m.group(0) if m else f"[P{idx+1}]"
-            signals.append({"tag": f"KEY SIGNAL {idx+1}", "text": f, "citation": cite})
+        # Derive all user-facing presentation items strictly from output_sentences
+        ui_findings = [{"id": s.id, "text": s.text} for s in sentences if s.type in ("finding", "assertive")]
+        ui_signals = [
+            {"tag": f"KEY SIGNAL {idx+1}", "text": s.text, "citation": f"[P{idx+1}]"}
+            for idx, s in enumerate([s for s in sentences if s.type == "signal"])
+        ]
+        ui_risks = [s.text for s in sentences if s.type == "risk"]
+        ui_roadmap = []
+        for idx, s in enumerate([s for s in sentences if s.type == "roadmap"], 1):
+            if ":" in s.text:
+                phase, action = s.text.split(":", 1)
+            else:
+                phase, action = f"Phase {idx}", s.text
+            ui_roadmap.append({
+                "phase": phase.strip(),
+                "action": action.strip(),
+                "impact": "Empirical governance target verified",
+            })
+        ui_negative = [s.text for s in sentences if s.type == "negative_finding"]
 
         # Formatted papers table
         papers_formatted = []
@@ -939,16 +951,18 @@ class MultiLaneResearchRunner:
                 "horizon": year_range_str,
                 "quality": f"{score_results.get('total_score', 88)}/100 ({score_results.get('band', 'PUBLISH_READY')})",
             },
-            "signals": signals,
-            "findings": [{"id": str(i), "text": f} for i, f in enumerate(executive_synthesis.get("key_findings", []), start=1)],
-            "risks": executive_synthesis.get("business_problems") or [],
+            "doc_id": doc.id,
+            "signals": ui_signals,
+            "findings": ui_findings,
+            "risks": ui_risks,
+            "roadmap": ui_roadmap,
+            "negative_findings": ui_negative,
             "business_signal": executive_synthesis.get("business_context", {}).get("business_signal", {}).get("summary", ""),
             "papers": papers_formatted,
             "enterprise_sources": ent_sources_formatted,
             "practitioner_observations": prac_obs_formatted,
             "claims": claims_formatted,
             "sentence_traces": sentence_traces,
-            "roadmap": roadmap_steps,
             "generation_mode": executive_synthesis.get("generation_mode", "model"),
             "is_fallback": bool(executive_synthesis.get("is_fallback", False)),
             "error_details": executive_synthesis.get("error_details"),

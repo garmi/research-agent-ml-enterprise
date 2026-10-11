@@ -25,7 +25,10 @@ ClaimGrade = Literal["strong", "moderate", "weak", "vendor_claim", "anecdote"]
 ClaimStatus = Literal["auto", "approved", "edited", "rejected"]
 OutputKind = Literal["field_note", "strategy_doc", "json_export"]
 OutputStatus = Literal["draft", "in_review", "published", "blocked", "legacy-ungraded"]
-SentenceType = Literal["assertive", "opinion", "field", "heading"]
+SentenceType = Literal[
+    "assertive", "opinion", "field", "heading",
+    "signal", "risk", "roadmap", "finding", "negative_finding"
+]
 
 
 def now_utc_iso() -> str:

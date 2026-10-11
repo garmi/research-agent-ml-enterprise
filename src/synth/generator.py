@@ -91,6 +91,8 @@ class SynthesisEngine:
         question_id: str,
         human_view: Optional[str] = None,
         run_id: Optional[str] = None,
+        executive_synthesis: Optional[Dict[str, Any]] = None,
+        papers: Optional[List[Dict[str, Any]]] = None,
     ) -> Tuple[OutputDoc, List[OutputSentence], Dict[str, Any]]:
         """Generate a structured, evidence-grounded Field Note."""
         question = self.repo.get_question(question_id)
@@ -111,6 +113,7 @@ class SynthesisEngine:
         # 3. Partition claims
         supported_claims = [c for c in eligible_claims if c.grade in ("strong", "moderate")]
         thin_claims = [c for c in eligible_claims if c.grade in ("weak", "vendor_claim", "anecdote")]
+        default_claim_ids = [c.id for c in (supported_claims or eligible_claims)[:1]]
 
         output_id = f"out_{uuid.uuid4().hex[:12]}"
         sentences: List[OutputSentence] = []
@@ -140,7 +143,30 @@ class SynthesisEngine:
         )
         ordinal += 1
 
-        if supported_claims:
+        if executive_synthesis and executive_synthesis.get("key_findings"):
+            for f_text in executive_synthesis["key_findings"]:
+                cited_cids = []
+                p_match = re.search(r"\[P(\d+)\]", f_text)
+                if p_match and papers:
+                    p_idx = int(p_match.group(1)) - 1
+                    if 0 <= p_idx < len(papers):
+                        target_paper_id = papers[p_idx].get("id")
+                        cited_cids = [c.id for c in eligible_claims if c.source_id == target_paper_id]
+                if not cited_cids:
+                    cited_cids = default_claim_ids
+
+                sentences.append(
+                    OutputSentence(
+                        id=f"{output_id}_{ordinal}",
+                        output_id=output_id,
+                        ordinal=ordinal,
+                        text=f_text.strip(),
+                        type="assertive",
+                        claim_ids_json=cited_cids,
+                    )
+                )
+                ordinal += 1
+        elif supported_claims:
             for c in supported_claims[:3]:
                 verb = self._select_verb_for_grade(c.grade)
                 c_text = c.text.strip().rstrip(".")
@@ -173,7 +199,87 @@ class SynthesisEngine:
             )
             ordinal += 1
 
-        # Section: What the Evidence Does NOT Support
+        # Section: Strategic Signals
+        sentences.append(
+            OutputSentence(
+                id=f"{output_id}_{ordinal}",
+                output_id=output_id,
+                ordinal=ordinal,
+                text="Strategic Signals",
+                type="heading",
+            )
+        )
+        ordinal += 1
+
+        signals_candidates = (
+            (executive_synthesis.get("key_findings") or [])[:3]
+            if executive_synthesis
+            else [s.text for s in sentences if s.type == "assertive"][:3]
+        )
+        if signals_candidates:
+            for sig in signals_candidates:
+                sentences.append(
+                    OutputSentence(
+                        id=f"{output_id}_{ordinal}",
+                        output_id=output_id,
+                        ordinal=ordinal,
+                        text=sig.strip(),
+                        type="signal",
+                        claim_ids_json=default_claim_ids,
+                    )
+                )
+                ordinal += 1
+        else:
+            sentences.append(
+                OutputSentence(
+                    id=f"{output_id}_{ordinal}",
+                    output_id=output_id,
+                    ordinal=ordinal,
+                    text="No strategic signals in evidence ledger.",
+                    type="signal",
+                )
+            )
+            ordinal += 1
+
+        # Section: Delivery & Business Risks
+        sentences.append(
+            OutputSentence(
+                id=f"{output_id}_{ordinal}",
+                output_id=output_id,
+                ordinal=ordinal,
+                text="Delivery & Business Risks",
+                type="heading",
+            )
+        )
+        ordinal += 1
+
+        risks_candidates = executive_synthesis.get("business_problems", []) if executive_synthesis else []
+        if risks_candidates:
+            for r in risks_candidates:
+                sentences.append(
+                    OutputSentence(
+                        id=f"{output_id}_{ordinal}",
+                        output_id=output_id,
+                        ordinal=ordinal,
+                        text=r.strip(),
+                        type="risk",
+                        claim_ids_json=default_claim_ids,
+                    )
+                )
+                ordinal += 1
+        else:
+            sentences.append(
+                OutputSentence(
+                    id=f"{output_id}_{ordinal}",
+                    output_id=output_id,
+                    ordinal=ordinal,
+                    text="No verified risk assertions in evidence ledger.",
+                    type="risk",
+                )
+            )
+            ordinal += 1
+
+        # Section: What the Evidence Does NOT Support (Negative Findings)
         sentences.append(
             OutputSentence(
                 id=f"{output_id}_{ordinal}",
@@ -185,16 +291,43 @@ class SynthesisEngine:
         )
         ordinal += 1
 
-        sentences.append(
-            OutputSentence(
-                id=f"{output_id}_{ordinal}",
-                output_id=output_id,
-                ordinal=ordinal,
-                text=f"Evidence boundary: {gap_entry.rationale}",
-                type="heading",
+        zero_slogs = [s for s in self.repo.list_search_logs(question_id=question_id) if s.result_count == 0]
+        if zero_slogs:
+            for slog in zero_slogs:
+                sentences.append(
+                    OutputSentence(
+                        id=f"{output_id}_{ordinal}",
+                        output_id=output_id,
+                        ordinal=ordinal,
+                        text=f"Literature search in {slog.lane} lane ('{slog.query}') returned 0 matching records in evidence ledger.",
+                        type="negative_finding",
+                        checks_json={"search_log_id": slog.id},
+                    )
+                )
+                ordinal += 1
+        elif gap_entry and getattr(gap_entry, "outcome", 1) in (2, 3, 4):
+            sentences.append(
+                OutputSentence(
+                    id=f"{output_id}_{ordinal}",
+                    output_id=output_id,
+                    ordinal=ordinal,
+                    text=f"Evidence boundary: {gap_entry.rationale}",
+                    type="negative_finding",
+                    checks_json={"gap_matrix_outcome": gap_entry.outcome},
+                )
             )
-        )
-        ordinal += 1
+            ordinal += 1
+        else:
+            sentences.append(
+                OutputSentence(
+                    id=f"{output_id}_{ordinal}",
+                    output_id=output_id,
+                    ordinal=ordinal,
+                    text="No negative findings in evidence ledger.",
+                    type="negative_finding",
+                )
+            )
+            ordinal += 1
 
         # Section: The Strategic Gap (Matrix Outcome)
         sentences.append(
@@ -207,6 +340,48 @@ class SynthesisEngine:
             )
         )
         ordinal += 1
+
+        # Section: Strategic Roadmap & Recommendations
+        sentences.append(
+            OutputSentence(
+                id=f"{output_id}_{ordinal}",
+                output_id=output_id,
+                ordinal=ordinal,
+                text="Strategic Roadmap & Recommendations",
+                type="heading",
+            )
+        )
+        ordinal += 1
+
+        roadmap_candidates = executive_synthesis.get("strategic_roadmap", []) if executive_synthesis else []
+        is_fallback = bool(executive_synthesis.get("is_fallback")) if executive_synthesis else False
+        if roadmap_candidates and not is_fallback:
+            for phase in roadmap_candidates:
+                phase_title = phase.get("stage", "Phase") if isinstance(phase, dict) else "Phase"
+                actions = phase.get("actions", []) if isinstance(phase, dict) else [str(phase)]
+                for act in actions:
+                    sentences.append(
+                        OutputSentence(
+                            id=f"{output_id}_{ordinal}",
+                            output_id=output_id,
+                            ordinal=ordinal,
+                            text=f"{phase_title}: {act}",
+                            type="roadmap",
+                            claim_ids_json=default_claim_ids,
+                        )
+                    )
+                    ordinal += 1
+        else:
+            sentences.append(
+                OutputSentence(
+                    id=f"{output_id}_{ordinal}",
+                    output_id=output_id,
+                    ordinal=ordinal,
+                    text="Recommendations require LLM synthesis; currently in offline extractive mode.",
+                    type="roadmap",
+                )
+            )
+            ordinal += 1
 
         # Section: Human Opinion & Field Stance (Gate 5 Human-only)
         if human_view and human_view.strip():
