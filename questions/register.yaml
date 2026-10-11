@@ -1,24 +1,25 @@
-# Question Register for Research Engine v2
-# Managed via register.yaml and frontend editor (Gate 1).
-
 questions:
-  - id: "q-sdlc-productivity"
-    text: "How do AI coding assistants impact developer productivity in enterprise software delivery?"
-    scope: "enterprise"
-    time_window_months: 36
-    status: "active"
-    version: 1
-
-  - id: "q-spec-driven-gov"
-    text: "What governance and specification-driven development frameworks ensure reliable agentic software engineering?"
-    scope: "governance"
-    time_window_months: 36
-    status: "active"
-    version: 1
-
-  - id: "q-kiro-empirical"
-    text: "What empirical evidence exists regarding Amazon Kiro adoption, productivity gains, and delivery trade-offs in engineering teams?"
-    scope: "kiro"
-    time_window_months: 36
-    status: "active"
-    version: 1
+- id: q-kiro-empirical
+  text: What empirical evidence exists regarding Amazon Kiro adoption, productivity
+    gains, and delivery trade-offs in engineering teams?
+  scope: kiro
+  time_window_months: 36
+  status: active
+  version: 1
+  created_at: '2026-10-10T14:43:35.829731+00:00'
+- id: q-how-do-enterprise-engineer
+  text: How do enterprise engineering teams mitigate security vulnerabilities, IP
+    risks, and licensing compliance when deploying Amazon Kiro?
+  scope: security
+  time_window_months: 36
+  status: active
+  version: 1
+  created_at: '2026-10-11T13:05:05.630248+00:00'
+- id: q-what-empirical-evidence-me
+  text: What empirical evidence measures the true developer productivity, cycle time,
+    and ROI impact of Autonomous AI Agents in enterprise delivery?
+  scope: productivity
+  time_window_months: 36
+  status: active
+  version: 1
+  created_at: '2026-10-11T13:05:28.293528+00:00'
