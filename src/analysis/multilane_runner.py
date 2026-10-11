@@ -126,6 +126,7 @@ class MultiLaneResearchRunner:
         on_progress: Optional[Callable[[int, str, float], None]] = None,
         academic_papers_override: Optional[List[Dict[str, Any]]] = None,
         custom_lane_urls: Optional[Dict[str, List[str]]] = None,
+        enterprise_feed_override: Optional[Dict[str, List[Dict[str, Any]]]] = None,
     ) -> Dict[str, Any]:
         """Execute the full 8-stage multi-lane workflow."""
         start_time = time.time()
@@ -177,6 +178,7 @@ class MultiLaneResearchRunner:
             question_obj=question_obj,
             run_id=run_id,
             custom_urls=lane_urls.get("enterprise", []),
+            enterprise_feed_override=enterprise_feed_override,
         )
 
         # Lane C: Practitioner Lane (Local Only)
@@ -372,24 +374,7 @@ class MultiLaneResearchRunner:
                 selected.insert(0, custom_p)
 
         if not selected:
-            selected = [
-                {
-                    "id": f"p_acad_{uuid.uuid4().hex[:10]}",
-                    "title": f"Empirical Assessment of {topic}",
-                    "abstract": f"Controlled investigation of enterprise engineering workflows evaluating {topic}. The authors find that adopting structured verification reduces defect injection by 34% while improving delivery velocity by 22%.",
-                    "year": 2024,
-                    "venue": "ICSE",
-                    "url": "https://doi.org/10.1145/example1",
-                },
-                {
-                    "id": f"p_acad_{uuid.uuid4().hex[:10]}",
-                    "title": f"Architectural Integrity and Governance in Automated Engineering: {topic}",
-                    "abstract": f"Field study across 45 production environments investigating {topic}. Analysis reveals that without automated guardrails, architectural drift occurs in 38% of components over 6 months.",
-                    "year": 2024,
-                    "venue": "IEEE Software",
-                    "url": "https://doi.org/10.1109/example2",
-                },
-            ]
+            selected = []
 
         # Ingest Sources into ledger.db
         for p in selected:
@@ -436,6 +421,7 @@ class MultiLaneResearchRunner:
         question_obj: Question,
         run_id: str,
         custom_urls: Optional[List[str]] = None,
+        enterprise_feed_override: Optional[Dict[str, List[Dict[str, Any]]]] = None,
     ) -> List[Claim]:
         """Harvest enterprise lane evidence from sources registry and curated industry feeds."""
         ent_collector = EnterpriseCollector(
@@ -443,47 +429,11 @@ class MultiLaneResearchRunner:
             db_path=self.db_path,
         )
 
-        # Seed curated empirical enterprise sources tailored to topic
-        curated_feed_data = {
-            "dora-dev-survey": [
-                {
-                    "title": "DORA State of DevOps Report: AI Tool Adoption and Delivery Performance",
-                    "text": "Empirical survey of 30,000 engineering respondents finds that AI tool adoption increases developer job satisfaction by 33%, while cycle time reduction requires robust automated testing pipelines.",
-                    "speaker": "independent",
-                    "year": 2024,
-                }
-            ],
-            "aws-dev-blog": [
-                {
-                    "title": "AWS Architecture Center: Building Bounded Agentic Coding Workflows",
-                    "text": "AWS enterprise architectures demonstrate that specification-driven contracts and automated pull request linters prevent architectural drift in production environments.",
-                    "speaker": "vendor",
-                    "year": 2024,
-                }
-            ],
-            "ms-engineering-blog": [
-                {
-                    "title": "Microsoft Engineering: Measuring Developer Velocity and Review Overhead with AI Assistants",
-                    "text": "Internal engineering telemetry reports that generative coding assistants increase code authoring speed, but require 18% additional review rigor to catch edge-case logic defects.",
-                    "speaker": "vendor",
-                    "year": 2024,
-                }
-            ],
-            "sec-edgar-filings": [
-                {
-                    "title": "Enterprise Technology 10-K Filings: AI Software Supply Chain and IP Risk Disclosures",
-                    "text": "Public enterprise filings disclose that AI-assisted code generation introduces regulatory licensing requirements and mandates verifiable code provenance tracking.",
-                    "speaker": "regulator",
-                    "year": 2024,
-                }
-            ],
-        }
-
         claims = ent_collector.search_and_ingest(
             question=question_obj,
             query=topic,
             run_id=run_id,
-            feed_data_override=curated_feed_data,
+            feed_data_override=enterprise_feed_override,
         )
 
         # Ingest custom user URLs for Enterprise Lane
@@ -551,23 +501,6 @@ class MultiLaneResearchRunner:
     ) -> List[Claim]:
         """Harvest local-only practitioner delivery observations from practitioner.db."""
         prac_collector = PractitionerCollector(db_path=self.practitioner_db_path)
-
-        # Seed initial abstracted field observation if database is fresh
-        existing_obs = prac_collector.list_observations()
-        if not existing_obs:
-            prac_collector.add_observation(
-                question_id=question_obj.id,
-                situation="Large multi-vendor financial services core platform modernization",
-                decision="Mandated specification-driven contract tests and pre-commit linters for AI agent pull requests",
-                action="Integrated automated verification gates in CI pipeline blocking unverified agentic drift",
-                outcome="Achieved zero unauthorized architectural drift across 140 enterprise microservices",
-                sector="financial_services",
-                date="2024-08-15",
-                metric={"drift_defect_rate": "0%"},
-                abstraction_confirmed=True,
-                observations_count=2,
-                entity="Enterprise Delivery",
-            )
 
         # Ingest custom user URLs / observations for Practitioner Lane
         if custom_urls:
@@ -827,11 +760,7 @@ class MultiLaneResearchRunner:
                 "impact": (phase.get("kpis") or ["Target KPI achieved"])[0],
             })
         if not roadmap_steps:
-            roadmap_steps = [
-                {"phase": "Phase 1 (Days 1–30)", "action": "Establish Deterministic Verification Gates & CI Sandbox", "impact": "Zero unauthorized drift"},
-                {"phase": "Phase 2 (Days 31–90)", "action": "Roll out bounded autonomous agents for repetitive unit tests", "impact": "+32% velocity on boilerplate"},
-                {"phase": "Phase 3 (Days 91–180)", "action": "Full Platform Engineering Spec-driven integration with DevEx metrics", "impact": "High engineer satisfaction"},
-            ]
+            roadmap_steps = []
 
         # Sentence-level traceability from ledger-only generator
         sentence_traces = []
@@ -844,7 +773,7 @@ class MultiLaneResearchRunner:
             })
 
         return {
-            "verdict": executive_synthesis.get("executive_summary", "Multi-lane evidence ledger validated across Academic, Enterprise, and Practitioner sources."),
+            "verdict": executive_synthesis.get("executive_summary", ""),
             "duration": f"{elapsed_seconds}s",
             "question_id": question_obj.id,
             "strategic_question": question_obj.text,
@@ -856,7 +785,7 @@ class MultiLaneResearchRunner:
                 "field_state": getattr(gap_entry, "field_state", "supported"),
                 "outcome": outcome_int,
                 "outcome_label": outcome_names.get(outcome_int, f"Outcome {outcome_int}"),
-                "rationale": getattr(gap_entry, "rationale", "Empirical academic research is corroborated by active enterprise practice."),
+                "rationale": getattr(gap_entry, "rationale", ""),
             },
             "lane_breakdown": {
                 "academic_count": len(academic_papers),
@@ -872,23 +801,15 @@ class MultiLaneResearchRunner:
             },
             "signals": signals,
             "findings": [{"id": str(i), "text": f} for i, f in enumerate(executive_synthesis.get("key_findings", []), start=1)],
-            "risks": executive_synthesis.get("business_problems") or [
-                "Unverified extrapolation in production pipelines leads to silent architectural drift.",
-                "Lack of centralized audit logging hampers compliance in regulated sectors.",
-                "Premature agentic deployment without deterministic test suites amplifies MTTR during incidents.",
-            ],
-            "business_signal": executive_synthesis.get("business_context", {}).get("business_signal", {}).get("summary", "Robust empirical support for architecture adoption under bounded contracts."),
+            "risks": executive_synthesis.get("business_problems") or [],
+            "business_signal": executive_synthesis.get("business_context", {}).get("business_signal", {}).get("summary", ""),
             "papers": papers_formatted,
             "enterprise_sources": ent_sources_formatted,
             "practitioner_observations": prac_obs_formatted,
             "claims": claims_formatted,
             "sentence_traces": sentence_traces,
             "roadmap": roadmap_steps,
-            "content_ideas": executive_synthesis.get("content_ideas") or [
-                "Why the 32% Dev Velocity metric is misleading without Bounded Autonomy Contracts",
-                "The 5 Deterministic Gates every VP of Engineering must establish for AI coding agents",
-                "From Copilot to Kiro: The shift from reactive completion to autonomous specification alignment",
-            ],
+            "content_ideas": executive_synthesis.get("content_ideas") or [],
             "gates_audit": gate_results,
             "quality_scorecard": score_results,
             "publish_res": publish_res,

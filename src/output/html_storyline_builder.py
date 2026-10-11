@@ -80,47 +80,33 @@ class HtmlStorylineBuilder:
 
         bottlenecks_table_html = "\n".join(bottleneck_rows) if bottleneck_rows else """
             <tr>
-              <td><strong style="color: #f87171;">Toolchain Interoperability Deficit</strong></td>
-              <td>Bespoke CI/CD scripts and fragmented toolchain APIs</td>
-              <td>High maintenance overhead and fragile automation</td>
-              <td>Standardization on open Model Context Protocol (MCP) tool servers</td>
+              <td colspan="4" style="text-align: center; color: var(--text-muted);">No structural bottlenecks identified from current evidence.</td>
             </tr>"""
 
         # Build Roadmap Timeline
         timeline_items = []
-        phases_meta = [
-            ("Horizon 1 • Months 0 to 6", "Foundational Governance & Controlled Pilot Validation", "bar-indigo", "Security Lead, Engineering Manager", "100% policy adoption; validated pilot cycle gains"),
-            ("Horizon 2 • Months 6 to 18", "Architectural Scaling & DevSecOps Integration", "bar-cyan", "CTO, Head of Platform, VP Engineering", "≥80% team enablement; 50% drop in pipeline failure alerts"),
-            ("Horizon 3 • Months 18 to 36", "Autonomous Platform Operations & Self-Healing", "bar-emerald", "CTO, Head of Platform", "Stable 20× deployment frequency; ≤10 min MTTR"),
-        ]
-
-        for idx, (horizon_tag, default_title, color_class, default_owners, default_kpis) in enumerate(phases_meta):
-            if idx < len(roadmap) and isinstance(roadmap[idx], dict):
-                stage_data = roadmap[idx]
-                r_stage = stage_data.get("stage", horizon_tag)
-                r_obj = stage_data.get("objective", default_title)
+        for idx, stage_data in enumerate(roadmap or []):
+            if isinstance(stage_data, dict):
+                r_stage = stage_data.get("stage", f"Phase {idx+1}")
+                r_obj = stage_data.get("objective", "Objective")
                 actions = stage_data.get("actions", [])
                 action_text = " ".join([str(a) for a in actions]) if actions else ""
-                kpis = stage_data.get("kpis", [default_kpis])
-                kpi_text = "; ".join([str(k) for k in kpis])
-            else:
-                r_stage = horizon_tag
-                r_obj = default_title
-                action_text = f"Execute Phase {idx+1} strategic governance, team training, and integration milestones."
-                kpi_text = default_kpis
-
-            timeline_items.append(f"""
+                kpis = stage_data.get("kpis", [])
+                kpi_text = "; ".join([str(k) for k in kpis]) if kpis else "Milestones aligned with evidence"
+                timeline_items.append(f"""
         <div class="roadmap-item">
           <div class="roadmap-phase">{html.escape(r_stage)}</div>
           <div class="roadmap-title">{html.escape(r_obj)}</div>
           <p class="card-text">{html.escape(action_text)}</p>
           <div class="roadmap-meta">
-            <div class="roadmap-meta-item"><strong>Executive Owners:</strong> {default_owners}</div>
-            <div class="roadmap-meta-item"><strong>Target KPIs:</strong> {html.escape(kpi_text)}</div>
+            <div class="roadmap-meta-item"><strong>Target Objectives:</strong> {html.escape(kpi_text)}</div>
           </div>
         </div>""")
 
-        roadmap_timeline_html = "\n".join(timeline_items)
+        roadmap_timeline_html = "\n".join(timeline_items) if timeline_items else """
+        <div class="roadmap-item">
+          <p class="card-text" style="color: var(--text-muted); text-align: center;">No roadmap milestones established from current evidence.</p>
+        </div>"""
 
         # Build Papers reviewed table
         paper_rows = []
@@ -651,81 +637,68 @@ class HtmlStorylineBuilder:
       <p class="subtitle">{objective}</p>
       
       <div class="meta-bar">
-        <div class="meta-item"><strong>Domain:</strong> Enterprise Platform Engineering & AI Architecture</div>
         <div class="meta-item"><strong>Literature Horizon:</strong> {time_horizon} ({total_papers} Papers Analyzed)</div>
-        <div class="meta-item"><strong>Target Audience:</strong> CTOs, Heads of Platform, VP of Engineering</div>
-        <div class="meta-item"><strong>Verification:</strong> 100% Zero-Hallucination Verified Citations</div>
+        <div class="meta-item"><strong>Verification:</strong> Multi-Lane Evidence Ledger</div>
       </div>
     </div>
   </header>
 
   <main class="container">
 
-    <!-- Section 1: Executive Summary & The Productivity Paradox -->
+    <!-- Section 1: Executive Summary -->
     <section>
-      <h2>Executive Summary & The Outer Loop Paradox</h2>
+      <h2>Executive Summary</h2>
       <p class="lead-paragraph">{exec_summary}</p>
-
-      <div class="callout">
-        <div class="callout-title">
-          The Core Architectural Bottleneck
-        </div>
-        <div class="callout-text">
-          Upstream AI coding tools compress raw code generation from hours to seconds. However, without automated downstream verification (testing, policy gating, CI/CD autoscaling, and architecture compliance), downstream pipelines experience severe bottlenecks, shifting operational strain onto review queues and platform operations.
-        </div>
-      </div>
     </section>
 
-    <!-- Section 2: Core Architectural Pillars -->
+    <!-- Section 2: Core Themes -->
     <section>
-      <h2>Unified Architectural Pillars</h2>
-      <p>Research indicates that overcoming enterprise adoption hurdles requires structured operating models across four interconnected pillars:</p>
-      
+      <h2>Unified Research Themes</h2>
       <div class="grid-2">
         {themes_block}
       </div>
     </section>
 
-    <!-- Section 3: Empirical Benchmarks -->
+    <!-- Section 3: Evidence Base Metrics -->
     <section>
-      <h2>Empirical Delivery Benchmarks & Observed Deltas</h2>
-      <p>Multi-cohort industry research reveals consistent empirical productivity and quality deltas when teams transition from ad-hoc prompting to spec-driven agentic architectures:</p>
+      <h2>Evidence Base Metrics</h2>
+      <p>Research metrics derived from empirical literature harvesting:</p>
 
       <div class="grid-4">
         <div class="metric-card">
           <div class="card-top-bar bar-indigo"></div>
           <div>
-            <div class="metric-label">Deployment Frequency</div>
-            <div class="metric-value gradient-text">20&times;</div>
+            <div class="metric-label">Papers Reviewed</div>
+            <div class="metric-value gradient-text">{total_papers}</div>
           </div>
-          <div class="metric-desc">Increase in automated release cadence via GitOps and continuous policy reconciliation.</div>
+          <div class="metric-desc">Academic literature items evaluated for this topic.</div>
         </div>
 
         <div class="metric-card">
           <div class="card-top-bar bar-cyan"></div>
           <div>
-            <div class="metric-label">Cycle Time Reduction</div>
-            <div class="metric-value gradient-cyan-text">&approx;67%</div>
+            <div class="metric-label">Key Findings</div>
+            <div class="metric-value gradient-cyan-text">{len(findings)}</div>
           </div>
-          <div class="metric-desc">Compression in end-to-end SDLC lead time from requirement specification to merge.</div>
+          <div class="metric-desc">Empirical findings synthesized from source papers.</div>
         </div>
 
         <div class="metric-card">
           <div class="card-top-bar bar-emerald"></div>
           <div>
-            <div class="metric-label">Defect Escape Drop</div>
-            <div class="metric-value gradient-emerald-text">90%</div>
+            <div class="metric-label">Recommendations</div>
+            <div class="metric-value gradient-emerald-text">{len(recommendations)}</div>
           </div>
-          <div class="metric-desc">Reduction in production defects via automated multi-agent boundary test synthesis.</div>
+          <div class="metric-desc">Actionable recommendations derived from synthesis.</div>
         </div>
 
         <div class="metric-card">
           <div class="card-top-bar bar-amber"></div>
           <div>
-            <div class="metric-label">Cloud OpEx Savings</div>
-            <div class="metric-value" style="color: var(--accent-amber);">28–42%</div>
+            <div class="metric-label">Research Horizon</div>
+            <div class="metric-value" style="color: var(--accent-amber); font-size: 1.5rem;">{time_horizon}</div>
           </div>
-          <div class="metric-desc">Optimization in CI/CD build spend through ephemeral compute and multi-level caching.</div>
+          <div class="metric-desc">Publication year range across evaluated studies.</div>
         </div>
       </div>
     </section>

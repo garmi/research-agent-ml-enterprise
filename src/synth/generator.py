@@ -143,9 +143,12 @@ class SynthesisEngine:
         if supported_claims:
             for c in supported_claims[:3]:
                 verb = self._select_verb_for_grade(c.grade)
-                text = f"Empirical literature {verb} that {c.text[0].lower() + c.text[1:] if not c.text.startswith('The study') else c.text}."
-                # Clean duplicate period
-                text = text.rstrip(".") + "."
+                c_text = c.text.strip().rstrip(".")
+                for prefix in ("the study reports that ", "the study finds that ", "the authors find that ", "empirical analysis shows that ", "research indicates that "):
+                    if c_text.lower().startswith(prefix):
+                        c_text = c_text[len(prefix):]
+                        break
+                text = f"Empirical literature {verb} that {c_text[0].lower() + c_text[1:] if c_text else ''}."
                 sentences.append(
                     OutputSentence(
                         id=f"{output_id}_{ordinal}",
@@ -164,7 +167,7 @@ class SynthesisEngine:
                     id=f"{output_id}_{ordinal}",
                     output_id=output_id,
                     ordinal=ordinal,
-                    text="Currently, peer-reviewed empirical evidence directly demonstrating this outcome is unmeasured across active repositories.",
+                    text="No peer-reviewed empirical claims meeting moderate or strong thresholds were retrieved for this question.",
                     type="heading",
                 )
             )
@@ -182,19 +185,12 @@ class SynthesisEngine:
         )
         ordinal += 1
 
-        gap_descriptions = {
-            1: "The evidence does not support claims of complete autonomous lifecycle displacement without human oversight.",
-            2: "The literature does not support claims of universal productivity gains across un-governed enterprise teams.",
-            3: "The evidence does not substantiate commercial vendor performance claims outside narrow synthetic benchmarks.",
-            4: "Available studies do not provide statistically verified productivity benchmarks for this specific tooling stack.",
-        }
-        gap_note = gap_descriptions.get(gap_entry.outcome, "Available research does not substantiate claims of autonomous displacement.")
         sentences.append(
             OutputSentence(
                 id=f"{output_id}_{ordinal}",
                 output_id=output_id,
                 ordinal=ordinal,
-                text=gap_note,
+                text=f"Evidence boundary: {gap_entry.rationale}",
                 type="heading",
             )
         )

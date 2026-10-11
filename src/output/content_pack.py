@@ -11,25 +11,20 @@ class ContentPackBuilder:
         recommendations = synthesis.get("recommendations", [])
         roadmap = synthesis.get("strategic_roadmap", [])
         findings = synthesis.get("key_findings", [])
+        content_ideas = synthesis.get("content_ideas") or []
+
+        article_topics = [f"Empirical findings on {self.topic}: {f}" for f in findings[:3]] if findings else []
+        talk_outline = [
+            f"Overview of research on {self.topic}",
+            *[f"Finding: {f}" for f in findings[:2]],
+            *[f"Recommendation: {r}" for r in recommendations[:2]],
+        ] if (findings or recommendations) else []
 
         return {
-            "linkedin_post_ideas": synthesis.get("content_ideas") or [
-                f"What recent research says about {self.topic} and why enterprise teams struggle to scale it.",
-                f"Three signals from the literature on {self.topic} that matter for engineering and business leaders.",
-                f"Why {self.topic} needs governance, platform maturity, and measurable value delivery—not just experimentation.",
-            ],
-            "article_topics": [
-                f"{self.topic}: market trends, adoption gaps, and strategic implications for enterprise delivery",
-                f"Why {self.topic} still stalls in many organizations: research-backed lessons for leaders",
-                f"From experimentation to strategic value: a roadmap for {self.topic} in practice",
-            ],
-            "talk_outline": [
-                "The research landscape and why leaders are paying attention",
-                "What enterprises are getting wrong in adoption and execution",
-                "The strategic roadmap: governance, capability, and operational design",
-                "Actionable next steps for engineering and product leaders",
-            ],
-            "recommended_takeaways": findings[:3] or ["Research suggests adoption depends on governance and operating model maturity.", "The value is highest when strategy is linked to delivery and platform capability."],
-            "recommended_callouts": recommendations[:3] or ["Create a measured adoption charter", "Align AI capability with engineering workflow redesign", "Invest in governance and value measurement"],
+            "linkedin_post_ideas": content_ideas,
+            "article_topics": article_topics,
+            "talk_outline": talk_outline,
+            "recommended_takeaways": findings[:3],
+            "recommended_callouts": recommendations[:3],
             "roadmap_summary": roadmap[:3] if isinstance(roadmap, list) else [],
         }

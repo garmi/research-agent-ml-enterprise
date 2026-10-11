@@ -40,6 +40,33 @@ def test_multilane_workflow_execution():
             },
         ]
 
+        from src.collectors.practitioner.collector import PractitionerCollector
+        prac_col = PractitionerCollector(db_path=prac_db)
+        prac_col.add_observation(
+            question_id="q-test",
+            situation="Financial services pilot",
+            decision="Automated verification gates",
+            action="Pre-commit linting",
+            outcome="Zero architectural regression in pilot",
+            sector="financial_services",
+            date="2024-08-15",
+            metric={"defect_rate": "0%"},
+            abstraction_confirmed=True,
+            observations_count=1,
+            entity="Enterprise Delivery",
+        )
+
+        dummy_enterprise = {
+            "dora-dev-survey": [
+                {
+                    "title": "DORA Research Report",
+                    "text": "Empirical survey finds that automated testing improves delivery performance.",
+                    "speaker": "independent",
+                    "year": 2024,
+                }
+            ]
+        }
+
         result = runner.run_workflow(
             topic="How do AI coding assistants impact developer productivity in enterprise software delivery?",
             depth="Fast",
@@ -47,6 +74,7 @@ def test_multilane_workflow_execution():
             map_provider="stub",
             reduce_provider="stub",
             academic_papers_override=dummy_papers,
+            enterprise_feed_override=dummy_enterprise,
         )
 
         assert result is not None
