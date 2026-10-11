@@ -707,7 +707,100 @@ evals/test_regression.py ..............                                  [100%]
 ```
 
 ### 5. Anything NOT Done in A7
-- Unified status vocabulary, export download button gating, and score coherence are scheduled in Section A8.
+- Unified status vocabulary, export download button gating, and score coherence are implemented in Section A8.
+
+---
+
+## Section A8: Status Vocabulary, Score Sensitivity, and Gated Exports
+
+### 1. What Changed
+- **Unified Status Vocabulary (Eliminated Defect D6):**
+  - Standardized vocabulary across `QualityScorer` and UI: `BLOCKED`, `NOT_PUBLISHABLE`, `REVISE`, `PUBLISH_READY`.
+  - Replaced legacy `DO_NOT_PUBLISH` status in `src/score/scorer.py` with `NOT_PUBLISHABLE`.
+- **Dynamic Score Sensitivity (Eliminated Constant 66.0):**
+  - Updated `src/synth/generator.py` to calculate dynamic scoring parameters:
+    - `gates_completed_count`: derived dynamically from passed gates (1 to 6).
+    - `reviewed_claim_ids`: passed from approved/edited claims in the ledger.
+    - `gap_outcomes_disclosed`: 1.0 if negative findings or strategic gaps are stated, else 0.5.
+    - `reproducibility_agreement`: 1.0 if papers exist and all claims possess source excerpts, else 0.7.
+  - Scores now vary dynamically based on evidence quality and completeness rather than remaining pinned at 66.0.
+- **Eliminated UI Contradiction (Defect D6):**
+  - In `web_app.py`, removed the contradictory green `"ZERO UNGROUNDED CLAIMS"` banner when an output is `BLOCKED` or `NOT_PUBLISHABLE`.
+  - Replaced it with an explicit blocking reasons alert container detailing gate failures, ungrounded numerals, or missing citations.
+- **Gated Export Download Buttons:**
+  - In `web_app.py`, gated all 5 artifact download buttons (`Markdown Brief`, `JSON Ledger`, `CSV Claims`, `LinkedIn Pack`, `HTML Slide Deck`) with `disabled=not can_download`.
+  - Buttons are disabled when status is not `PUBLISH_READY` unless the user explicitly checks the `--force` confirmation checkbox (`Override Gate & Download Draft`).
+  - Added warning banner explaining why downloads are restricted.
+
+### 2. Files Touched
+- `src/score/scorer.py`
+- `src/synth/generator.py`
+- `web_app.py`
+- `tests/test_a8_status_and_exports.py` (new)
+- `INTEGRITY_REPORT.md`
+
+### 3. Tests Added & Executed
+- Added `tests/test_a8_status_and_exports.py`:
+  1. `test_unified_status_vocabulary_and_no_do_not_publish`: Verifies `QualityScorer` produces only `BLOCKED`, `NOT_PUBLISHABLE`, `REVISE`, `PUBLISH_READY`, and never returns `DO_NOT_PUBLISH`.
+  2. `test_scorer_yields_distinct_scores_for_different_evidence_sets`: Verifies that strong vs weak evidence sets produce distinct scores differing by > 15 points and never freeze at 66.0.
+  3. `test_export_files_not_written_to_disk_when_publish_gate_fails`: Verifies that when publish gate does not pass, `publish_res['allowed']` is False and status is `blocked` or `not_publishable`.
+
+### 4. Verification & Pasted Evidence
+
+#### Failing Test Output (Before Fix):
+```
+tests/test_a8_status_and_exports.py:50: AssertionError: Expected NOT_PUBLISHABLE, got 'DO_NOT_PUBLISH'
+E       AssertionError: Expected NOT_PUBLISHABLE, got 'DO_NOT_PUBLISH'
+E       assert 'DO_NOT_PUBLISH' == 'NOT_PUBLISHABLE'
+```
+
+#### Passing Test Output (After Fix):
+```
+PYTHONPATH=. .venv/bin/pytest tests/test_a8_status_and_exports.py -v
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Users/gauravm/Developer/projects/research-agent-ml-enterprise/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/gauravm/Developer/projects/research-agent-ml-enterprise
+collecting ... collected 3 items                                                              
+
+tests/test_a8_status_and_exports.py::test_unified_status_vocabulary_and_no_do_not_publish PASSED [ 33%]
+tests/test_a8_status_and_exports.py::test_scorer_yields_distinct_scores_for_different_evidence_sets PASSED [ 66%]
+tests/test_a8_status_and_exports.py::test_export_files_not_written_to_disk_when_publish_gate_fails PASSED [100%]
+
+========================= 3 passed, 1 warning in 0.41s =========================
+```
+
+#### Full Test Suite Status (Zero Regressions, 50 Passed):
+```
+PYTHONPATH=. .venv/bin/pytest tests evals -k "not test_ui_smoke"
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/gauravm/Developer/projects/research-agent-ml-enterprise
+collecting ... collected 51 items / 1 deselected / 50 selected                                
+
+tests/test_a2_honest_offline_fallback.py .                               [  2%]
+tests/test_a3_single_source_of_truth.py .                                [  4%]
+tests/test_a4_traceable_citations.py ..                                  [  8%]
+tests/test_a5_lane_scoping.py ..                                         [ 12%]
+tests/test_a6_enterprise_honesty.py ...                                  [ 18%]
+tests/test_a7_retrieval_and_venues.py ...                                [ 24%]
+tests/test_a8_status_and_exports.py ...                                  [ 30%]
+tests/test_multilane_workflow.py .                                       [ 32%]
+tests/test_no_literal_report_text.py .                                   [ 34%]
+tests/test_pipeline.py ....                                              [ 42%]
+tests/test_question_formulator.py ..                                     [ 46%]
+evals/test_phase2_service.py ....                                        [ 54%]
+evals/test_phase3_enterprise.py ...                                      [ 60%]
+evals/test_phase4_synth.py ...                                           [ 66%]
+evals/test_phase5_practitioner_publish.py ..                             [ 70%]
+evals/test_r10_migration.py .                                            [ 72%]
+evals/test_regression.py ..............                                  [100%]
+
+================= 50 passed, 1 deselected, 1 warning in 10.28s =================
+```
+
+### 5. Anything NOT Done in A8
+- Network egress controls, local-first LLM enforcement, Gate 6 explicit human confirmation, and hosted demo safety are scheduled in Section A9.
 
 
 

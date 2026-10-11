@@ -426,13 +426,22 @@ class SynthesisEngine:
         )
 
         # 6. Run Quality Scorer
+        passed_gates = sum(1 for g in ("g1_pass", "g2_pass", "g3_pass", "g4_pass", "g5_pass", "g6_pass") if getattr(gate_res, g, False))
+        reviewed_claims = {c.id for c in claims_by_id.values() if getattr(c, "status", "") in ("approved", "edited")}
+        has_negative_or_gap = any(s.type == "negative_finding" or "Strategic Gap" in s.text for s in sentences)
+        gap_disc = 1.0 if has_negative_or_gap else 0.5
+        reproducibility = 1.0 if (len(papers or []) > 0 and all(c.source_excerpt for c in claims_by_id.values())) else 0.7
+
         score_res = self.scorer.calculate_score(
             gate_result=gate_res,
             sentences=sentences,
             ledger_claims=claims_by_id,
             sources=sources,
             questions=[question],
-            gap_outcomes_disclosed=1.0,
+            reviewed_claim_ids=reviewed_claims,
+            gates_completed_count=passed_gates,
+            gap_outcomes_disclosed=gap_disc,
+            reproducibility_agreement=reproducibility,
         )
 
         # 7. Persist Output and Sentences

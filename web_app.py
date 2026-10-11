@@ -1268,21 +1268,53 @@ if results:
                     language="text",
                 )
     else:
-        # Success synthesis banner
         gap_info = results.get("gap_matrix", {})
-        st.markdown(
-            f"""
-            <div style="background: #F0FDF4; border: 1px solid #86EFAC; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1.25rem; font-size: 0.88rem; color: #166534; display: flex; align-items: center; justify-content: space-between;">
-                <div>
-                    <strong>✓ Multi-lane synthesis complete</strong> in {results['duration']} ({len(results.get('papers', []))} papers • {len(results.get('claims', []))} atomic ledger claims)
+        status = (results.get("publish_res", {}).get("status") or results.get("quality_scorecard", {}).get("band") or "NOT_PUBLISHABLE").upper()
+        gates_passed = results.get("gates_audit", {}).get("passed", False)
+        if not gates_passed or status == "BLOCKED":
+            reasons = results.get("gates_audit", {}).get("reasons", []) or ["Gate audit blocked publication."]
+            reasons_html = "".join(f"<li>{r}</li>" for r in reasons)
+            st.markdown(
+                f"""
+                <div style="background: #FEF2F2; border: 1px solid #FCA5A5; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1.25rem; font-size: 0.88rem; color: #991B1B;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+                        <strong>⛔ PUBLICATION BLOCKED (G1–G6 Violations Detected)</strong>
+                        <span style="background: #FEE2E2; color: #991B1B; padding: 0.2rem 0.6rem; border-radius: 6px; font-weight: 700; font-size: 0.78rem;">BLOCKED</span>
+                    </div>
+                    <ul style="margin: 0.25rem 0 0 1rem; padding: 0; font-size: 0.82rem;">
+                        {reasons_html}
+                    </ul>
                 </div>
-                <div style="font-size: 0.78rem; background: #DCFCE7; padding: 0.2rem 0.6rem; border-radius: 6px; font-weight: 700;">
-                    G1–G6 AUDITED • ZERO UNGROUNDED CLAIMS
+                """,
+                unsafe_allow_html=True,
+            )
+        elif status == "NOT_PUBLISHABLE":
+            st.markdown(
+                f"""
+                <div style="background: #FFFBEB; border: 1px solid #FCD34D; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1.25rem; font-size: 0.88rem; color: #92400E; display: flex; align-items: center; justify-content: space-between;">
+                    <div>
+                        <strong>⚠️ Output Quality Below Publication Threshold</strong> ({results.get('metrics', {}).get('quality', 'NOT_PUBLISHABLE')})
+                    </div>
+                    <span style="background: #FEF3C7; color: #92400E; padding: 0.2rem 0.6rem; border-radius: 6px; font-weight: 700; font-size: 0.78rem;">NOT_PUBLISHABLE</span>
                 </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+                """,
+                unsafe_allow_html=True,
+            )
+        else:
+            # Success synthesis banner
+            st.markdown(
+                f"""
+                <div style="background: #F0FDF4; border: 1px solid #86EFAC; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1.25rem; font-size: 0.88rem; color: #166534; display: flex; align-items: center; justify-content: space-between;">
+                    <div>
+                        <strong>✓ Multi-lane synthesis complete</strong> in {results['duration']} ({len(results.get('papers', []))} papers • {len(results.get('claims', []))} atomic ledger claims)
+                    </div>
+                    <div style="font-size: 0.78rem; background: #DCFCE7; padding: 0.2rem 0.6rem; border-radius: 6px; font-weight: 700;">
+                        G1–G6 AUDITED • ZERO UNGROUNDED CLAIMS
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
     fallback_note = results.get("synthesis", {}).get("llm_fallback_notice")
     if fallback_note:
@@ -1802,6 +1834,16 @@ if results:
         unsafe_allow_html=True,
     )
 
+    status = (results.get("publish_res", {}).get("status") or results.get("quality_scorecard", {}).get("band") or "NOT_PUBLISHABLE").upper()
+    is_publish_ready = (status == "PUBLISH_READY") and (results.get("publish_res", {}).get("allowed") is True)
+
+    force_export = False
+    if not is_publish_ready:
+        st.warning(f"🔒 **Artifact Downloads Gated:** Current status is `{status}`. Publication packaging requires `PUBLISH_READY` status (composite quality score ≥ 85 and 100% G1–G6 gate compliance).")
+        force_export = st.checkbox("⚠️ Enable `--force` override to download unverified/blocked artifacts", value=False)
+
+    can_download = is_publish_ready or force_export
+
     export_col1, export_col2, export_col3, export_col4, export_col5 = st.columns(5)
 
     builder = ReportBuilder()
@@ -1821,6 +1863,7 @@ if results:
             data=brief_content,
             file_name="Executive_Research_Brief.md",
             mime="text/markdown",
+            disabled=not can_download,
             use_container_width=True,
         )
     with export_col2:
@@ -1829,6 +1872,7 @@ if results:
             data=json_content,
             file_name="evidence_ledger.json",
             mime="application/json",
+            disabled=not can_download,
             use_container_width=True,
         )
     with export_col3:
@@ -1837,6 +1881,7 @@ if results:
             data=csv_content,
             file_name="paper_index.csv",
             mime="text/csv",
+            disabled=not can_download,
             use_container_width=True,
         )
     with export_col4:
@@ -1845,6 +1890,7 @@ if results:
             data=linkedin_pack,
             file_name="LinkedIn_Executive_Pack.md",
             mime="text/markdown",
+            disabled=not can_download,
             use_container_width=True,
         )
     with export_col5:
@@ -1853,6 +1899,7 @@ if results:
             data=deck_html,
             file_name="Executive_Deck.html",
             mime="text/html",
+            disabled=not can_download,
             use_container_width=True,
         )
 

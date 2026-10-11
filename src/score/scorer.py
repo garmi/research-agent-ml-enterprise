@@ -139,7 +139,7 @@ class QualityScorer:
         elif total_score >= self.cfg.get("bands", {}).get("revise", 70):
             band = "REVISE"
         else:
-            band = "DO_NOT_PUBLISH"
+            band = "NOT_PUBLISHABLE"
 
         # Generate top 3 high-impact improvement recommendations
         recommendations = []
