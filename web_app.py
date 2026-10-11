@@ -329,9 +329,8 @@ st.markdown(
 # ==============================================================================
 # 2. INTUITIVE SEARCH & TOPIC BAR
 # ==============================================================================
-# Pre-fill topic if selected from pill
 if "topic_query" not in st.session_state:
-    st.session_state["topic_query"] = "how Kiro is being used for development by engineering teams"
+    st.session_state["topic_query"] = ""
 
 topic_input = st.text_input(
     "What strategic topic or technology would you like to investigate?",
@@ -382,19 +381,26 @@ tone_mapping = {
 depth_mapping = {"⚡ Fast (2 Rounds)": "quick", "🔬 Deep (4 Rounds)": "deep"}
 
 # Optional advanced tuning (cleanly tucked away)
-has_gemini_key = bool(os.getenv("GEMINI_API_KEY"))
-with st.expander("⚙️ Optional Inference & API Key Settings", expanded=not has_gemini_key):
+has_env_key = bool(os.getenv("GEMINI_API_KEY"))
+with st.expander("⚙️ Inference & API Key Settings", expanded=not has_env_key):
     col_t1, col_t2 = st.columns(2)
     with col_t1:
         map_prov = st.selectbox("Reading Model", ["gemini", "ollama"], index=0)
     with col_t2:
         reduce_prov = st.selectbox("Synthesis Model", ["gemini", "ollama"], index=0)
 
+    if has_env_key:
+        st.success("🔒 Server API Key: Configured in environment.")
+    else:
+        st.info("ℹ️ No server API key detected. Provide a temporary key below to run research.")
+
+    # Security fix: NEVER pass os.getenv into the input value!
     custom_key = st.text_input(
-        "Gemini API Key (Google AI Studio)",
-        value=os.getenv("GEMINI_API_KEY", ""),
+        "Session Gemini API Key (Optional override)",
+        value="",
         type="password",
-        help="If not configured in Cloud Run environment variables, you can paste your key here.",
+        placeholder="Enter key to override server configuration...",
+        help="Secrets are never rendered into HTML. Used only in memory for this session.",
     )
     if custom_key.strip():
         os.environ["GEMINI_API_KEY"] = custom_key.strip()
@@ -406,8 +412,10 @@ st.markdown("---")
 # 3. PIPELINE EXECUTION
 # ==============================================================================
 if run_btn:
-    if (map_prov == "gemini" or reduce_prov == "gemini") and not os.getenv("GEMINI_API_KEY"):
-        st.error("🔑 **Gemini API Key missing:** Please enter your Google AI Studio key in the settings above, or set `GEMINI_API_KEY` in Cloud Run environment variables.")
+    if not topic_input.strip():
+        st.warning("⚠️ Please enter a research topic or select a suggested topic chip above.")
+    elif (map_prov == "gemini" or reduce_prov == "gemini") and not os.getenv("GEMINI_API_KEY"):
+        st.error("🔑 **Gemini API Key missing:** Please configure `GEMINI_API_KEY` in Cloud Run environment variables or provide a key in settings above.")
     else:
         progress_status = st.status("🚀 Running Research Engine Pipeline...", expanded=True)
         try:
@@ -426,14 +434,7 @@ if run_btn:
             progress_status.error(f"Execution error: {exc}")
             st.error(f"Pipeline failed: {exc}")
 
-# Auto-load cached synthesis if available
-if "synthesis" not in st.session_state:
-    cached_path = Path("outputs/json/research_report.json")
-    if cached_path.exists():
-        try:
-            st.session_state["synthesis"] = json.loads(cached_path.read_text(encoding="utf-8"))
-        except Exception:
-            pass
+# Deliverables are displayed when generated in this session
 
 
 # ==============================================================================
