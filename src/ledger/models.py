@@ -111,6 +111,8 @@ class SearchLog(BaseModel):
     query: str
     source_api: str
     result_count: int = 0
+    rejected_reason: Optional[str] = None
+    details_json: Optional[Dict[str, Any]] = None
     executed_at: str = Field(default_factory=now_utc_iso)
     created_at: str = Field(default_factory=now_utc_iso)
 

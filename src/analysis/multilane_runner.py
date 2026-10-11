@@ -26,6 +26,7 @@ import time
 import uuid
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
+import yaml
 
 from src.collectors.enterprise.collector import EnterpriseCollector
 from src.collectors.practitioner.collector import PractitionerCollector
@@ -73,6 +74,51 @@ def fetch_url_metadata(url: str) -> Tuple[str, str, str]:
     except Exception:
         return default_title[:120], f"Empirical technical literature and verified findings from {url}.", domain
 
+
+def resolve_honest_venue_and_type(p: Dict[str, Any]) -> Tuple[str, str]:
+    """Resolve genuine publication venue and accurate source type, eliminating API provider leaks."""
+    v = (p.get("venue") or "").strip()
+    source_api = (p.get("source") or "").strip()
+    container = (p.get("container_title") or "").strip()
+    url = str(p.get("url") or p.get("doi") or p.get("link") or "").lower()
+
+    # Disallow API aggregator names from masquerading as venues
+    api_names = {"crossref", "semantic scholar", "openalex", "open_academic_repos", "academic repository", "academic literature"}
+    if not v or v.lower() in api_names:
+        if container:
+            v = container
+        elif any(k in url for k in ("10.1109", "ieee.org")):
+            v = "IEEE Transactions / Proceedings"
+        elif any(k in url for k in ("10.1145", "acm.org")):
+            v = "ACM Digital Library"
+        elif any(k in url for k in ("10.1038", "nature.com")):
+            v = "Nature Publishing Group"
+        elif any(k in url for k in ("10.1016", "sciencedirect.com")):
+            v = "Elsevier ScienceDirect"
+        elif any(k in url for k in ("10.1007", "springer.com")):
+            v = "SpringerLink"
+        elif "arxiv" in url or source_api.lower() == "arxiv":
+            v = "arXiv"
+        else:
+            v = p.get("publisher") or "Scholarly Publication"
+
+    v_lower = str(v).lower()
+    if "arxiv" in v_lower or "arxiv" in url or source_api.lower() == "arxiv":
+        s_type = "Preprint"
+    elif any(w in v_lower for w in ("conference", "symposium", "proceedings", "icse", "fse", "ase", "sigsoft", "neurips", "iclr", "icml", "www")):
+        s_type = "Conference"
+    elif any(w in v_lower for w in ("journal", "transactions", "nature", "science", "letters", "review", "communications", "ieee", "acm")):
+        s_type = "Peer-Reviewed Journal"
+    elif any(w in v_lower for w in ("dora", "report", "survey", "standard", "industry", "filing")):
+        s_type = "Industry Report"
+    elif any(w in v_lower for w in ("book", "monograph")):
+        s_type = "Book"
+    else:
+        s_type = "Peer-Reviewed Journal" if ("doi" in p or "10." in url) else "Preprint"
+
+    return v, s_type
+
+
 class MultiLaneResearchRunner:
     """End-to-end orchestrator executing the full multi-lane research workflow."""
 
@@ -87,6 +133,7 @@ class MultiLaneResearchRunner:
         verbs_path: str = "synth/strength_verbs.yaml",
         scoring_path: str = "score/scoring.yaml",
         denylist_path: str = "denylist.txt",
+        config_path: str = "config.yaml",
     ):
         self.db_path = db_path
         self.practitioner_db_path = practitioner_db_path
@@ -97,6 +144,12 @@ class MultiLaneResearchRunner:
         self.verbs_path = verbs_path
         self.scoring_path = scoring_path
         self.denylist_path = denylist_path
+        self.config_path = config_path
+
+        self.config = {}
+        if os.path.exists(self.config_path):
+            with open(self.config_path, "r", encoding="utf-8") as f:
+                self.config = yaml.safe_load(f) or {}
 
         # Ensure database tables exist
         Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
@@ -420,25 +473,99 @@ class MultiLaneResearchRunner:
         if not selected:
             selected = []
 
+        # Filter candidate papers by min_year and question topic relevance
+        min_year = int(self.config.get("research", {}).get("min_year", 2020))
+        accepted_papers: List[Dict[str, Any]] = []
+
+        stopwords = {
+            "the", "and", "or", "of", "to", "in", "a", "an", "is", "for", "on", "with",
+            "as", "by", "at", "from", "it", "that", "this", "be", "are", "was", "were",
+            "what", "how", "why", "which", "when", "where", "who", "whom", "whose", "do",
+            "does", "did", "can", "could", "should", "would", "may", "might", "must",
+            "about", "into", "through", "during", "before", "after", "above", "below",
+        }
+        q_tokens = {
+            w.lower() for w in re.findall(r"\b[a-zA-Z]{3,}\b", topic)
+            if w.lower() not in stopwords
+        }
+        q_stems = {w[:4] for w in q_tokens}
+
+        for p in selected:
+            # 1. Year filter enforcement at retrieval time
+            yr = p.get("year")
+            if yr is not None and str(yr).isdigit():
+                yr_val = int(yr)
+                if yr_val < min_year:
+                    self.repo.insert_search_log(
+                        SearchLog(
+                            id=f"slog_rej_yr_{uuid.uuid4().hex[:10]}",
+                            run_id=run_id,
+                            question_id=question_id,
+                            lane="academic",
+                            query=topic,
+                            source_api=p.get("source") or "open_academic_repos",
+                            result_count=0,
+                            rejected_reason=f"year_below_minimum: publication year {yr_val} is older than min_year {min_year}",
+                            details_json={"paper_id": p.get("id"), "title": p.get("title"), "year": yr_val},
+                        )
+                    )
+                    continue
+
+            # 2. Topic term overlap filter
+            p_text = f"{p.get('title', '')} {p.get('abstract', '')}"
+            p_tokens = {
+                w.lower() for w in re.findall(r"\b[a-zA-Z]{3,}\b", p_text)
+                if w.lower() not in stopwords
+            }
+            p_stems = {w[:4] for w in p_tokens}
+            overlap = (q_tokens & p_tokens) or (q_stems & p_stems)
+            relevance = float(p.get("relevance_score", 1.0))
+            if (not overlap and len(q_tokens) > 0) or (relevance < 0.20 and not overlap):
+                self.repo.insert_search_log(
+                    SearchLog(
+                        id=f"slog_rej_top_{uuid.uuid4().hex[:10]}",
+                        run_id=run_id,
+                        question_id=question_id,
+                        lane="academic",
+                        query=topic,
+                        source_api=p.get("source") or "open_academic_repos",
+                        result_count=0,
+                        rejected_reason=f"off_topic_low_relevance: paper has no substantive term overlap with question scope (overlap={len(overlap)}, relevance={relevance:.2f})",
+                        details_json={"paper_id": p.get("id"), "title": p.get("title"), "matched_terms": list(overlap)},
+                    )
+                )
+                continue
+
+            accepted_papers.append(p)
+
+        selected = accepted_papers
+
         # Ingest Sources into ledger.db
         for p in selected:
             title = p.get("title", "Untitled")
             doi = p.get("doi") or p.get("url") or p.get("link")
             src_id = p.get("id") or hashlib.sha256(f"{doi or title}".encode()).hexdigest()[:16]
             p["id"] = src_id
-            venue = p.get("venue") or p.get("source") or "Academic Repository"
-            venue_tier = self.grader.resolve_venue_tier(venue, p.get("source_type"))
+            venue, s_type = resolve_honest_venue_and_type(p)
+            p["venue"] = venue
+            p["source_type"] = s_type
+            venue_tier = self.grader.resolve_venue_tier(venue, s_type)
+
+            yr = p.get("year")
+            pub_date_str = str(yr) if (yr is not None and str(yr).lower() not in ("none", "null", "")) else "Date unknown"
+            if pub_date_str == "Date unknown":
+                p["year"] = "Date unknown"
 
             source = Source(
                 id=src_id,
                 lane="academic",
-                source_type="peer_reviewed" if venue_tier in ("verified", "reputable_preprint") else "preprint",
+                source_type="peer_reviewed" if s_type in ("Peer-Reviewed Journal", "Conference") else "preprint",
                 org=p.get("authors", ["Academic Authors"])[0] if isinstance(p.get("authors"), list) and p.get("authors") else "Academic Researcher",
                 title=title,
                 url=p.get("url") or p.get("link"),
                 venue=venue,
                 venue_tier=venue_tier,
-                pub_date=str(p.get("year", "2024")),
+                pub_date=pub_date_str,
                 commercial_stake="none",
                 status="active",
             )
@@ -842,12 +969,14 @@ class MultiLaneResearchRunner:
         # Formatted papers table
         papers_formatted = []
         for i, p in enumerate(academic_papers, start=1):
-            v = p.get("venue") or p.get("source") or "Academic Repository"
-            t = "Peer-Reviewed Conference" if any(w in str(v) for w in ("ACM", "IEEE", "Conference", "WWW")) else "Peer-Reviewed Journal" if "Journal" in str(v) else "Open Pre-print"
+            v, t = resolve_honest_venue_and_type(p)
+            yr = p.get("year")
+            yr_str = "Date unknown" if (yr is None or str(yr).lower() in ("none", "null", "", "date unknown")) else str(yr)
             papers_formatted.append({
+                "id": p.get("id"),
                 "key": f"P{i}",
                 "title": p.get("title", "Untitled"),
-                "year": str(p.get("year", "2024")),
+                "year": yr_str,
                 "venue": v,
                 "doi": p.get("doi") or p.get("url") or p.get("link") or "Indexed",
                 "type": t,

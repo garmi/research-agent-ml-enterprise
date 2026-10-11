@@ -21,7 +21,7 @@ class CrossrefClient:
         params = {
             "query.bibliographic": clean_query,
             "rows": max_results,
-            "select": "title,author,issued,URL,publisher,DOI,abstract",
+            "select": "title,author,issued,URL,publisher,DOI,abstract,container-title",
         }
         
         response = None
@@ -56,12 +56,17 @@ class CrossrefClient:
             authors = [a.get("family", "") for a in item.get("author", []) if a.get("family")]
             issued = item.get("issued", {}).get("date-parts", [[None]])[0]
             year = issued[0] if isinstance(issued, list) and issued and issued[0] else None
+            container_title = item.get("container-title", [""])[0] if item.get("container-title") else ""
+            publisher = item.get("publisher") or ""
+            venue = container_title or publisher or ""
             papers.append({
                 "title": title,
                 "abstract": abstract,
                 "year": year,
                 "authors": authors,
                 "source": "Crossref",
+                "venue": venue,
+                "container_title": container_title,
                 "url": item.get("URL"),
                 "doi": item.get("DOI"),
             })

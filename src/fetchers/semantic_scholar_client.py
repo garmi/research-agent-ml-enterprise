@@ -21,7 +21,7 @@ class SemanticScholarClient:
         params = {
             "query": clean_query,
             "limit": limit,
-            "fields": "title,year,authors,abstract,externalIds,url,venue",
+            "fields": "title,year,authors,abstract,externalIds,url,venue,publicationVenue",
         }
         response = None
         for attempt in range(3):
@@ -49,6 +49,9 @@ class SemanticScholarClient:
         results = payload.get("data", [])
         papers = []
         for item in results:
+            venue = item.get("venue")
+            if not venue and isinstance(item.get("publicationVenue"), dict):
+                venue = item.get("publicationVenue", {}).get("name")
             paper = {
                 "title": item.get("title", ""),
                 "abstract": item.get("abstract", ""),
@@ -56,7 +59,7 @@ class SemanticScholarClient:
                 "authors": [a.get("name", "") for a in item.get("authors", [])],
                 "source": "Semantic Scholar",
                 "url": item.get("url"),
-                "venue": item.get("venue"),
+                "venue": venue or "",
             }
             papers.append(paper)
         return papers

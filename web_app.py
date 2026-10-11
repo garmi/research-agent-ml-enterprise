@@ -1507,7 +1507,7 @@ if results:
                             <a href="{p['url']}" target="_blank" style="color: #0F172A; text-decoration: none;">{p['title']} ↗</a>
                         </div>
                         <div style="font-size: 0.84rem; color: #64748B;">
-                            Published: <strong>{p['year']}</strong> &nbsp;•&nbsp; Venue: <strong>{p['venue']}</strong> &nbsp;•&nbsp; DOI/ID: <code style="font-size: 0.78rem;">{p['doi']}</code>
+                            {"Published: <strong>" + p['year'] + "</strong>" if p.get('year') and p['year'] != 'Date unknown' else "Date: <em>Date unknown</em>"} &nbsp;•&nbsp; Venue: <strong>{p['venue']}</strong> &nbsp;•&nbsp; DOI/ID: <code style="font-size: 0.78rem;">{p['doi']}</code>
                         </div>
                     </div>
                     """,
@@ -1521,6 +1521,8 @@ if results:
         if ent_sources:
             for es in ent_sources:
                 custom_ent_tag = '<span style="font-size: 0.72rem; background: #EDE9FE; color: #6D28D9; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 700; margin-left: 0.4rem;">🏷️ Custom Ingested URL</span>' if es.get("is_custom") else ""
+                es_date = es.get("pub_date")
+                es_date_str = es_date if (es_date and str(es_date).lower() not in ("none", "null")) else "Date unknown"
                 st.markdown(
                     f"""
                     <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px; padding: 0.9rem 1.15rem; margin-bottom: 0.65rem;">
@@ -1532,7 +1534,7 @@ if results:
                             <a href="{es.get('url', '#')}" target="_blank" style="color: #0F172A; text-decoration: none;">{es.get('title')} ↗</a> {custom_ent_tag}
                         </div>
                         <div style="font-size: 0.8rem; color: #64748B;">
-                            Org/Venue: <strong>{es.get('venue')}</strong> &nbsp;•&nbsp; Date: <strong>{es.get('pub_date')}</strong>
+                            Org/Venue: <strong>{es.get('venue')}</strong> &nbsp;•&nbsp; Date: <strong>{es_date_str}</strong>
                         </div>
                     </div>
                     """,

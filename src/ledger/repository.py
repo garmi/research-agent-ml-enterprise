@@ -144,15 +144,29 @@ class LedgerRepository:
     # --- Search Log ---
     def insert_search_log(self, log: SearchLog) -> None:
         with self._conn() as conn:
-            conn.execute(
-                """INSERT OR REPLACE INTO search_log
-                   (id, run_id, question_id, lane, query, source_api, result_count, executed_at, created_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);""",
-                (
-                    log.id, log.run_id, log.question_id, log.lane, log.query,
-                    log.source_api, log.result_count, log.executed_at, log.created_at,
-                ),
-            )
+            details_str = json.dumps(log.details_json) if log.details_json else None
+            columns = [c[1] for c in conn.execute("PRAGMA table_info(search_log);").fetchall()]
+            if "rejected_reason" in columns:
+                conn.execute(
+                    """INSERT OR REPLACE INTO search_log
+                       (id, run_id, question_id, lane, query, source_api, result_count, executed_at, created_at, rejected_reason, details_json)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);""",
+                    (
+                        log.id, log.run_id, log.question_id, log.lane, log.query,
+                        log.source_api, log.result_count, log.executed_at, log.created_at,
+                        log.rejected_reason, details_str,
+                    ),
+                )
+            else:
+                conn.execute(
+                    """INSERT OR REPLACE INTO search_log
+                       (id, run_id, question_id, lane, query, source_api, result_count, executed_at, created_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);""",
+                    (
+                        log.id, log.run_id, log.question_id, log.lane, log.query,
+                        log.source_api, log.result_count, log.executed_at, log.created_at,
+                    ),
+                )
 
     def list_search_logs(self, question_id: Optional[str] = None) -> List[SearchLog]:
         with self._conn() as conn:
@@ -160,7 +174,16 @@ class LedgerRepository:
                 cursor = conn.execute("SELECT * FROM search_log WHERE question_id = ? ORDER BY executed_at DESC;", (question_id,))
             else:
                 cursor = conn.execute("SELECT * FROM search_log ORDER BY executed_at DESC;")
-            return [SearchLog(**dict(row)) for row in cursor.fetchall()]
+            logs = []
+            for row in cursor.fetchall():
+                d = dict(row)
+                if d.get("details_json") and isinstance(d["details_json"], str):
+                    try:
+                        d["details_json"] = json.loads(d["details_json"])
+                    except Exception:
+                        pass
+                logs.append(SearchLog(**d))
+            return logs
 
     # --- Runs ---
     def insert_run(self, run: Run) -> None:

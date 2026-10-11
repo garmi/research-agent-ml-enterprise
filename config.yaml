@@ -7,6 +7,7 @@ research:
   max_papers: 12
   min_relevance_score: 0.5
   time_window: "2019-2025"
+  min_year: 2020
   vendor_only_max_outcome: 2
   search_sources:
     - openalex

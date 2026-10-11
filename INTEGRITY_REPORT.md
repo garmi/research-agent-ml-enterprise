@@ -581,6 +581,135 @@ evals/test_regression.py ..............                                  [100%]
 ### 5. Anything NOT Done in A6
 - Academic paper retrieval filtering (`min_year >= 2020`), search log rejection reasons, and venue tier metadata honesty are scheduled in Section A7.
 
+---
+
+## Section A7: Retrieval Quality and Venue Metadata
+
+### 1. What Changed
+- **Honest Venue Metadata Resolution (Eliminated Defect D5):**
+  - Updated `src/fetchers/crossref_client.py` to query `container-title` and extract real journal/conference publication venues, preventing the API provider name "Crossref" from masquerading as a venue.
+  - Updated `src/fetchers/semantic_scholar_client.py` to query `publicationVenue` and resolve legitimate venue names instead of "Semantic Scholar".
+  - Created `resolve_honest_venue_and_type(p)` in `src/analysis/multilane_runner.py`:
+    - Completely strips aggregator names (`Crossref`, `Semantic Scholar`, `OpenAlex`, `Academic Repository`) from venue fields.
+    - Resolves real venue names from `container_title`, `publisher`, or publisher domain fingerprints (`IEEE Transactions`, `ACM Digital Library`, `Nature Publishing Group`, `Elsevier ScienceDirect`, `SpringerLink`, `arXiv`).
+- **Real Source Types (Eliminated Blanket "Open Pre-print" Badge):**
+  - Assigned distinct, accurate source types: `Peer-Reviewed Journal`, `Conference`, `Preprint`, `Book`, `Industry Report`.
+  - Replaced blanket `Open Pre-print` labelling across UI and exports.
+- **Honest Publication Date Display (Eliminated "Published: None"):**
+  - Missing or null publication dates render as `Date unknown` and `Date: <em>Date unknown</em>` across `multilane_runner.py` and `web_app.py`, never printing "Published: None".
+- **Retrieval-Time Year Filtering (`year >= min_year`):**
+  - Added `min_year: 2020` under `research:` in `config.yaml`.
+  - Enforced `min_year` at retrieval time in `MultiLaneResearchRunner._harvest_academic_lane`.
+  - Papers older than `min_year` are excluded from the ledger and logged to `search_log` with `rejected_reason="year_below_minimum: publication year {yr} is older than min_year {min_year}"`.
+- **Deterministic Off-Topic Paper Filtering:**
+  - Evaluates substantive question/paper term overlap (filtering English stopwords).
+  - Papers with 0 question term overlap (such as macroeconomic trade papers on a software question) are rejected before ledger insertion and logged to `search_log` with `rejected_reason="off_topic_low_relevance: paper has no substantive term overlap with question scope"`.
+- **Database Schema Migration 003:**
+  - Applied user-approved migration `ledger/migrations/003_add_rejected_fields_to_search_log.sql` adding `rejected_reason TEXT` and `details_json TEXT` to `search_log`.
+  - Updated `SearchLog` Pydantic model in `src/ledger/models.py` and `LedgerRepository` in `src/ledger/repository.py`.
+
+### 2. Files Touched
+- `ledger/migrations/003_add_rejected_fields_to_search_log.sql` (new)
+- `config.yaml`
+- `src/ledger/models.py`
+- `src/ledger/repository.py`
+- `src/fetchers/crossref_client.py`
+- `src/fetchers/semantic_scholar_client.py`
+- `src/analysis/multilane_runner.py`
+- `web_app.py`
+- `tests/test_a7_retrieval_and_venues.py` (new)
+- `INTEGRITY_REPORT.md`
+
+### 3. Tests Added & Executed
+- Added `tests/test_a7_retrieval_and_venues.py`:
+  1. `test_venue_never_displays_api_provider_and_real_source_types`: Asserts venue never shows "Crossref", assigns "Peer-Reviewed Journal" / "Conference", preprint gets "Preprint", and missing date gets "Date unknown" (never "None").
+  2. `test_retrieval_filters_by_min_year_and_logs_rejected_stale_papers`: Asserts paper from 2008 is rejected, excluded from ledger sources, and logged to `search_log` with `year_below_minimum`.
+  3. `test_retrieval_rejects_off_topic_papers_by_term_overlap`: Asserts off-topic OECD trade economics paper is rejected, excluded from ledger sources, and logged to `search_log` with `off_topic_low_relevance`.
+
+### 4. Verification & Pasted Evidence
+
+#### Failing Test Output (Before Fix):
+```
+=================================== FAILURES ===================================
+_________ test_venue_never_displays_api_provider_and_real_source_types _________
+            p1 = papers[0]
+>           assert p1["venue"] != "Crossref", f"Venue must not be API provider name 'Crossref', got '{p1['venue']}'"
+E           AssertionError: Venue must not be API provider name 'Crossref', got 'Crossref'
+E           assert 'Crossref' != 'Crossref'
+tests/test_a7_retrieval_and_venues.py:86: AssertionError
+```
+
+#### Passing Test Output (After Fix):
+```
+PYTHONPATH=. .venv/bin/pytest tests/test_a7_retrieval_and_venues.py -v
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Users/gauravm/Developer/projects/research-agent-ml-enterprise/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/gauravm/Developer/projects/research-agent-ml-enterprise
+collecting ... collected 3 items                                                              
+
+tests/test_a7_retrieval_and_venues.py::test_venue_never_displays_api_provider_and_real_source_types PASSED [ 33%]
+tests/test_a7_retrieval_and_venues.py::test_retrieval_filters_by_min_year_and_logs_rejected_stale_papers PASSED [ 66%]
+tests/test_a7_retrieval_and_venues.py::test_retrieval_rejects_off_topic_papers_by_term_overlap PASSED [100%]
+
+========================= 3 passed, 1 warning in 0.90s =========================
+```
+
+#### Live Canary Retrieval Runs (Empirical Audit):
+Executed live retrieval across the 3 canary questions with active filtering:
+```
+QUERY: What empirical evidence exists regarding Amazon Kiro adoption, productivity gains, and delivery trade-offs in engineering teams?
+  Count Retrieved: 5
+  Count Rejected by Year: 1
+  Count Rejected by Topic: 0
+  Count Accepted: 4
+---
+QUERY: How are hospitals governing clinical AI triage tools to manage patient safety and regulatory compliance?
+  Count Retrieved: 5
+  Count Rejected by Year: 0
+  Count Rejected by Topic: 0
+  Count Accepted: 5
+---
+QUERY: What empirical evidence exists on sourdough fermentation temperature and crumb structure?
+  Count Retrieved: 5
+  Count Rejected by Year: 2
+  Count Rejected by Topic: 0
+  Count Accepted: 3
+---
+```
+
+#### Full Test Suite Status (Zero Regressions, 47 Passed):
+```
+PYTHONPATH=. .venv/bin/pytest tests evals -k "not test_ui_smoke"
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/gauravm/Developer/projects/research-agent-ml-enterprise
+collecting ... collected 48 items / 1 deselected / 47 selected                                
+
+tests/test_a2_honest_offline_fallback.py .                               [  2%]
+tests/test_a3_single_source_of_truth.py .                                [  4%]
+tests/test_a4_traceable_citations.py ..                                  [  8%]
+tests/test_a5_lane_scoping.py ..                                         [ 12%]
+tests/test_a6_enterprise_honesty.py ...                                  [ 19%]
+tests/test_a7_retrieval_and_venues.py ...                                [ 25%]
+tests/test_multilane_workflow.py .                                       [ 27%]
+tests/test_no_literal_report_text.py .                                   [ 29%]
+tests/test_pipeline.py ....                                              [ 38%]
+tests/test_question_formulator.py ..                                     [ 42%]
+evals/test_phase2_service.py ....                                        [ 51%]
+evals/test_phase3_enterprise.py ...                                      [ 57%]
+evals/test_phase4_synth.py ...                                           [ 63%]
+evals/test_phase5_practitioner_publish.py ..                             [ 68%]
+evals/test_r10_migration.py .                                            [ 70%]
+evals/test_regression.py ..............                                  [100%]
+
+================= 47 passed, 1 deselected, 1 warning in 10.21s =================
+```
+
+### 5. Anything NOT Done in A7
+- Unified status vocabulary, export download button gating, and score coherence are scheduled in Section A8.
+
+
 
 
 
