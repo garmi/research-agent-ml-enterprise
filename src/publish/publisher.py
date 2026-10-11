@@ -97,8 +97,12 @@ class Publisher:
                 )
                 if not abstraction_confirmed:
                     gate_res.g5_pass = False
+                    gate_res.g6_pass = False
                     gate_res.violations["G5"].append(
                         f"Gate 6 Abstraction Violation: Practitioner claim '{c.id}' has unconfirmed abstraction (R12)."
+                    )
+                    gate_res.violations["G6"].append(
+                        "Gate 6: Practitioner abstraction not confirmed by operator."
                     )
 
         # If any gate failed, status is strictly BLOCKED
@@ -110,10 +114,15 @@ class Publisher:
                     "UPDATE outputs SET status = ?, gates_json = ? WHERE id = ?;",
                     ("blocked", json.dumps(doc.gates_json), doc.id),
                 )
+            block_reason = (
+                "Gate 6: Practitioner abstraction not confirmed by operator."
+                if any("Gate 6" in v for v in gate_res.violations.get("G6", []))
+                else "Hard gate violation"
+            )
             return False, {
                 "published": False,
                 "status": "BLOCKED",
-                "reason": "Hard gate violation",
+                "reason": block_reason,
                 "gate_results": gate_res.to_dict(),
             }
 

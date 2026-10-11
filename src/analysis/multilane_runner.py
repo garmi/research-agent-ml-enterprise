@@ -119,6 +119,19 @@ def resolve_honest_venue_and_type(p: Dict[str, Any]) -> Tuple[str, str]:
     return v, s_type
 
 
+def get_default_local_provider() -> str:
+    """Return 'ollama' if Ollama daemon is reachable on localhost:11434, else 'stub'."""
+    import urllib.request
+    try:
+        req = urllib.request.Request("http://localhost:11434/api/tags", method="GET")
+        with urllib.request.urlopen(req, timeout=1.0) as resp:
+            if resp.status == 200:
+                return "ollama"
+    except Exception:
+        pass
+    return "stub"
+
+
 class MultiLaneResearchRunner:
     """End-to-end orchestrator executing the full multi-lane research workflow."""
 
@@ -174,12 +187,15 @@ class MultiLaneResearchRunner:
         topic: str,
         depth: str = "Fast",
         tone: str = "Executive",
-        map_provider: str = "gemini",
-        reduce_provider: str = "gemini",
+        map_provider: Optional[str] = None,
+        reduce_provider: Optional[str] = None,
         on_progress: Optional[Callable[[int, str, float], None]] = None,
         academic_papers_override: Optional[List[Dict[str, Any]]] = None,
         custom_lane_urls: Optional[Dict[str, List[str]]] = None,
         enterprise_feed_override: Optional[Dict[str, List[Dict[str, Any]]]] = None,
+        custom_prac_urls: Optional[List[str]] = None,
+        allow_remote_practitioner_synthesis: bool = False,
+        practitioner_abstraction_confirmed: bool = False,
     ) -> Dict[str, Any]:
         """Execute the full 8-stage multi-lane workflow."""
         start_time = time.time()
@@ -187,7 +203,29 @@ class MultiLaneResearchRunner:
         max_academic_papers = 5 if is_quick else 10
         query_limit = 2 if is_quick else 4
         max_per_query = 4 if is_quick else 6
-        lane_urls = custom_lane_urls or {}
+        lane_urls = dict(custom_lane_urls or {})
+        if custom_prac_urls:
+            existing_prac = list(lane_urls.get("practitioner", []))
+            lane_urls["practitioner"] = existing_prac + list(custom_prac_urls)
+
+        # Provider local-first resolution
+        if map_provider is None:
+            map_provider = get_default_local_provider()
+        if reduce_provider is None:
+            reduce_provider = map_provider
+
+        # Check practitioner egress privacy constraint (Network spy requirement)
+        has_custom_prac = bool(lane_urls.get("practitioner"))
+        if has_custom_prac and not allow_remote_practitioner_synthesis:
+            if str(map_provider).lower() not in ("ollama", "stub", "mock", "fake"):
+                logger.info(
+                    "Lane C contains custom practitioner text and allow_remote_practitioner_synthesis is False. "
+                    "Enforcing local synthesis via %s to prevent remote egress.",
+                    get_default_local_provider(),
+                )
+                map_provider = get_default_local_provider()
+            if str(reduce_provider).lower() not in ("ollama", "stub", "mock", "fake"):
+                reduce_provider = map_provider
 
         def report(stage: int, msg: str, val: float):
             if on_progress:
@@ -235,11 +273,12 @@ class MultiLaneResearchRunner:
         )
 
         # Lane C: Practitioner Lane (Local Only)
-        practitioner_claims = self._harvest_practitioner_lane(
+        practitioner_claims, has_unconfirmed_practitioner_notes = self._harvest_practitioner_lane(
             topic=topic,
             question_obj=question_obj,
             run_id=run_id,
             custom_urls=lane_urls.get("practitioner", []),
+            practitioner_abstraction_confirmed=practitioner_abstraction_confirmed,
         )
 
         # ----------------------------------------------------------------------
@@ -325,7 +364,25 @@ class MultiLaneResearchRunner:
         # STAGE 8: PUBLISH GATE & EXPORT DELIVERABLES
         # ----------------------------------------------------------------------
         report(8, "Publish Gate: Running denylist audit and packaging website deliverables...", 0.98)
-        if is_fallback:
+        if has_unconfirmed_practitioner_notes:
+            publish_success = False
+            g6_violation = "Gate 6: Practitioner abstraction not confirmed by operator."
+            if "violations" in gate_results:
+                gate_results["violations"].setdefault("G6", []).append(g6_violation)
+            gate_results["G6"] = {"pass": False, "violations": [g6_violation]}
+            pub_res = {
+                "published": False,
+                "status": "BLOCKED",
+                "allowed": False,
+                "reason": g6_violation,
+                "reasons": [g6_violation],
+                "gate_results": gate_results,
+            }
+            score_results["band"] = "BLOCKED"
+            doc.status = "blocked"
+            with self.repo._conn() as conn:
+                conn.execute("UPDATE outputs SET status = ? WHERE id = ?;", ("blocked", doc.id))
+        elif is_fallback:
             publish_success = False
             pub_res = {
                 "allowed": False,
@@ -669,9 +726,11 @@ class MultiLaneResearchRunner:
         question_obj: Question,
         run_id: str,
         custom_urls: Optional[List[str]] = None,
-    ) -> List[Claim]:
+        practitioner_abstraction_confirmed: bool = False,
+    ) -> Tuple[List[Claim], bool]:
         """Harvest local-only practitioner delivery observations from practitioner.db."""
         prac_collector = PractitionerCollector(db_path=self.practitioner_db_path)
+        has_unconfirmed_practitioner_notes = False
 
         # Ingest custom user URLs / observations for Practitioner Lane
         if custom_urls:
@@ -679,6 +738,8 @@ class MultiLaneResearchRunner:
                 u_clean = u.strip()
                 if not u_clean:
                     continue
+                if not practitioner_abstraction_confirmed:
+                    has_unconfirmed_practitioner_notes = True
                 t, a, d = fetch_url_metadata(u_clean) if u_clean.startswith("http") else (u_clean[:60], u_clean, "field-notes")
                 prac_collector.add_observation(
                     question_id=question_obj.id,
@@ -689,7 +750,7 @@ class MultiLaneResearchRunner:
                     sector="technology_delivery",
                     date=datetime.date.today().isoformat(),
                     metric={"observation_status": "verified"},
-                    abstraction_confirmed=True,
+                    abstraction_confirmed=practitioner_abstraction_confirmed,
                     observations_count=1,
                     entity=t[:50],
                 )
@@ -721,7 +782,7 @@ class MultiLaneResearchRunner:
         )
         self.repo.insert_search_log(slog)
 
-        return exported_claims
+        return exported_claims, has_unconfirmed_practitioner_notes
 
     def _extract_academic_claims(self, papers: List[Dict[str, Any]], question_id: str) -> List[Claim]:
         """Extract atomic claims from academic papers."""

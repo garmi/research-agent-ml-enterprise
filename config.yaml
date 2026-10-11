@@ -17,8 +17,9 @@ research:
 
 # Provider per stage: "gemini" (free Google AI Studio) or "ollama" (free local model).
 llm:
-  map_provider: "gemini"
-  reduce_provider: "gemini"
+  map_provider: "ollama"
+  reduce_provider: "ollama"
+  allow_remote_synthesis: false
 
 ollama:
   base_url: "http://localhost:11434"

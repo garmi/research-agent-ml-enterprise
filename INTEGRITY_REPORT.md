@@ -800,7 +800,189 @@ evals/test_regression.py ..............                                  [100%]
 ```
 
 ### 5. Anything NOT Done in A8
-- Network egress controls, local-first LLM enforcement, Gate 6 explicit human confirmation, and hosted demo safety are scheduled in Section A9.
+- Network egress controls, local-first LLM enforcement, Gate 6 explicit human confirmation, and hosted demo safety are implemented in Section A9.
+
+---
+
+## Section A9: Privacy, Egress Controls, Gate 6 Human Confirmation, and Hosted Safety
+
+### 1. What Changed
+- **Default Active Engine is Strictly Local-First (Eliminated Defect D7):**
+  - Updated `config.yaml`: set `map_provider: "ollama"`, `reduce_provider: "ollama"`, and `allow_remote_synthesis: false`.
+  - Added `get_default_local_provider()` helper in `src/analysis/multilane_runner.py`: dynamically probes `http://localhost:11434/api/tags` and returns `"ollama"` if reachable, otherwise `"stub"` (offline deterministic engine).
+  - In `MultiLaneResearchRunner.run_workflow`: defaults `map_provider` and `reduce_provider` to local engine, never defaulting to remote APIs.
+  - In `web_app.py`:
+    - Updated `get_available_models()`: local options listed first (`ollama`, `stub`), remote Gemini is opt-in and explicitly tagged `Google Gemini 2.5 Flash (Remote API — sends prompt out-of-boundary)`.
+    - Sidebar System Status Pod displays: `Default Active Engine: Local Ollama Qwen 2.5 3B` (or `Deterministic Offline Engine` if Ollama is offline).
+    - Advanced settings dropdown index defaults strictly to local model (`ollama` or `stub`), never defaulting to Gemini even when `GEMINI_API_KEY` is present.
+- **Hosted Demo Safety (`HOSTED_DEMO=1`):**
+  - In `web_app.py`: when `HOSTED_DEMO=1`, Session API Key Override text input is disabled and replaced with: `🔒 API key override disabled on shared instance.`
+- **Network Spy Test & Zero Remote Egress for Custom Practitioner Text:**
+  - In `src/analysis/multilane_runner.py`:
+    - Added `allow_remote_practitioner_synthesis: bool = False` (default) and `practitioner_abstraction_confirmed: bool = False` (default).
+    - When Lane C contains custom practitioner text and `allow_remote_practitioner_synthesis` is False:
+      - Any remote provider (e.g. `gemini` or non-local API) is automatically re-routed to the local engine (`get_default_local_provider()`).
+      - In `tests/test_a9_privacy_and_hosted_safety.py`, a socket spy intercepts `socket.socket.connect` and asserts that ZERO bytes or connections leave the process to any non-loopback host during that run.
+- **Gate 6 Mandatory Human Sign-Off (Defect D7 Fix):**
+  - Eliminated automatic `abstraction_confirmed=True` stamping for custom practitioner inputs.
+  - In `_harvest_practitioner_lane`: custom notes take `practitioner_abstraction_confirmed` from operator input.
+  - If custom practitioner notes are present and `practitioner_abstraction_confirmed` is False:
+    - Notes are saved with `abstraction_confirmed: False` in `practitioner.db` and are NEVER exported to the shared ledger.
+    - Gate 6 strictly fails: `gate_res.g6_pass = False`, `gate_res.violations["G6"].append("Gate 6: Practitioner abstraction not confirmed by operator.")`.
+    - Overall run is `BLOCKED` with reason `"Gate 6: Practitioner abstraction not confirmed by operator."`.
+  - Added checkboxes in `web_app.py` under the Practitioner Lane input:
+    - `Gate 6: Confirm Practitioner Abstraction (Human Operator Sign-Off)`
+    - `Allow remote synthesis of practitioner data`
+- **Cloud Run Production Hardening Commands (No Live Deployment):**
+  - Documented exact `gcloud run services update` and Terraform definitions below.
+
+### 2. Files Touched
+- `config.yaml`
+- `src/analysis/multilane_runner.py`
+- `src/publish/publisher.py`
+- `web_app.py`
+- `tests/test_a9_privacy_and_hosted_safety.py` (new)
+- `INTEGRITY_REPORT.md`
+
+### 3. Tests Added & Executed
+- Added `tests/test_a9_privacy_and_hosted_safety.py`:
+  1. `test_default_active_engine_is_local_in_config_and_runner`: Verifies default provider in `config.yaml` is `"ollama"` or `"stub"`, `allow_remote_synthesis` is False, and runner helper returns local provider.
+  2. `test_gate_6_blocks_unconfirmed_custom_practitioner_notes`: Verifies run with unconfirmed custom practitioner notes is strictly `BLOCKED` with reason `"Gate 6: Practitioner abstraction not confirmed by operator."`, and passes when confirmed.
+  3. `test_network_spy_asserts_zero_remote_egress_when_lane_c_contains_custom_practitioner_text`: Installs socket spy on `socket.connect`, passes custom practitioner notes with `allow_remote_practitioner_synthesis=False` and requested remote provider `"gemini"`. Asserts 0 non-localhost sockets were connected.
+  4. `test_hosted_demo_mode_disables_api_key_override`: Asserts `HOSTED_DEMO=1` disables API key input and renders `"API key override disabled on shared instance."`.
+
+### 4. Verification & Pasted Evidence
+
+#### Failing Test Output (Before Fix):
+```
+tests/test_a9_privacy_and_hosted_safety.py:20: in <module>
+    from src.analysis.multilane_runner import MultiLaneResearchRunner, get_default_local_provider
+E   ImportError: cannot import name 'get_default_local_provider' from 'src.analysis.multilane_runner'
+```
+
+#### Passing Test Output (After Fix):
+```
+PYTHONPATH=. .venv/bin/pytest tests/test_a9_privacy_and_hosted_safety.py -v
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Users/gauravm/Developer/projects/research-agent-ml-enterprise/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/gauravm/Developer/projects/research-agent-ml-enterprise
+collecting ... collected 4 items                                                              
+
+tests/test_a9_privacy_and_hosted_safety.py::test_default_active_engine_is_local_in_config_and_runner PASSED [ 25%]
+tests/test_a9_privacy_and_hosted_safety.py::test_gate_6_blocks_unconfirmed_custom_practitioner_notes PASSED [ 50%]
+tests/test_a9_privacy_and_hosted_safety.py::test_network_spy_asserts_zero_remote_egress_when_lane_c_contains_custom_practitioner_text PASSED [ 75%]
+tests/test_a9_privacy_and_hosted_safety.py::test_hosted_demo_mode_disables_api_key_override PASSED [100%]
+
+========================= 4 passed, 1 warning in 0.82s =========================
+```
+
+#### Full Test Suite Status (Zero Regressions, 54 Passed):
+```
+PYTHONPATH=. .venv/bin/pytest tests evals -k "not test_ui_smoke"
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/gauravm/Developer/projects/research-agent-ml-enterprise
+collecting ... collected 55 items / 1 deselected / 54 selected                                
+
+tests/test_a2_honest_offline_fallback.py .                               [  1%]
+tests/test_a3_single_source_of_truth.py .                                [  3%]
+tests/test_a4_traceable_citations.py ..                                  [  7%]
+tests/test_a5_lane_scoping.py ..                                         [ 11%]
+tests/test_a6_enterprise_honesty.py ...                                  [ 16%]
+tests/test_a7_retrieval_and_venues.py ...                                [ 22%]
+tests/test_a8_status_and_exports.py ...                                  [ 27%]
+tests/test_a9_privacy_and_hosted_safety.py ....                          [ 35%]
+tests/test_multilane_workflow.py .                                       [ 37%]
+tests/test_no_literal_report_text.py .                                   [ 38%]
+tests/test_pipeline.py ....                                              [ 46%]
+tests/test_question_formulator.py ..                                     [ 50%]
+evals/test_phase2_service.py ....                                        [ 57%]
+evals/test_phase3_enterprise.py ...                                      [ 62%]
+evals/test_phase4_synth.py ...                                           [ 68%]
+evals/test_phase5_practitioner_publish.py ..                             [ 72%]
+evals/test_r10_migration.py .                                            [ 74%]
+evals/test_regression.py ..............                                  [100%]
+
+================= 54 passed, 1 deselected, 1 warning in 10.97s =================
+```
+
+### 5. Production Cloud Run Hardening Specification (Commands Only)
+
+To secure the hosted service without deploying:
+
+```bash
+# Production Update Command for Google Cloud Run
+# 1. Require IAM authentication (--no-allow-unauthenticated)
+# 2. Attach a persistent Google Cloud Storage volume to /app/ledger (persistent state across container restarts)
+# 3. Enforce HOSTED_DEMO=1 (disables in-browser secret entry)
+# 4. Enable Gen2 execution environment (mandatory for Cloud Storage FUSE volume mounts)
+
+gcloud run services update research-agent \
+  --region=us-central1 \
+  --no-allow-unauthenticated \
+  --execution-environment=gen2 \
+  --add-volume=name=ledger-volume,type=cloud-storage,bucket=research-agent-ledger-prod \
+  --add-volume-mount=volume=ledger-volume,mount-path=/app/ledger \
+  --set-env-vars=HOSTED_DEMO=1,SQLITE_DB_PATH=/app/ledger/ledger.db,PRACTITIONER_DB_PATH=/app/ledger/practitioner.db
+```
+
+#### Terraform Infrastructure as Code Snippet:
+```hcl
+resource "google_cloud_run_v2_service" "research_agent" {
+  name     = "research-agent"
+  location = "us-central1"
+  ingress  = "INGRESS_TRAFFIC_ALL"
+
+  template {
+    execution_environment = "EXECUTION_ENVIRONMENT_GEN2"
+
+    containers {
+      image = "gcr.io/${var.project_id}/research-agent:latest"
+
+      env {
+        name  = "HOSTED_DEMO"
+        value = "1"
+      }
+      env {
+        name  = "SQLITE_DB_PATH"
+        value = "/app/ledger/ledger.db"
+      }
+      env {
+        name  = "PRACTITIONER_DB_PATH"
+        value = "/app/ledger/practitioner.db"
+      }
+
+      volume_mounts {
+        name       = "ledger-volume"
+        mount_path = "/app/ledger"
+      }
+    }
+
+    volumes {
+      name = "ledger-volume"
+      gcs {
+        bucket    = google_storage_bucket.ledger_storage.name
+        read_only = false
+      }
+    }
+  }
+}
+
+resource "google_cloud_run_service_iam_binding" "authenticated_invokers" {
+  project  = google_cloud_run_v2_service.research_agent.project
+  location = google_cloud_run_v2_service.research_agent.location
+  service  = google_cloud_run_v2_service.research_agent.name
+  role     = "roles/run.invoker"
+  members  = [
+    "group:authorized-researchers@enterprise.com"
+  ]
+}
+```
+
+### 6. Anything NOT Done in A9
+- Section A10 canary suite and comprehensive regression verification is scheduled next.
+
 
 
 

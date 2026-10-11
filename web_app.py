@@ -79,13 +79,16 @@ def get_available_models() -> Dict[str, str]:
     has_key = bool(os.getenv("GEMINI_API_KEY", "").strip())
     ollama_ok = is_ollama_reachable()
 
-    if has_key:
-        options["Google Gemini 3.8 Flash (Cloud API) [Configured]"] = "gemini"
+    # Local-first engines listed first
     if ollama_ok:
         options["Local Ollama Qwen 2.5 3B (Local Offline) [Active]"] = "ollama"
-    if not has_key:
-        options["Google Gemini 3.8 Flash (Cloud API) [API Key Required]"] = "gemini"
     options["Deterministic Offline Engine (Zero-API Fallback)"] = "stub"
+
+    # Remote engines opt-in only
+    if has_key:
+        options["Google Gemini 2.5 Flash (Remote API — sends prompt out-of-boundary) [Configured]"] = "gemini"
+    else:
+        options["Google Gemini 2.5 Flash (Remote API — sends prompt out-of-boundary) [API Key Required]"] = "gemini"
     return options
 
 
@@ -722,6 +725,8 @@ def run_production_pipeline(
     progress_box: Any,
     papers_override: Optional[List[Dict[str, Any]]] = None,
     custom_lane_urls: Optional[Dict[str, List[str]]] = None,
+    allow_remote_practitioner_synthesis: bool = False,
+    practitioner_abstraction_confirmed: bool = False,
 ) -> Dict[str, Any]:
     """Execute the formal 8-stage research engine workflow across Academic, Enterprise, and Practitioner lanes."""
     stage_titles = {
@@ -762,6 +767,8 @@ def run_production_pipeline(
         on_progress=on_progress,
         academic_papers_override=papers_override,
         custom_lane_urls=custom_lane_urls,
+        allow_remote_practitioner_synthesis=allow_remote_practitioner_synthesis,
+        practitioner_abstraction_confirmed=practitioner_abstraction_confirmed,
     )
     progress_box.empty()
     return results
@@ -806,7 +813,7 @@ with st.sidebar:
                 </span>
             </div>
             <div style="margin-top: 0.65rem; padding-top: 0.65rem; border-top: 1px solid #F1F5F9; font-size: 0.74rem; color: #64748B;">
-                Default Active Engine: <strong style="color: #334155;">Google Gemini 3.8 Flash</strong>
+                Default Active Engine: <strong style="color: #334155;">{'Local Ollama Qwen 2.5 3B' if ollama_online else 'Deterministic Offline Engine'}</strong>
             </div>
         </div>
         """,
@@ -1105,6 +1112,20 @@ with lane_input_col3:
     )
     st.session_state["custom_prac_urls"] = custom_prac_input
 
+    prac_col1, prac_col2 = st.columns(2)
+    with prac_col1:
+        prac_abs_confirmed = st.checkbox(
+            "Gate 6: Confirm Practitioner Abstraction (Human Operator Sign-Off)",
+            value=False,
+            help="Mandatory operator sign-off confirming all client and proprietary identifiers have been abstracted.",
+        )
+    with prac_col2:
+        allow_remote_prac_synth = st.checkbox(
+            "Allow remote synthesis of practitioner data",
+            value=False,
+            help="If unchecked, practitioner data is synthesized strictly locally via Ollama or the offline deterministic engine. Never leaves your environment.",
+        )
+
 # Advanced Governance & Model Selection
 with st.expander("⚙️ Advanced Settings & Deterministic Governance Hub", expanded=False):
     adv_col1, adv_col2, adv_col3 = st.columns(3)
@@ -1122,11 +1143,9 @@ with st.expander("⚙️ Advanced Settings & Deterministic Governance Hub", expa
             available_models["Deterministic Offline Engine (Zero-API Fallback)"] = "stub"
             model_names.append("Deterministic Offline Engine (Zero-API Fallback)")
 
-        # Compute sensible default index based on availability
+        # Compute sensible default index based on availability (strictly local-first)
         if is_stub_requested:
             default_idx = next((i for i, k in enumerate(model_names) if available_models.get(k) == "stub"), 0)
-        elif bool(os.getenv("GEMINI_API_KEY", "").strip()):
-            default_idx = next((i for i, k in enumerate(model_names) if available_models.get(k) == "gemini"), 0)
         elif is_ollama_reachable():
             default_idx = next((i for i, k in enumerate(model_names) if available_models.get(k) == "ollama"), 0)
         else:
@@ -1138,16 +1157,19 @@ with st.expander("⚙️ Advanced Settings & Deterministic Governance Hub", expa
         st.multiselect("Active Academic Repositories", ["arXiv", "OpenAlex", "Crossref", "Semantic Scholar", "ACM / IEEE"], default=["arXiv", "OpenAlex", "Crossref", "Semantic Scholar"])
         st.slider("Evidence Confidence Floor", min_value=0.7, max_value=0.99, value=0.92, step=0.01)
 
-    st.markdown("##### Session API Key Override")
-    custom_key = st.text_input(
-        "Temporary Gemini API Key",
-        value="",
-        type="password",
-        placeholder="Paste Gemini API key to override server configuration...",
-        help="Secrets are kept in process memory for this session and are never written to disk or DOM.",
-    )
-    if custom_key.strip():
-        os.environ["GEMINI_API_KEY"] = custom_key.strip()
+    if os.getenv("HOSTED_DEMO") == "1":
+        st.info("API key override disabled on shared instance.")
+    else:
+        st.markdown("##### Session API Key Override")
+        custom_key = st.text_input(
+            "Temporary Gemini API Key",
+            value="",
+            type="password",
+            placeholder="Paste Gemini API key to override server configuration...",
+            help="Secrets are kept in process memory for this session and are never written to disk or DOM.",
+        )
+        if custom_key.strip():
+            os.environ["GEMINI_API_KEY"] = custom_key.strip()
 
 st.markdown('</div>', unsafe_allow_html=True)
 
@@ -1195,6 +1217,8 @@ if run_submitted:
                 progress_box=progress_placeholder,
                 papers_override=_generate_mock_papers(active_query) if is_stub_requested else None,
                 custom_lane_urls=lane_urls,
+                allow_remote_practitioner_synthesis=allow_remote_prac_synth,
+                practitioner_abstraction_confirmed=prac_abs_confirmed,
             )
             eta_banner.empty()
             st.session_state["research_results"] = results
