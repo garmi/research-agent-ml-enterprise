@@ -411,20 +411,20 @@ if run_btn:
     else:
         progress_status = st.status("🚀 Running Research Engine Pipeline...", expanded=True)
         try:
-        synthesis_result = run_pipeline(
-            topic=topic_input,
-            max_papers=5,
-            mode=depth_mapping[search_depth],
-            tone=tone_mapping[audience_tone],
-            length="detailed",
-            map_provider=map_prov,
-            reduce_provider=reduce_prov,
-            status_container=progress_status,
-        )
-        st.session_state["synthesis"] = synthesis_result
-    except Exception as exc:
-        progress_status.error(f"Execution error: {exc}")
-        st.error(f"Pipeline failed: {exc}")
+            synthesis_result = run_pipeline(
+                topic=topic_input,
+                max_papers=5,
+                mode=depth_mapping[search_depth],
+                tone=tone_mapping[audience_tone],
+                length="detailed",
+                map_provider=map_prov,
+                reduce_provider=reduce_prov,
+                status_container=progress_status,
+            )
+            st.session_state["synthesis"] = synthesis_result
+        except Exception as exc:
+            progress_status.error(f"Execution error: {exc}")
+            st.error(f"Pipeline failed: {exc}")
 
 # Auto-load cached synthesis if available
 if "synthesis" not in st.session_state:
