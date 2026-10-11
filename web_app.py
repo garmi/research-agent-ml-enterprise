@@ -382,12 +382,32 @@ depth_mapping = {"⚡ Fast (2 Rounds)": "quick", "🔬 Deep (4 Rounds)": "deep"}
 
 # Optional advanced tuning (cleanly tucked away)
 has_env_key = bool(os.getenv("GEMINI_API_KEY"))
-with st.expander("⚙️ Inference & API Key Settings", expanded=not has_env_key):
+is_cloud_run = bool(os.getenv("K_SERVICE"))
+query_prov = str(st.query_params.get("provider", "")).lower()
+
+if query_prov == "ollama":
+    default_idx = 1
+elif query_prov == "gemini":
+    default_idx = 0
+else:
+    default_idx = 0 if is_cloud_run else 1
+
+with st.expander("⚙️ Inference & API Key Settings", expanded=True):
     col_t1, col_t2 = st.columns(2)
     with col_t1:
-        map_prov = st.selectbox("Reading Model", ["gemini", "ollama"], index=0)
+        map_prov = st.selectbox(
+            "Reading Model",
+            ["gemini", "ollama"],
+            index=default_idx,
+            help="gemini = Google Gemini 3.8 Flash, ollama = Local Qwen 2.5",
+        )
     with col_t2:
-        reduce_prov = st.selectbox("Synthesis Model", ["gemini", "ollama"], index=0)
+        reduce_prov = st.selectbox(
+            "Synthesis Model",
+            ["gemini", "ollama"],
+            index=default_idx,
+            help="gemini = Google Gemini 3.8 Flash, ollama = Local Qwen 2.5",
+        )
 
     if has_env_key:
         st.success("🔒 Server API Key: Configured in environment.")

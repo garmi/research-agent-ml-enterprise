@@ -1,5 +1,4 @@
-from __future__ import annotations
-
+import os
 import re
 import time
 from typing import List, Dict, Any
@@ -13,6 +12,9 @@ class SemanticScholarClient:
         self.headers = {
             "User-Agent": "EnterpriseResearchAgent/1.0 (mailto:research-agent@enterprise.local)"
         }
+        api_key = (os.getenv("SEMANTIC_SCHOLAR_API_KEY") or os.getenv("S2_API_KEY") or "").strip()
+        if api_key:
+            self.headers["x-api-key"] = api_key
 
     def search(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:
         clean_query = re.sub(r"[^\w\s-]", " ", query).strip()

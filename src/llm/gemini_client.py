@@ -11,10 +11,11 @@ class GeminiClient:
     """Minimal Gemini REST client (Google AI Studio key). Same interface as OllamaClient."""
 
     def __init__(self, model: Optional[str] = None, api_key: Optional[str] = None, retries: int = 2, timeout: int = 120):
-        self.api_key = api_key or os.getenv("GEMINI_API_KEY", "")
+        self.api_key = (api_key or os.getenv("GEMINI_API_KEY", "")).strip()
         if not self.api_key:
             raise RuntimeError("GEMINI_API_KEY is not set. Add it to .env (AI Studio key).")
-        self.model = model or os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
+        raw_model = model or os.getenv("GEMINI_MODEL") or "gemini-3.8-flash"
+        self.model = str(raw_model).strip()
         self.retries = retries
         self.timeout = timeout
         self.base_url = "https://generativelanguage.googleapis.com/v1beta/models"
@@ -35,7 +36,8 @@ class GeminiClient:
         if json_mode:
             body["generationConfig"]["responseMimeType"] = "application/json"
 
-        url = f"{self.base_url}/{self.model}:generateContent"
+        clean_model = self.model.strip()
+        url = f"{self.base_url}/{clean_model}:generateContent"
         headers = {"x-goog-api-key": self.api_key, "Content-Type": "application/json"}
 
         last_exc: Optional[Exception] = None
