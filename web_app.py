@@ -1468,7 +1468,7 @@ if results:
                 """,
                 unsafe_allow_html=True,
             )
-            st.caption(f"Harvested {results.get('lane_breakdown', {}).get('enterprise_claims_count', 4)} enterprise claims (commercial cap enforced)")
+            st.caption(f"Harvested {results.get('lane_breakdown', {}).get('enterprise_claims_count', 0)} enterprise claims (commercial cap enforced)")
 
         with lane_col_c:
             st.markdown(
@@ -1485,7 +1485,7 @@ if results:
                 """,
                 unsafe_allow_html=True,
             )
-            st.caption(f"Harvested {results.get('lane_breakdown', {}).get('practitioner_claims_count', 1)} abstracted delivery field observations")
+            st.caption(f"Harvested {results.get('lane_breakdown', {}).get('practitioner_claims_count', 0)} abstracted delivery field observations")
 
         st.markdown("---")
         st.markdown("#### 📚 Academic Papers Ingested (Lane A)")
@@ -1539,7 +1539,7 @@ if results:
                     unsafe_allow_html=True,
                 )
         else:
-            st.caption("No enterprise sources harvested yet.")
+            st.caption("No enterprise claims recorded for this question")
 
         # Lane C: Practitioner Delivery Observations
         st.markdown("---")
@@ -1569,7 +1569,7 @@ if results:
                     unsafe_allow_html=True,
                 )
         else:
-            st.caption("No local practitioner observations exported yet.")
+            st.caption("No practitioner observations recorded for this question")
 
         # Paper exclusion and re-synthesis action
         st.markdown("---")

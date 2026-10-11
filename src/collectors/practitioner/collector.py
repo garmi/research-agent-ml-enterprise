@@ -98,7 +98,7 @@ class PractitionerCollector:
             f"when addressing {situation.lower().rstrip('.')}, {action.lower().rstrip('.')} resulted in {outcome.lower().rstrip('.')}."
         )
 
-        excerpt_summary = f"{situation[:50]} -> {action[:50]} -> {outcome[:50]}"
+        excerpt_summary = f"{situation} -> {action} -> {outcome}"
         # Ensure excerpt is max 25 words
         excerpt_words = excerpt_summary.split()
         if len(excerpt_words) > 25:

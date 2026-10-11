@@ -41,9 +41,15 @@ def test_multilane_workflow_execution():
         ]
 
         from src.collectors.practitioner.collector import PractitionerCollector
+        topic = "How do AI coding assistants impact developer productivity in enterprise software delivery?"
+        q = runner.ledger_service.create_question(
+            question_id="q-test",
+            text=topic,
+            scope="productivity",
+        )
         prac_col = PractitionerCollector(db_path=prac_db)
         prac_col.add_observation(
-            question_id="q-test",
+            question_id=q.id,
             situation="Financial services pilot",
             decision="Automated verification gates",
             action="Pre-commit linting",

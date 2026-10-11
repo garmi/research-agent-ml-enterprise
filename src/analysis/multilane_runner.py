@@ -555,9 +555,9 @@ class MultiLaneResearchRunner:
                 t, a, d = fetch_url_metadata(u_clean) if u_clean.startswith("http") else (u_clean[:60], u_clean, "field-notes")
                 prac_collector.add_observation(
                     question_id=question_obj.id,
-                    situation=f"[Custom User Observation] Ingested from {u_clean[:80]}",
+                    situation=f"[Custom User Observation] {t}" if not u_clean.startswith("http") else f"[Custom User Observation] Ingested from {u_clean}",
                     decision="Integrated automated verification gates for custom stack",
-                    action=f"Observed delivery outcome and telemetry: {a[:140]}",
+                    action=f"Observed delivery outcome and telemetry: {a}",
                     outcome="Maintained verified governance and zero ungrounded regression",
                     sector="technology_delivery",
                     date=datetime.date.today().isoformat(),
@@ -567,9 +567,9 @@ class MultiLaneResearchRunner:
                     entity=t[:50],
                 )
 
-        # Export all confirmed abstracted claims to the shared ledger
+        # Export confirmed abstracted claims for this question to the shared ledger
         exported_claims: List[Claim] = []
-        for obs in prac_collector.list_observations():
+        for obs in prac_collector.list_observations(question_id=question_obj.id):
             if obs.context_json and obs.context_json.get("abstraction_confirmed") is True:
                 try:
                     exported = prac_collector.export_abstracted_claim_to_ledger(
@@ -856,24 +856,27 @@ class MultiLaneResearchRunner:
                 "is_custom": bool(p.get("is_custom", False) or "[Custom User Source]" in p.get("title", "")),
             })
 
-        # Formatted enterprise sources
+        # Formatted enterprise sources (scoped strictly to claims for this question/run)
         ent_sources_formatted = []
-        for s in self.repo.list_sources(lane="enterprise"):
-            ent_sources_formatted.append({
-                "id": s.id,
-                "title": s.title,
-                "url": s.url or "https://dora.dev",
-                "venue": s.venue or s.org,
-                "commercial_stake": s.commercial_stake,
-                "source_type": s.source_type,
-                "pub_date": s.pub_date,
-                "is_custom": "[Custom User Source]" in s.title,
-            })
+        ent_source_ids = {c.source_id for c in enterprise_claims}
+        for sid in ent_source_ids:
+            s = self.repo.get_source(sid)
+            if s and s.lane == "enterprise":
+                ent_sources_formatted.append({
+                    "id": s.id,
+                    "title": s.title,
+                    "url": s.url or "https://dora.dev",
+                    "venue": s.venue or s.org,
+                    "commercial_stake": s.commercial_stake,
+                    "source_type": s.source_type,
+                    "pub_date": s.pub_date,
+                    "is_custom": "[Custom User Source]" in s.title,
+                })
 
-        # Formatted practitioner observations
+        # Formatted practitioner observations (scoped strictly to this question)
         prac_collector = PractitionerCollector(db_path=self.practitioner_db_path)
         prac_obs_formatted = []
-        for obs in prac_collector.list_observations():
+        for obs in prac_collector.list_observations(question_id=question_obj.id):
             ctx = obs.context_json or {}
             prac_obs_formatted.append({
                 "id": obs.id,

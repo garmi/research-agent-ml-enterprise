@@ -11,7 +11,7 @@ This document records the systematic verification and enforcement of integrity g
 | **D1** | Canned findings, risks, business signals, roadmap steps, content ideas identical across unrelated questions | **Fixed in A1** | Removed 45 hardcoded content strings; zero-hit grep verified; `test_no_literal_report_text` passing. |
 | **D2** | Silent fallback on model error swallowed as generic RuntimeError; fallback produces normal-looking findings | **Fixed in A2** | Extractive fallback implemented; error details captured; publication blocked; `test_a2_honest_offline_fallback` passing. |
 | **D3** | Gates audit shadow copy rather than final text; template verb stutter; uncited assertions passing G1 | **Fixed in A3** | Migration 002 applied; UnifiedRenderer implemented; output_sentences single source of truth; `test_a3_single_source_of_truth` passing. |
-| **D4** | Lanes not scoped to current question; practitioner observations and enterprise registry leakage across runs | Pending (A4, A5) | Seed purged in A1; question-scoping in A5. |
+| **D4** | Lanes not scoped to current question; practitioner observations and enterprise registry leakage across runs | **Fixed in A5** | Filtered all lane rows by question_id; fixed practitioner truncation; canary hospital run produces 0 observations and Outcome 3/4 (not 1); `test_a5_lane_scoping` passing. |
 | **D5** | Off-topic and stale papers admitted; venue equals API provider name; blanket "Open Pre-print" tagging | Pending (A6, A7) | Next section. |
 | **D6** | Contradictory UI state (green banner beside failing gate score); component scores constant | Pending (A8) | Next section. |
 | **D7** | Privacy violations: practitioner text in egress, auto-confirmed Gate 6 abstraction, unauthenticated endpoints | Pending (A9) | Next section. |
@@ -391,6 +391,97 @@ evals/test_regression.py ..............                                  [100%]
 
 ### 5. Anything NOT Done in A4
 - Scoping of enterprise and practitioner observations to run and question is scheduled in Section A5.
+
+---
+
+## Section A5: Scope Every Lane to Run and Question
+
+### 1. What Changed
+- **Scoping Practitioner Observations:** Updated `MultiLaneResearchRunner._harvest_practitioner_lane` and `_build_result_payload` in `src/analysis/multilane_runner.py` to pass `question_id=question_obj.id` into `PractitionerCollector.list_observations()`. Eliminated cross-question leakage where unrelated practitioner notes (e.g. software delivery microservices) previously leaked into other questions.
+- **Scoping Enterprise Sources:** Filtered `ent_sources_formatted` strictly to sources associated with claims extracted for `question_obj.id` in that run.
+- **Removed Observation Truncation:** Updated `PractitionerCollector.add_observation` in `src/collectors/practitioner/collector.py` and `multilane_runner.py` to preserve complete text without `[:50]` or `[:140]` truncations in `situation`, `action`, `outcome`, or `context_payload`.
+- **Honest Empty Lane Rendering:** Updated `web_app.py` so that:
+  - When 0 enterprise claims exist for a question, Lane B renders `"No enterprise claims recorded for this question"`.
+  - When 0 practitioner observations exist for a question, Lane C renders `"No practitioner observations recorded for this question"`.
+  - Reset fallback counts in metric captions from misleading defaults (4 and 1) to honest `0`.
+- **Gap Matrix Scoping:** Verified that for questions lacking enterprise claims or practitioner observations (such as the canary hospital question), `GapMatrixBuilder` evaluates `field_state = "none found"`, `enterprise_state = "none found"`, and Outcome 3 or 4 (NEVER Outcome 1).
+
+### 2. Files Touched
+- `src/analysis/multilane_runner.py`
+- `src/collectors/practitioner/collector.py`
+- `web_app.py`
+- `tests/test_multilane_workflow.py`
+- `tests/test_a5_lane_scoping.py` (new)
+- `INTEGRITY_REPORT.md`
+
+### 3. Tests Added & Executed
+- Added `tests/test_a5_lane_scoping.py` with:
+  1. `test_canary_hospital_question_isolated_from_software_delivery_observations`: Seeds unrelated software delivery practitioner observations, runs canary hospital question, and asserts 0 practitioner observations, 0 enterprise claims, and Outcome 3/4 (NEVER Outcome 1).
+  2. `test_practitioner_observation_preserves_full_text_without_truncation`: Verifies situation, action, and outcome text > 50 characters are preserved completely without truncation.
+- Updated `tests/test_multilane_workflow.py` to attach observation explicitly to the question id.
+
+### 4. Verification & Pasted Evidence
+
+#### Failing Test Output (Before Fix):
+```
+PYTHONPATH=. .venv/bin/pytest tests/test_a5_lane_scoping.py
+============================= test session starts ==============================
+rootdir: /Users/gauravm/Developer/projects/research-agent-ml-enterprise
+collected 2 items                                                              
+
+tests/test_a5_lane_scoping.py F.                                         [100%]
+
+=================================== FAILURES ===================================
+__ test_canary_hospital_question_isolated_from_software_delivery_observations __
+...
+>           assert len(results["practitioner_observations"]) == 0, (
+                f"Expected 0 practitioner observations for hospital question, found: {results['practitioner_observations']}"
+            )
+E           AssertionError: Expected 0 practitioner observations for hospital question, found: [{'id': 'claim_prac_0ae40d99db', 'situation': '140 enterprise microservices undergoing continuous deployment', 'decision': 'Enforced strict gate check', 'action': 'Automated static analysis', 'outcome': 'Zero defect regression', 'date': '2026-10-11', 'is_custom': False}]
+E           assert 1 == 0
+==================== 1 failed, 1 passed, 1 warning in 0.48s ====================
+```
+
+#### Passing Test Output (After Fix):
+```
+PYTHONPATH=. .venv/bin/pytest tests/test_a5_lane_scoping.py
+============================= test session starts ==============================
+rootdir: /Users/gauravm/Developer/projects/research-agent-ml-enterprise
+collected 2 items                                                              
+
+tests/test_a5_lane_scoping.py ..                                         [100%]
+
+========================= 2 passed, 1 warning in 0.38s =========================
+```
+
+#### Full Test Suite Status (Zero Regressions, 41 Passed):
+```
+PYTHONPATH=. .venv/bin/pytest tests evals -k "not test_ui_smoke"
+============================= test session starts ==============================
+rootdir: /Users/gauravm/Developer/projects/research-agent-ml-enterprise
+collected 42 items / 1 deselected / 41 selected                                
+
+tests/test_a2_honest_offline_fallback.py .                               [  2%]
+tests/test_a3_single_source_of_truth.py .                                [  4%]
+tests/test_a4_traceable_citations.py ..                                  [  9%]
+tests/test_a5_lane_scoping.py ..                                         [ 14%]
+tests/test_multilane_workflow.py .                                       [ 17%]
+tests/test_no_literal_report_text.py .                                   [ 19%]
+tests/test_pipeline.py ....                                              [ 29%]
+tests/test_question_formulator.py ..                                     [ 34%]
+evals/test_phase2_service.py ....                                        [ 43%]
+evals/test_phase3_enterprise.py ...                                      [ 51%]
+evals/test_phase4_synth.py ...                                           [ 58%]
+evals/test_phase5_practitioner_publish.py ..                             [ 63%]
+evals/test_r10_migration.py .                                            [ 65%]
+evals/test_regression.py ..............                                  [100%]
+
+================= 41 passed, 1 deselected, 1 warning in 9.05s ==================
+```
+
+### 5. Anything NOT Done in A5
+- Enterprise lane source distinctness, harvest count honesty, and vendor claim capping are scheduled in Section A6.
+
 
 
 
