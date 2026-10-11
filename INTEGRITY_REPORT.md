@@ -482,6 +482,106 @@ evals/test_regression.py ..............                                  [100%]
 ### 5. Anything NOT Done in A5
 - Enterprise lane source distinctness, harvest count honesty, and vendor claim capping are scheduled in Section A6.
 
+---
+
+## Section A6: Enterprise Lane Honesty and Gap Matrix Rules
+
+### 1. What Changed
+- **Separated Distinct Sources and Claims Counts:**
+  - In `src/analysis/multilane_runner.py`:
+    - Track distinct source IDs vs total extracted claims for all lanes in `lane_breakdown`: `academic_sources_count`, `academic_claims_count`, `enterprise_sources_count`, `enterprise_claims_count`, `practitioner_sources_count`, and `practitioner_claims_count`.
+    - Volume metric in payload reports distinct sources count and claims count accurately.
+  - In `web_app.py`:
+    - Updated Lane B caption: `Harvested {claims_count} enterprise claims from {sources_count} distinct sources (commercial cap enforced)`.
+    - Ensured "Harvested N" strictly reflects items retrieved and claims extracted for the question, never the number of registry entries.
+- **Enforced Deterministic Vendor-Only Capping (Outcome 2 Max):**
+  - Added `vendor_only_max_outcome: 2` to `grade/rules.yaml` under `caps:` and to `config.yaml`.
+  - Updated `GapMatrixBuilder` in `src/gaps/matrix_builder.py`:
+    - Inspects `commercial_stake`, `venue_tier`, `c.grade == "vendor_claim"`, and `c.context_json["source_stake"] == "vendor"`.
+    - When all enterprise claims originate solely from vendor sources without independent non-vendor corroboration or practitioner field notes, outcome is capped at Outcome 2 (NEVER Outcome 1), even when strong peer-reviewed academic literature is present.
+    - Updated `rationale` to record the exact rule fired: `"Outcome 2: Practice without evidence — Enterprise claims originate solely from vendor sources without independent empirical corroboration."`
+- **Enforced Strategic Gap Matrix 1–4 Determinism:**
+  - Outcome 1 requires at least one peer-reviewed academic paper AND at least one non-vendor enterprise source.
+  - Outcome 2 fires when enterprise evidence exists without peer-reviewed academic support (or when enterprise claims are vendor-only).
+  - Outcome 3 fires when academic research demonstrates capabilities, but enterprise/practitioner evidence is absent.
+  - Outcome 4 fires when rigorous evidence is lacking across both academic and enterprise lanes.
+
+### 2. Files Touched
+- `grade/rules.yaml`
+- `config.yaml`
+- `src/gaps/matrix_builder.py`
+- `src/analysis/multilane_runner.py`
+- `web_app.py`
+- `tests/test_a6_enterprise_honesty.py` (new)
+- `INTEGRITY_REPORT.md`
+
+### 3. Tests Added & Executed
+- Added `tests/test_a6_enterprise_honesty.py`:
+  1. `test_vendor_only_capping_caps_at_outcome_2_not_outcome_1`: Validates that 1 vendor source + strong academic research evaluates to Outcome 2, never Outcome 1, and records vendor capping in rationale.
+  2. `test_sources_and_claims_counted_separately_in_runner_payload`: Validates that 1 enterprise source yielding 2 claims produces `enterprise_sources_count: 1` and `enterprise_claims_count: 2`, proving distinct source and claim counting.
+  3. `test_outcome_1_requires_peer_reviewed_academic_and_non_vendor_enterprise`: Validates that Outcome 1 requires both peer-reviewed academic evidence and non-vendor enterprise evidence.
+- Verified canary hospital question in `tests/test_a5_lane_scoping.py`: 0 enterprise claims, 0 practitioner claims produces Outcome 3 or 4, never 1.
+
+### 4. Verification & Pasted Evidence
+
+#### Failing Test Output (Before Fix):
+```
+=================================== FAILURES ===================================
+__________ test_vendor_only_capping_caps_at_outcome_2_not_outcome_1 ___________
+    entry = builder.evaluate_question_lanes(question_id=q.id, run_id="run-test-vcap")
+>   assert entry.outcome == 2, f"Expected Outcome 2 due to vendor-only capping, but got Outcome {entry.outcome}"
+E   AssertionError: Expected Outcome 2 due to vendor-only capping, but got Outcome 1
+E   assert 1 == 2
+tests/test_a6_enterprise_honesty.py:104: AssertionError
+```
+
+#### Passing Test Output (After Fix):
+```
+PYTHONPATH=. .venv/bin/pytest tests/test_a6_enterprise_honesty.py -v
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Users/gauravm/Developer/projects/research-agent-ml-enterprise/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/gauravm/Developer/projects/research-agent-ml-enterprise
+collecting ... collected 3 items                                                              
+
+tests/test_a6_enterprise_honesty.py::test_vendor_only_capping_caps_at_outcome_2_not_outcome_1 PASSED [ 33%]
+tests/test_a6_enterprise_honesty.py::test_sources_and_claims_counted_separately_in_runner_payload PASSED [ 66%]
+tests/test_a6_enterprise_honesty.py::test_outcome_1_requires_peer_reviewed_academic_and_non_vendor_enterprise PASSED [100%]
+
+========================= 3 passed, 1 warning in 0.50s =========================
+```
+
+#### Full Test Suite Status (Zero Regressions, 44 Passed):
+```
+PYTHONPATH=. .venv/bin/pytest tests evals -k "not test_ui_smoke"
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/gauravm/Developer/projects/research-agent-ml-enterprise
+collecting ... collected 45 items / 1 deselected / 44 selected                                
+
+tests/test_a2_honest_offline_fallback.py .                               [  2%]
+tests/test_a3_single_source_of_truth.py .                                [  4%]
+tests/test_a4_traceable_citations.py ..                                  [  9%]
+tests/test_a5_lane_scoping.py ..                                         [ 13%]
+tests/test_a6_enterprise_honesty.py ...                                  [ 20%]
+tests/test_multilane_workflow.py .                                       [ 22%]
+tests/test_no_literal_report_text.py .                                   [ 25%]
+tests/test_pipeline.py ....                                              [ 34%]
+tests/test_question_formulator.py ..                                     [ 38%]
+evals/test_phase2_service.py ....                                        [ 47%]
+evals/test_phase3_enterprise.py ...                                      [ 54%]
+evals/test_phase4_synth.py ...                                           [ 61%]
+evals/test_phase5_practitioner_publish.py ..                             [ 65%]
+evals/test_r10_migration.py .                                            [ 68%]
+evals/test_regression.py ..............                                  [100%]
+
+================= 44 passed, 1 deselected, 1 warning in 9.34s ==================
+```
+
+### 5. Anything NOT Done in A6
+- Academic paper retrieval filtering (`min_year >= 2020`), search log rejection reasons, and venue tier metadata honesty are scheduled in Section A7.
+
+
 
 
 

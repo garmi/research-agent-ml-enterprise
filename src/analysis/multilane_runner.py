@@ -111,7 +111,7 @@ class MultiLaneResearchRunner:
         )
         self.repo = LedgerRepository(db_path=self.db_path)
         self.grader = Grader(rules_path=self.rules_path, venue_tiers_path=self.venue_tiers_path)
-        self.gap_builder = GapMatrixBuilder(db_path=self.db_path)
+        self.gap_builder = GapMatrixBuilder(db_path=self.db_path, rules_path=self.rules_path)
         self.checker = GateChecker(verbs_path=self.verbs_path)
         self.scorer = QualityScorer(scoring_cfg_path=self.scoring_path)
         self.publisher = Publisher(db_path=self.db_path, denylist_path=self.denylist_path)
@@ -943,13 +943,16 @@ class MultiLaneResearchRunner:
                 "rationale": getattr(gap_entry, "rationale", ""),
             },
             "lane_breakdown": {
+                "academic_sources_count": len(academic_papers),
                 "academic_count": len(academic_papers),
                 "academic_claims_count": len(academic_claims),
+                "enterprise_sources_count": len(ent_sources_formatted),
                 "enterprise_claims_count": len(enterprise_claims),
+                "practitioner_observations_count": len(prac_obs_formatted),
                 "practitioner_claims_count": len(practitioner_claims),
             },
             "metrics": {
-                "volume": f"{len(academic_papers)} Papers • {len(enterprise_claims)} Enterprise • {len(practitioner_claims)} Field",
+                "volume": f"{len(academic_papers)} Papers ({len(academic_claims)} claims) • {len(ent_sources_formatted)} Enterprise Sources ({len(enterprise_claims)} claims) • {len(prac_obs_formatted)} Field Observations",
                 "sources": f"{len(sources_set)} Repositories",
                 "horizon": year_range_str,
                 "quality": f"{score_results.get('total_score', 88)}/100 ({score_results.get('band', 'PUBLISH_READY')})",

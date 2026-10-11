@@ -1468,7 +1468,7 @@ if results:
                 """,
                 unsafe_allow_html=True,
             )
-            st.caption(f"Harvested {results.get('lane_breakdown', {}).get('enterprise_claims_count', 0)} enterprise claims (commercial cap enforced)")
+            st.caption(f"Harvested {results.get('lane_breakdown', {}).get('enterprise_claims_count', 0)} enterprise claims from {results.get('lane_breakdown', {}).get('enterprise_sources_count', 0)} distinct sources (commercial cap enforced)")
 
         with lane_col_c:
             st.markdown(

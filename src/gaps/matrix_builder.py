@@ -14,8 +14,10 @@ from __future__ import annotations
 
 import datetime
 import logging
+import os
 import uuid
 from typing import Any, Dict, List, Optional, Tuple
+import yaml
 
 from src.ledger.models import Claim, GapMatrixEntry, Question, Run
 from src.ledger.repository import LedgerRepository
@@ -24,9 +26,28 @@ logger = logging.getLogger(__name__)
 
 
 class GapMatrixBuilder:
-    def __init__(self, db_path: str = "ledger/ledger.db"):
+    def __init__(
+        self,
+        db_path: str = "ledger/ledger.db",
+        rules_path: Optional[str] = None,
+        config_path: Optional[str] = None,
+    ):
         self.db_path = db_path
+        self.rules_path = rules_path
+        self.config_path = config_path
         self.repo = LedgerRepository(db_path=self.db_path)
+        self._load_config_and_rules()
+
+    def _load_config_and_rules(self) -> None:
+        self.rules = {}
+        if self.rules_path and os.path.exists(self.rules_path):
+            with open(self.rules_path, "r", encoding="utf-8") as f:
+                self.rules = yaml.safe_load(f) or {}
+
+        self.config = {}
+        if self.config_path and os.path.exists(self.config_path):
+            with open(self.config_path, "r", encoding="utf-8") as f:
+                self.config = yaml.safe_load(f) or {}
 
     def evaluate_question_lanes(
         self,
@@ -83,13 +104,40 @@ class GapMatrixBuilder:
         ent_state = determine_state(enterprise_claims, "enterprise")
         field_state = determine_state(field_claims, "practitioner")
 
+        # Check if enterprise lane consists solely of vendor sources
+        only_vendor_sources = False
+        if enterprise_claims:
+            is_vendor_source = []
+            for c in enterprise_claims:
+                src = self.repo.get_source(c.source_id)
+                stake = getattr(src, "commercial_stake", "") if src else ""
+                v_tier = getattr(src, "venue_tier", "") if src else ""
+                is_vendor_source.append(
+                    stake == "vendor"
+                    or v_tier == "vendor"
+                    or c.grade == "vendor_claim"
+                    or (c.context_json and c.context_json.get("source_stake") == "vendor")
+                )
+            if all(is_vendor_source):
+                only_vendor_sources = True
+
+        vendor_cap = None
+        if self.rules and "caps" in self.rules:
+            vendor_cap = self.rules.get("caps", {}).get("vendor_only_max_outcome")
+        elif self.config:
+            vendor_cap = self.config.get("vendor_only_max_outcome")
+
         # Determine Outcome 1 to 4
         outcome: int
         rationale: str
 
         if acad_state in ("supported", "partial") and (ent_state in ("supported", "partial") or field_state in ("supported", "partial")):
-            outcome = 1
-            rationale = "Outcome 1: Supported — Empirical academic research is corroborated by active enterprise practice."
+            if only_vendor_sources and field_state == "none found" and vendor_cap is not None:
+                outcome = min(2, vendor_cap)
+                rationale = "Outcome 2: Practice without evidence — Enterprise claims originate solely from vendor sources without independent empirical corroboration."
+            else:
+                outcome = 1
+                rationale = "Outcome 1: Supported — Empirical academic research is corroborated by active enterprise practice."
         elif (ent_state in ("supported", "partial") or field_state in ("supported", "partial")) and acad_state == "none found":
             outcome = 2
             rationale = "Outcome 2: Practice without evidence — Enterprise teams are actively adopting, but peer-reviewed empirical evidence is absent."

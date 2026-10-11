@@ -43,6 +43,8 @@ caps:
   commercial_stake_max_grade: vendor_claim
   # Entity mismatch restricts claim to topic_level only
   entity_mismatch_restrict_topic: true
+  # If only vendor sources are found, outcome is capped at Outcome 2 (never Outcome 1)
+  vendor_only_max_outcome: 2
 
 corroboration:
   min_independent_sources_for_strong: 2
