@@ -1780,6 +1780,90 @@ tests/test_a12_cloud_run_specification.py::test_integrity_report_documents_rever
 ### 6. Anything NOT Done in A2-7
 - Section A2-8: Enterprise lane live retrieval audit.
 
+---
+
+## Section A2-8: Enterprise Lane Production Retrieval Audit (Lane B)
+
+### 1. Defect Description & Audit Objective
+- **Objective:**
+  Plainly state, backed by an empirical live run, what Enterprise Lane (Lane B) actually retrieves in production for Q1 without test fixtures:
+  - Does Lane B retrieve items with URL, date, and excerpt, or an honest zero?
+  - Are the automated registry fetchers implemented or not?
+  - Which sources currently work in production?
+
+### 2. Live Run Audit on Q1 (Empirical Evidence)
+Executed a live production run of `EnterpriseCollector.search_and_ingest()` on Q1 (`What empirical evidence exists regarding Amazon Kiro adoption, productivity gains, and delivery trade-offs in engineering teams?`) with zero fixture overrides:
+
+```
+>>> c = EnterpriseCollector(db_path=db)
+>>> q = Question(id='q1', text='What empirical evidence exists regarding Amazon Kiro adoption...')
+>>> claims = c.search_and_ingest(question=q, query=q.text)
+CLAIMS COUNT: 0
+SEARCH LOGS COUNT: 5
+  SOURCE: dora-dev-survey     | RESULT_COUNT: 0 | QUERY: What empirical evidence exists regarding Amazon Ki...
+  SOURCE: sec-edgar-filings   | RESULT_COUNT: 0 | QUERY: What empirical evidence exists regarding Amazon Ki...
+  SOURCE: google-cloud-blog   | RESULT_COUNT: 0 | QUERY: What empirical evidence exists regarding Amazon Ki...
+  SOURCE: ms-engineering-blog | RESULT_COUNT: 0 | QUERY: What empirical evidence exists regarding Amazon Ki...
+  SOURCE: aws-dev-blog        | RESULT_COUNT: 0 | QUERY: What empirical evidence exists regarding Amazon Ki...
+```
+
+- **Retrieved Items for Q1:** Exactly **0 items**.
+- **Claims Extracted for Q1:** **Honest zero (0 claims)**.
+- **Audit Trail:** Lane B records 5 transparent audit rows in `search_log`, demonstrating that the system executed searches across all 5 registered endpoints and recorded `result_count=0` rather than fabricating synthetic metrics or ungrounded statistics.
+- **Gap Matrix Outcome:** Evaluates cleanly to **Outcome 4: Unmeasured** (or Outcome 3 if Academic Lane found evidence), correctly asserting that industry delivery evidence is absent.
+
+### 3. Implementation Status of Registry Fetchers
+- **Status: UNIMPLEMENTED.**
+  - The registry file `collectors/enterprise/sources_registry.yaml` defines 5 curated sources:
+    1. `aws-dev-blog` (AWS Developer Blog RSS)
+    2. `ms-engineering-blog` (Microsoft Engineering Blog RSS)
+    3. `google-cloud-blog` (Google Cloud Blog RSS)
+    4. `sec-edgar-filings` (SEC EDGAR Submissions API)
+    5. `dora-dev-survey` (DORA DevOps Research Assessment)
+  - The live automated network crawlers (live XML RSS parsers, SEC EDGAR quarterly filing scraper, and DORA survey ingestor) **have not been implemented**.
+  - In `src/collectors/enterprise/collector.py`, `items = []` unless a `feed_data_override` fixture dictionary is supplied.
+
+### 4. What Actually Works in Lane B
+1. **User-Provided Custom Enterprise URLs (Fully Working):**
+   - In `src/analysis/multilane_runner.py` (`_harvest_enterprise_lane`), any URLs entered by the operator in the UI or supplied via `custom_lane_urls={"enterprise": [...]}` are fetched live via `fetch_url_metadata()`:
+     - Real HTTP request retrieves webpage content, title, and textual excerpts.
+     - Creates a `Source` record in `ledger.db` with genuine `url`, publication date, and domain.
+     - Scopes commercial stake: classifies vendor blogs as `venue_tier="vendor"`, capping claim grades at `vendor_claim`.
+     - Extracts atomic empirical claims using `extract_claims_from_paper()`.
+2. **Deterministic Evaluation Harness:**
+   - Test suites and benchmarks can inject ground-truth enterprise documents using `enterprise_feed_override` in `MultiLaneResearchRunner` or `feed_data_override` in `EnterpriseCollector`.
+
+### 5. Files Changed
+- `tests/test_a13_enterprise_lane_audit.py`: Added regression and verification tests confirming honest zero production behavior, search log audit trail recording, and custom URL ingestion.
+- `INTEGRITY_REPORT.md`: Appended Section A2-8 with live run evidence and source status breakdown.
+
+### 6. Verification Evidence
+
+#### Failing Test Output (Before Fix):
+```
+FAILED tests/test_a13_enterprise_lane_audit.py::test_enterprise_lane_custom_url_ingests_real_metadata - IntegrityError
+FAILED tests/test_a13_enterprise_lane_audit.py::test_integrity_report_documents_enterprise_lane_status - AssertionError: assert 'honest zero' in report
+```
+
+#### Passing Test Output (After Fix):
+```
+PYTHONPATH=. .venv/bin/pytest tests/test_a13_enterprise_lane_audit.py -v
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/gauravm/Developer/projects/research-agent-ml-enterprise
+collected 3 items
+
+tests/test_a13_enterprise_lane_audit.py::test_enterprise_lane_production_returns_honest_zero PASSED [ 33%]
+tests/test_a13_enterprise_lane_audit.py::test_enterprise_lane_custom_url_ingests_real_metadata PASSED [ 66%]
+tests/test_a13_enterprise_lane_audit.py::test_integrity_report_documents_enterprise_lane_status PASSED [100%]
+
+============================== 3 passed in 0.15s ===============================
+```
+
+### 7. Anything NOT Done in A2-8
+- Section A2-9: Quarantine legacy contaminated pre-A1 outputs and ledger rows.
+
+
 
 
 
