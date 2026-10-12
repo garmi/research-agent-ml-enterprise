@@ -1,0 +1,24 @@
+[
+  {
+    "id": "synthetic_paper-kiro-sdd-2025",
+    "fixture_type": "SYNTHETIC FIXTURE",
+    "is_synthetic": true,
+    "title": "[SYNTHETIC FIXTURE] Spec-Driven Development with AI Coding Assistants: An Empirical Study of Amazon Kiro",
+    "abstract": "We evaluate Amazon Kiro adoption across enterprise engineering teams. Controlled analysis demonstrates that spec-driven development reduces architectural drift and increases routine feature delivery throughput by 24% while enforcing security constraints.",
+    "year": 2025,
+    "venue": "IEEE Transactions on Software Engineering",
+    "url": "https://doi.org/10.1109/tse.2025.01",
+    "relevance_score": 0.95
+  },
+  {
+    "id": "synthetic_paper-agent-deliv-2024",
+    "fixture_type": "SYNTHETIC FIXTURE",
+    "is_synthetic": true,
+    "title": "[SYNTHETIC FIXTURE] Measuring Developer Productivity and Delivery Trade-offs with Generative Assistants",
+    "abstract": "Empirical analysis of 350 developers shows that generative assistants improve code generation speed but require rigorous automated gate checks to prevent regression risks in multi-service production environments.",
+    "year": 2024,
+    "venue": "ACM Transactions on Software Engineering and Methodology",
+    "url": "https://doi.org/10.1145/tosem.2024.02",
+    "relevance_score": 0.91
+  }
+]

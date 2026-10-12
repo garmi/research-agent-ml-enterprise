@@ -43,6 +43,7 @@ outputs/
 data/
 *.csv
 *.json
+!evals/canary/cassettes/*.json
 *.md~
 
 # Environment

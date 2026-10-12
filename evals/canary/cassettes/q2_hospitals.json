@@ -1,0 +1,35 @@
+[
+  {
+    "id": "f502d729c8a20e45",
+    "title": "The EU AI Act: implications and compliance guidance for healthcare facilities",
+    "abstract": "The European Union AI Act [Regulation (EU) 2024/1689] establishes the first comprehensive legal framework for artificial intelligence. While AI offers transformative potential in healthcare, its deployment introduces risks regarding safety, bias, and accountability. There is currently a lack of practical operational frameworks to help healthcare facilities transition from legal theory to clinical compliance. We performed a qualitative regulatory analysis of the EU AI Act, specifically focusing on the obligations of deployers (Articles 26, 27, and 50) in clinical settings. The Act requirements were cross-referenced with established clinical governance standards. A 10-step compliance roadmap was synthesized and exemplified through a hypothetical case study of a high-risk multimodal breast cancer AI system. The analysis identifies healthcare as a primary focus of the Act, with most clinical AI tools classified as high-risk. Key results include the definition of mandatory Fundamental Rights Impact Assessments (FRIA), requirements for site-specific technical validation, and the necessity of establishing trust through structured human oversight mechanisms to mitigate automation bias.",
+    "year": 2026,
+    "authors": [
+      "Fabio Dennstädt",
+      "Janna Hastings",
+      "Nikola Cihoric"
+    ],
+    "source": "OpenAlex",
+    "venue": "Frontiers in Digital Health",
+    "url": "https://doi.org/10.3389/fdgth.2026.1808373",
+    "doi": "https://doi.org/10.3389/fdgth.2026.1808373",
+    "relevance_score": 40.7,
+    "source_type": "Peer-Reviewed Journal"
+  },
+  {
+    "id": "4431dddb110a9b0e",
+    "title": "Governing medical AI under the EU AI Act: an integrated compliance-by-design framework",
+    "abstract": "Artificial intelligence (AI) is becoming an increasingly important component of healthcare, supporting diagnosis, clinical decision-making, medical imaging, triage, and patient-facing services. While these technologies offer significant opportunities to improve healthcare delivery, they also raise important questions about patient safety, fairness, privacy, transparency, cybersecurity, and accountability. This paper examines the regulatory framework governing medical AI in the European Union, focusing on the interaction between the Artificial Intelligence Act, the Medical Device Regulation, and the General Data Protection Regulation. Drawing on doctrinal and conceptual regulatory analysis, it argues that many AI-enabled medical systems should be regulated through continuous lifecycle compliance rather than by relying primarily on a one-time assessment at market entry. The paper proposes a compliance-by-design framework that translates overlapping legal requirements into a set of auditable governance artefacts covering system classification, regulatory mapping, data governance, validation, human oversight, and post-market monitoring.",
+    "year": 2026,
+    "authors": [
+      "Qaiser Khan",
+      "Abdul Raffay Saeed"
+    ],
+    "source": "OpenAlex",
+    "venue": "Frontiers in Digital Health",
+    "url": "https://doi.org/10.3389/fdgth.2026.1932256",
+    "doi": "https://doi.org/10.3389/fdgth.2026.1932256",
+    "relevance_score": 39.2,
+    "source_type": "Peer-Reviewed Journal"
+  }
+]

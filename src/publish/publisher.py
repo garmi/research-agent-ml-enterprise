@@ -105,6 +105,21 @@ class Publisher:
                         "Gate 6: Practitioner abstraction not confirmed by operator."
                     )
 
+        # 3. Check for Synthetic Fixtures (R28 / A3-3 enforcement)
+        for cid, c in ledger_claims.items():
+            src = sources.get(c.source_id)
+            is_synthetic = (
+                str(c.source_id).startswith("synthetic_")
+                or (src and str(src.id).startswith("synthetic_"))
+                or (c.context_json and c.context_json.get("fixture_type") == "SYNTHETIC FIXTURE")
+                or (c.context_json and c.context_json.get("is_synthetic") is True)
+            )
+            if is_synthetic and os.getenv("ALLOW_SYNTHETIC_FIXTURES") != "1":
+                gate_res.g6_pass = False
+                gate_res.violations["G6"].append(
+                    f"Gate 6 Integrity Violation: Claim '{c.id}' derives from synthetic source '{c.source_id}'. Synthetic fixtures are strictly prohibited from publication exports."
+                )
+
         # If any gate failed, status is strictly BLOCKED
         if not gate_res.passed:
             doc.status = "blocked"

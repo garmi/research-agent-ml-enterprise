@@ -1,0 +1,24 @@
+[
+  {
+    "id": "synthetic_paper-hosp-triage-2024",
+    "fixture_type": "SYNTHETIC FIXTURE",
+    "is_synthetic": true,
+    "title": "[SYNTHETIC FIXTURE] Governance and Patient Safety of Clinical AI Triage Tools in Acute Care Hospitals",
+    "abstract": "Clinical AI triage tools deployed in emergency departments reduce wait times by 18% under continuous algorithmic audit and human-in-the-loop oversight, maintaining full compliance with medical device regulations.",
+    "year": 2024,
+    "venue": "New England Journal of Medicine AI",
+    "url": "https://doi.org/10.1056/nejmai.2024.01",
+    "relevance_score": 0.94
+  },
+  {
+    "id": "synthetic_paper-reg-clinical-2023",
+    "fixture_type": "SYNTHETIC FIXTURE",
+    "is_synthetic": true,
+    "title": "[SYNTHETIC FIXTURE] Regulatory Compliance and Risk Mitigation for Hospital Clinical Decision Support Systems",
+    "abstract": "Hospital governance committees report that multi-tier validation protocols prevent diagnostic bias and align institutional AI triage tools with EU AI Act and FDA digital health safety frameworks.",
+    "year": 2023,
+    "venue": "The Lancet Digital Health",
+    "url": "https://doi.org/10.1016/s2589-7500(23)00112-9",
+    "relevance_score": 0.92
+  }
+]

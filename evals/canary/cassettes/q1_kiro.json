@@ -1,0 +1,38 @@
+[
+  {
+    "id": "7ae3b66bd9c76580",
+    "title": "Generative AI Assistants in Software Development: Productivity Gains, Code Quality, and Security Trade-offs",
+    "abstract": "Generative artificial intelligence (AI) coding assistants promise to shorten software-development tasks, yet task speed alone cannot establish an improvement in engineering productivity. This critical narrative review asks whether assistants help developers complete work faster without increasing functional defects, maintenance burden, or security weaknesses. The final analytical corpus comprises 20 principal sources available through September 27, 2026, including experiments, field trials, repository studies, a benchmark, methodological work, and security guidance. Findings remain heterogeneous: a bounded JavaScript task was completed 55.8% faster with Copilot; pooled workplace trials found 26.08% more completed tasks; an observational Phase 1 maintainability result showed a 30.7% shorter median initial-task time; and experienced maintainers in mature repositories took 19% longer when AI was permitted. A 2026 controlled interface study found shorter task times while directly recording verification-related interactions. The evidence supports conditional gains, with task, developer, interface, verification burden, and downstream effects defining the applicable boundary.",
+    "year": 2026,
+    "authors": [
+      "Menezes"
+    ],
+    "source": "Crossref",
+    "venue": "Nexus Science Review",
+    "url": "https://doi.org/10.66104/z67gjz21",
+    "doi": "10.66104/z67gjz21",
+    "relevance_score": 35.2,
+    "source_type": "Peer-Reviewed Journal"
+  },
+  {
+    "id": "d00846d3413f1fa6",
+    "title": "Three-Phase Evaluation of AI-Assisted Software Development Life Cycle",
+    "abstract": "This paper presents an exploratory evaluation of how increasing levels of AI autonomy affect software development productivity, requirement adherence, and developer cognitive workload. A team of four developers reimplemented the same full-stack web application across three sequential phases: partial AI-assisted development using GitHub Copilot, an AI-exclusive workflow using GitHub Copilot, and an AI-exclusive workflow using AWS Kiro. Evaluation metrics included development effort (hours), requirement adherence (RITM score), AI-interaction efficiency, and NASA-TLX workload measures. Across phases, higher levels of AI autonomy were associated with reduced development effort, improved requirement adherence, and lower self-reported mental workload, while developer frustration increased modestly. The AWS Kiro phase achieved the strongest overall performance on most measured dimensions, suggesting that tooling architecture may influence outcomes independently of AI autonomy level.",
+    "year": 2026,
+    "authors": [
+      "Joshua Strubel",
+      "Carrie Russell",
+      "Carson Crockett",
+      "Jason Ferraro",
+      "Nathan Londhe",
+      "Uzayr Syed",
+      "Jacob Viehe"
+    ],
+    "source": "OpenAlex",
+    "venue": "arXiv (Cornell University)",
+    "url": "https://doi.org/10.48550/arxiv.2607.05125",
+    "doi": "https://doi.org/10.48550/arxiv.2607.05125",
+    "relevance_score": 18.7,
+    "source_type": "Preprint"
+  }
+]

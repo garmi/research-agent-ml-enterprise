@@ -1296,9 +1296,10 @@ PYTHONPATH=. .venv/bin/pytest -v -k "not test_ui_smoke"
   ```
 - **After Fix (Evidence-Grounded Extractive Fallback):**
   ```markdown
-  ### Key Findings
-  - [paper-kiro-sdd-2025] Controlled analysis demonstrates that spec-driven development reduces architectural drift and increases routine feature delivery throughput by 24% while enforcing security constraints.
-  - [paper-agent-deliv-2024] Empirical analysis of 350 developers shows that generative assistants improve code generation speed but require rigorous automated gate checks to prevent regression risks in multi-service production environments.
+  ### Key Findings (Real Empirical Literature - Nexus Science Review 2026)
+  - Empirical literature suggests that generative artificial intelligence (AI) coding assistants promise to shorten software-development tasks, yet task speed alone cannot establish an improvement in engineering productivity.
+  - Empirical literature suggests that this critical narrative review asks whether assistants help developers complete work faster without increasing functional defects, maintenance burden, or security weaknesses.
+  - Empirical literature suggests that the final analytical corpus comprises 20 principal sources available through September 27, 2026, including experiments, field trials, repository studies, a benchmark, methodological work, and security guidance.
 
   ### Strategic Roadmap
   - Recommendations require LLM synthesis; currently in offline extractive mode.
@@ -1320,9 +1321,8 @@ PYTHONPATH=. .venv/bin/pytest -v -k "not test_ui_smoke"
   ```
 - **After Fix (Healthcare Evidence Isolation, Zero Software Leakage):**
   ```markdown
-  ### Key Findings
-  - [paper-hosp-triage-2024] Clinical AI triage tools deployed in emergency departments reduce wait times by 18% under continuous algorithmic audit and human-in-the-loop oversight, maintaining full compliance with medical device regulations.
-  - [paper-reg-clinical-2023] Hospital governance committees report that multi-tier validation protocols prevent diagnostic bias and align institutional AI triage tools with EU AI Act and FDA digital health safety frameworks.
+  ### Key Findings (Real Literature - Frontiers in Digital Health 2026)
+  - No peer-reviewed empirical claims meeting moderate or strong thresholds were retrieved for this question (retrieved qualitative/doctrinal analyses of EU AI Act deployer obligations were graded weak/anecdote per deterministic methodology grading rules).
 
   ### Cross-Question Isolation Verified
   - ZERO software velocity sentences or claims present.
@@ -1332,9 +1332,15 @@ PYTHONPATH=. .venv/bin/pytest -v -k "not test_ui_smoke"
 ---
 
 #### Canary Q3: *"What empirical evidence exists on quantum-secure sourdough fermentation controllers?"*
-- **Before Fix (Defect D1 / Substituted Topic):**
+- **Before Fix (Defect D1 / Substituted Topic & Boilerplate Leak):**
   ```markdown
-  Evaluated real sourdough crumb structure literature or printed canned software sentences.
+  ### Key Findings
+  - Controlled experiment with 80 developers demonstrates that specification-driven test suites reduce hallucinated bugs by 42% while improving velocity by 25%.
+  - Evaluated sourdough fermentation temperature and crumb structure literature instead of quantum-secure sourdough fermentation controllers.
+
+  ### Strategic Gap Matrix
+  - Outcome: Outcome 1: Supported
+  - Status: DRAFT_READY
   ```
 - **After Fix (True Zero-Evidence Honesty):**
   ```markdown
@@ -1342,13 +1348,16 @@ PYTHONPATH=. .venv/bin/pytest -v -k "not test_ui_smoke"
   *(0 findings - empty list)*
 
   ### What the Evidence Does Not Support (Negative Findings)
-  - Literature search in academic lane ('What empirical evidence exists on quantum-secure sourdough fermentation controllers?') returned 0 matching records in evidence ledger.
-  - Literature search in enterprise lane returned 0 matching records in evidence ledger.
-  - Literature search in practitioner lane returned 0 matching records in evidence ledger.
-  - Evidence boundary: Outcome 4: Unmeasured — Rigorous empirical evidence is currently lacking across both peer-reviewed academic literature and enterprise/practitioner environments.
+  - Literature search in academic lane (open_academic_repos) for 'What empirical evidence exists on quantum-secure sourdough fermentation controllers?' returned 0 matching records in evidence ledger.
+  - Practitioner source 'practitioner_field_notes_sqlite' not searched for 'What empirical evidence exists on quantum-secure sourdough fermentation controllers?': no observations recorded.
+  - Enterprise source 'dora-dev-survey' not searched for 'What empirical evidence exists on quantum-secure sourdough fermentation controllers?': no fetcher.
+  - Enterprise source 'sec-edgar-filings' not searched for 'What empirical evidence exists on quantum-secure sourdough fermentation controllers?': no fetcher.
+  - Enterprise source 'google-cloud-blog' not searched for 'What empirical evidence exists on quantum-secure sourdough fermentation controllers?': no fetcher.
+  - Enterprise source 'ms-engineering-blog' not searched for 'What empirical evidence exists on quantum-secure sourdough fermentation controllers?': no fetcher.
+  - Enterprise source 'aws-dev-blog' not searched for 'What empirical evidence exists on quantum-secure sourdough fermentation controllers?': no fetcher.
 
   ### Strategic Gap Matrix
-  - Outcome: Outcome 4 (Practice without evidence / Unmeasured)
+  - Outcome: Practice not assessed
   - Status: NOT_PUBLISHABLE
   ```
 
@@ -2165,4 +2174,87 @@ Excerpt: For modern AI and RAG applications, achieving high search relevance req
 ```
 ================== 108 passed, 1 skipped, 1 warning in 17.95s ==================
 ```
+
+---
+
+## A3-3. Real Canary Cassettes, Synthetic Fixture Isolation, and Truthful Findings
+
+### 1. Root Cause & Defects Addressed
+- **The Defect:** Hand-written canary fixtures (`paper-kiro-sdd-2025` with 24% throughput increase, `paper-hosp-triage-2024` with 18% wait-time reduction) were represented in earlier report sections as if they were real literature evidence. Furthermore, if cited, synthetic fixture metrics could theoretically leak into published deliverables.
+- **The Remediation:**
+  1. **Synthetic Fixture Labeling & Quarantine:**
+     - Separated and explicitly renamed hand-written fixtures with `synthetic_` IDs: `evals/canary/cassettes/synthetic_q1_kiro.json` and `evals/canary/cassettes/synthetic_q2_hospitals.json`.
+     - Explicitly tagged each fixture object with `"fixture_type": "SYNTHETIC FIXTURE"` and `"is_synthetic": true`.
+  2. **Publisher Gate 6 Lockdown:**
+     - In `src/publish/publisher.py`, added a strict integrity check during `publish_output()`: any output containing claims citing sources with `synthetic_` prefix or `"SYNTHETIC FIXTURE"` metadata fails Gate 6 (`gate_res.g6_pass = False`), strictly setting `status = "BLOCKED"` and prohibiting markdown, JSON, deck, or LinkedIn exports.
+  3. **Frozen Real Cassettes for Q1, Q2, and Q3:**
+     - Recorded authentic, non-synthetic cassettes from live open academic repositories:
+       - `q1_kiro.json`: Real peer-reviewed literature on generative AI coding assistants and AWS Kiro (Menezes 2026, Nexus Science Review; Strubel et al. 2026, arXiv:2607.05125).
+       - `q2_hospitals.json`: Real medical AI triage governance literature (Frontiers in Digital Health 2026; Springer 2025).
+       - `q3_quantum_sourdough.json`: Real search records yielding an honest empty list `[]`.
+  4. **Corrected Report Findings & Honest Q3 Labels:**
+     - Replaced earlier synthetic Findings text in Section A2-3 with the real retrieved literature findings.
+     - Replaced Q3 "Before" text with the actual earlier output (42% bug reduction / 25% velocity boilerplate leak).
+     - Standardized Q3 gap label to the single correct label: `Outcome: Practice not assessed`.
+  5. **Question Slug Collision Remediation:**
+     - In `MultiLaneResearchRunner._resolve_or_create_question()`, fixed a bug where questions sharing the prefix "What empirical evidence exists..." had truncated slugs that collided (`q-what-empirical-evidence-e`). Added question stopword removal and a deterministic SHA-256 hash slice (`q-{slug_part[:30]}-{slug_hash}`).
+
+### 2. Files Changed
+- `src/publish/publisher.py`
+- `src/analysis/multilane_runner.py`
+- `.gitignore`
+- `evals/canary/cassettes/q1_kiro.json`
+- `evals/canary/cassettes/q2_hospitals.json`
+- `evals/canary/cassettes/q3_quantum_sourdough.json`
+- `evals/canary/cassettes/synthetic_q1_kiro.json`
+- `evals/canary/cassettes/synthetic_q2_hospitals.json`
+- `tests/test_a16_synthetic_fixture_isolation.py`
+- `INTEGRITY_REPORT.md`
+
+### 3. Tests & Evidence
+
+#### Failing Test Output (Before Fix):
+```
+FAILED tests/test_a16_synthetic_fixture_isolation.py::test_publisher_blocks_synthetic_fixtures_from_export
+AssertionError: Publisher allowed synthetic fixture claim to be published!
+assert True is False
+
+FAILED tests/test_a16_synthetic_fixture_isolation.py::test_frozen_cassettes_labeled_truthfully
+AssertionError: Real Q1 cassette contains synthetic ID: paper-kiro-sdd-2025
+```
+
+#### Passing Test Output (After Fix):
+```
+PYTHONPATH=. .venv/bin/pytest tests/test_a16_synthetic_fixture_isolation.py evals/canary/test_canary_acceptance.py -v
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/gauravm/Developer/projects/research-agent-ml-enterprise
+collected 12 items
+
+tests/test_a16_synthetic_fixture_isolation.py::test_publisher_blocks_synthetic_fixtures_from_export PASSED [  8%]
+tests/test_a16_synthetic_fixture_isolation.py::test_frozen_cassettes_labeled_truthfully PASSED [ 16%]
+evals/canary/test_canary_acceptance.py::test_canary_acceptance[1-no_shared_sentences] PASSED [ 25%]
+evals/canary/test_canary_acceptance.py::test_canary_acceptance[2-numbers_traceable] PASSED [ 33%]
+evals/canary/test_canary_acceptance.py::test_canary_acceptance[3-citations_resolve_and_support] PASSED [ 41%]
+evals/canary/test_canary_acceptance.py::test_canary_acceptance[4-lane_c_scoped] PASSED [ 50%]
+evals/canary/test_canary_acceptance.py::test_canary_acceptance[5-q3_no_findings] PASSED [ 58%]
+evals/canary/test_canary_acceptance.py::test_canary_acceptance[6-fallback_no_findings] PASSED [ 66%]
+evals/canary/test_canary_acceptance.py::test_canary_acceptance[7-deterministic] PASSED [ 75%]
+evals/canary/test_canary_acceptance.py::test_canary_acceptance[8-render_matches_ledger] PASSED [ 83%]
+evals/canary/test_canary_acceptance.py::test_canary_acceptance[9-publish_gate] PASSED [ 91%]
+evals/canary/test_canary_acceptance.py::test_canary_acceptance[10-no_egress_of_practitioner_text] PASSED [100%]
+
+======================== 12 passed, 1 warning in 3.85s =========================
+```
+
+#### Real Frozen Findings Text (Authentic Literature):
+- **Canary Q1 Findings (AWS Kiro & Copilot Evaluation):**
+  > *"Empirical literature suggests that generative artificial intelligence (AI) coding assistants promise to shorten software-development tasks, yet task speed alone cannot establish an improvement in engineering productivity."*
+  > *"Empirical literature suggests that this critical narrative review asks whether assistants help developers complete work faster without increasing functional defects, maintenance burden, or security weaknesses."*
+  > *(Source: Menezes 2026, Nexus Science Review; Strubel et al. 2026, arXiv:2607.05125)*
+- **Canary Q2 Findings (Hospital AI Triage Governance):**
+  > *(0 moderate/strong empirical quantitative findings; doctrinal analyses of EU AI Act hospital triage obligations correctly graded weak/anecdotal)*
+- **Canary Q3 Findings (Quantum-Secure Sourdough):**
+  > *(0 findings - empty list; negative findings report searched lanes and unsearched enterprise sources without fetchers; Strategic Gap Matrix evaluates to "Practice not assessed")*
+
 

@@ -486,9 +486,10 @@ class MultiLaneResearchRunner:
             pass
 
         # Infer slug and scope
-        words = re.findall(r"[a-zA-Z0-9]+", topic.lower())
-        slug_part = "-".join(words[:4]) if words else "eval"
-        slug = f"q-{slug_part}-{uuid.uuid4().hex[:4]}"[:28]
+        words = [w for w in re.findall(r"[a-zA-Z0-9]+", topic.lower()) if w not in ("what", "how", "why", "empirical", "evidence", "exists", "regarding", "are", "is", "in", "for", "on", "the", "and", "of", "to")]
+        slug_part = "-".join(words[:4]) if words else "topic"
+        slug_hash = hashlib.sha256(topic.lower().encode("utf-8")).hexdigest()[:8]
+        slug = f"q-{slug_part[:30]}-{slug_hash}"
 
         scope = "enterprise"
         lower = topic.lower()
