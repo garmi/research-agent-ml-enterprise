@@ -22,7 +22,7 @@ StudyType = Literal[
     "vendor_assertion", "filing_disclosure", "practitioner_observation"
 ]
 ClaimGrade = Literal["strong", "moderate", "weak", "vendor_claim", "anecdote"]
-ClaimStatus = Literal["auto", "approved", "edited", "rejected"]
+ClaimStatus = Literal["auto", "approved", "edited", "rejected", "legacy-ungraded"]
 OutputKind = Literal["field_note", "strategy_doc", "json_export"]
 OutputStatus = Literal["draft", "in_review", "published", "blocked", "legacy-ungraded"]
 SentenceType = Literal[

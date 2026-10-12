@@ -1863,6 +1863,165 @@ tests/test_a13_enterprise_lane_audit.py::test_integrity_report_documents_enterpr
 ### 7. Anything NOT Done in A2-8
 - Section A2-9: Quarantine legacy contaminated pre-A1 outputs and ledger rows.
 
+---
+
+## Section A2-9: Quarantine Legacy Contaminated Pre-A1 Outputs and Ledger Rows
+
+### 1. Defect Description & Requirements
+- **Defect:**
+  Legacy runs, exports, and ledger rows created before commit A1 (`81e2fd6`, `2026-10-11T16:35:21Z`) contained fabricated academic papers (synthetic ICSE/IEEE DOIs with 34%, 22%, and 38% productivity/adoption figures) and unconfirmed seeded practitioner notes ("140 enterprise microservices").
+- **Requirements:**
+  1. Identify every run, export deliverable, and ledger row created before commit A1.
+  2. Mark them `legacy-ungraded` in the SQLite database (`outputs`, `claims`, `runs`).
+  3. Permanently block their export across all 5 export formats (zero downloads allowed).
+  4. Move/watermark legacy pre-A1 file deliverables in `outputs/quarantine/` with disclaimer notices.
+  5. List every single identified run, output, claim, and export file.
+
+### 2. Files Changed
+- `src/ledger/quarantine.py`: Created quarantine module with `quarantine_pre_a1_records()`.
+- `ledger/migrations/004_expand_claim_status_for_quarantine.sql`: Forward-only migration expanding `claims.status` CHECK constraint to include `'legacy-ungraded'`.
+- `ledger/migrations/001_initial_schema.sql`: Updated default schema to support `'legacy-ungraded'`.
+- `src/ledger/models.py`: Updated `ClaimStatus` literal type to include `"legacy-ungraded"`.
+- `src/publish/export_policy.py`: Enforced that `status in ("LEGACY-UNGRADED", "LEGACY_UNGRADED")` is strictly blocked (`is_blocked=True`, all downloads disabled).
+- `evals/test_r10_migration.py`: Added regression test `test_quarantine_legacy_pre_a1_records()` asserting pre-A1 quarantine, status updates, and export blocking.
+- `INTEGRITY_REPORT.md`: Appended complete quarantine catalog, file list, and verification evidence.
+
+### 3. Complete List of Quarantined Artifacts
+
+#### A. Quarantined Ledger Outputs (11 outputs marked `legacy-ungraded` in `ledger.db`):
+| Output ID | Creation Timestamp (UTC) | Former Status | Quarantine Status | Export Allowed? |
+| :--- | :--- | :--- | :--- | :--- |
+| `out_219f70b1de09` | 2026-10-11T13:05:05Z | blocked | legacy-ungraded | **BLOCKED (0 formats)** |
+| `out_9bc92b0e1e41` | 2026-10-11T13:05:28Z | blocked | legacy-ungraded | **BLOCKED (0 formats)** |
+| `out_928eb704f5ee` | 2026-10-11T13:06:23Z | blocked | legacy-ungraded | **BLOCKED (0 formats)** |
+| `out_f7b2355fd35f` | 2026-10-11T13:07:49Z | blocked | legacy-ungraded | **BLOCKED (0 formats)** |
+| `out_b1eab37ad86f` | 2026-10-11T13:58:32Z | blocked | legacy-ungraded | **BLOCKED (0 formats)** |
+| `out_7b9f690e211b` | 2026-10-11T14:22:15Z | blocked | legacy-ungraded | **BLOCKED (0 formats)** |
+| `out_b6fd4804b293` | 2026-10-11T14:23:17Z | blocked | legacy-ungraded | **BLOCKED (0 formats)** |
+| `out_636bd066b77e` | 2026-10-11T14:28:16Z | published | legacy-ungraded | **BLOCKED (0 formats)** |
+| `out_df7b5084c036` | 2026-10-11T14:47:12Z | published | legacy-ungraded | **BLOCKED (0 formats)** |
+| `out_458ae9566b28` | 2026-10-11T14:48:43Z | published | legacy-ungraded | **BLOCKED (0 formats)** |
+| `out_4acd47cc31df` | 2026-10-11T14:50:17Z | blocked | legacy-ungraded | **BLOCKED (0 formats)** |
+
+#### B. Quarantined Ledger Runs (13 runs updated with quarantine metadata in `ledger.db`):
+| Run ID | Started Timestamp (UTC) | Quarantine Tag in `config_json` |
+| :--- | :--- | :--- |
+| `run_aa6dde3674b8` | 2026-10-11T12:57:22Z | `{"status": "legacy-ungraded", "quarantine": "pre-a1-legacy"}` |
+| `run_53c418f4263f` | 2026-10-11T13:05:05Z | `{"status": "legacy-ungraded", "quarantine": "pre-a1-legacy"}` |
+| `run_5c7084c24e00` | 2026-10-11T13:05:28Z | `{"status": "legacy-ungraded", "quarantine": "pre-a1-legacy"}` |
+| `run_0806ce0f7de0` | 2026-10-11T13:06:22Z | `{"status": "legacy-ungraded", "quarantine": "pre-a1-legacy"}` |
+| `run_a4c0351d02e7` | 2026-10-11T13:07:48Z | `{"status": "legacy-ungraded", "quarantine": "pre-a1-legacy"}` |
+| `run_87acd8832cc5` | 2026-10-11T13:57:03Z | `{"status": "legacy-ungraded", "quarantine": "pre-a1-legacy"}` |
+| `run_046ad49f5b7a` | 2026-10-11T13:57:22Z | `{"status": "legacy-ungraded", "quarantine": "pre-a1-legacy"}` |
+| `run_63ae4bf047ef` | 2026-10-11T14:22:14Z | `{"status": "legacy-ungraded", "quarantine": "pre-a1-legacy"}` |
+| `run_0f6aa3e3f157` | 2026-10-11T14:23:16Z | `{"status": "legacy-ungraded", "quarantine": "pre-a1-legacy"}` |
+| `run_780beeea585d` | 2026-10-11T14:27:34Z | `{"status": "legacy-ungraded", "quarantine": "pre-a1-legacy"}` |
+| `run_b016d8d9950a` | 2026-10-11T14:46:30Z | `{"status": "legacy-ungraded", "quarantine": "pre-a1-legacy"}` |
+| `run_dadf93cdeb44` | 2026-10-11T14:48:11Z | `{"status": "legacy-ungraded", "quarantine": "pre-a1-legacy"}` |
+| `run_15e5d55a5cf8` | 2026-10-11T14:50:01Z | `{"status": "legacy-ungraded", "quarantine": "pre-a1-legacy"}` |
+
+#### C. Quarantined Claims:
+- **252 total claims** created prior to cutoff `2026-10-11T16:35:21Z` updated to `status = 'legacy-ungraded'`.
+
+#### D. Quarantined Export Files on Disk (Moved to `outputs/quarantine/` with `.quarantined.txt` watermarks):
+1. `outputs/reports/demo_research_brief.md`
+2. `outputs/reports/gemini-research.html`
+3. `outputs/reports/kiro_research_brief.md`
+4. `outputs/reports/research_report_gemini.md`
+5. `outputs/reports/research_report_v2.md`
+6. `outputs/reports/how_kiro_is_being_used_for_development_b.md`
+7. `outputs/reports/measuring_roi_and_developer_productivity.md`
+8. `outputs/json/publish_export_out_636bd066b77e.json`
+9. `outputs/json/publish_export_out_df7b5084c036.json`
+10. `outputs/json/publish_export_out_458ae9566b28.json`
+11. `outputs/json/field_note_export.json`
+
+### 4. Verification Evidence
+
+#### Failing Test Output (Before Fix):
+```
+FAILED evals/test_r10_migration.py::test_quarantine_legacy_pre_a1_records - ModuleNotFoundError: No module named 'src.ledger.quarantine'
+sqlite3.IntegrityError: CHECK constraint failed: status IN ('auto', 'approved', 'edited', 'rejected')
+```
+
+#### Passing Test Output (After Fix):
+```
+PYTHONPATH=. .venv/bin/pytest evals/test_r10_migration.py -v
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/gauravm/Developer/projects/research-agent-ml-enterprise
+collected 2 items
+
+evals/test_r10_migration.py::test_r10_migration_populated_old_db PASSED [ 50%]
+evals/test_r10_migration.py::test_quarantine_legacy_pre_a1_records PASSED [100%]
+
+============================== 2 passed in 0.13s ===============================
+```
+
+---
+
+## Phase A2 Complete Verification & Summary Matrix
+
+### Item Status Summary
+
+| Item | Status | Commit Hash | Core Deliverables / Proof |
+| :--- | :--- | :--- | :--- |
+| **A2-1** | **Completed** | `692c795` | Restored real "no evidence" canary Q3 ("What empirical evidence exists on quantum-secure sourdough fermentation controllers?"); crumb structure renamed to Q4. 0 findings, gap outcome 4, status NOT_PUBLISHABLE, negative finding sentence verified. |
+| **A2-2** | **Completed** | `ec26a84` | Stricter weighted topic term filter rejecting trade/regulatory papers against Q1 (`min_weighted_overlap=0.35`, salient terms 1.0 vs generic words 0.05); config generic words list. |
+| **A2-3** | **Completed** | `8ba025b` | Regression cases R15-R26 added; deterministic canary acceptance suite with HTTP cassettes; render_matches_ledger test; before/after findings text for Q1-Q3 documented; reconciled report summary. |
+| **A2-4** | **Completed** | `2bd85b8` | Removed `--force` checkbox override; draft export (.md, .json) watermarked with failing gates; deck, LinkedIn, CSV permanently disabled when not PUBLISH_READY; BLOCKED outputs have 0 downloads. |
+| **A2-5** | **Completed** | `01167a5` | Evidence-based scoring: S7 evaluates cache reproducibility agreement (caps band at REVISE when unmeasured); S6 counts actual human reviewed claims & completed gates; S4 computed continuously from gap outcomes & contradictions. |
+| **A2-6** | **Completed** | `29671ed` | `HOSTED_DEMO=1` lockdown: visible "Demo: no private data is stored" notice; practitioner lane disabled (UI + runner Lane C); all ledger writes blocked across SQLite repository and runner stages (0 rows written). |
+| **A2-7** | **Completed** | `c5893dc` | Corrected Cloud Run hardening specification for `executive-research-engine` in `asia-south1`; safe `--update-env-vars`; GCS FUSE volume removed for SQLite; `--max-instances=5` cap; budget alert; parameterized IAM group; reversibility matrix documented (commands only). |
+| **A2-8** | **Completed** | `b8f0e1a` | Enterprise lane production audit on Q1: returns an honest zero (0 claims, 5 search_log rows with result_count=0); confirmed registry fetchers are unimplemented; custom user URLs work live. |
+| **A2-9** | **Completed** | `[this commit]` | Quarantined 11 outputs, 13 runs, and 252 claims created before commit A1 as `legacy-ungraded`; moved 11 pre-A1 file exports to `outputs/quarantine/` with `.quarantined.txt` watermarks; export permanently blocked. |
+
+### Complete Test Suite Execution (All Tests Included)
+
+```
+PYTHONPATH=. .venv/bin/pytest tests evals
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/gauravm/Developer/projects/research-agent-ml-enterprise
+collected 103 items
+
+tests/test_a10_canary_suite.py ....                                      [  3%]
+tests/test_a11_evidence_based_scoring.py ....                            [  7%]
+tests/test_a12_cloud_run_specification.py ......                         [ 13%]
+tests/test_a13_enterprise_lane_audit.py ...                              [ 16%]
+tests/test_a2_honest_offline_fallback.py .                               [ 17%]
+tests/test_a3_single_source_of_truth.py .                                [ 18%]
+tests/test_a4_traceable_citations.py ..                                  [ 20%]
+tests/test_a5_lane_scoping.py ..                                         [ 22%]
+tests/test_a6_enterprise_honesty.py ...                                  [ 25%]
+tests/test_a7_retrieval_and_venues.py ....                               [ 29%]
+tests/test_a8_status_and_exports.py .......                              [ 35%]
+tests/test_a9_privacy_and_hosted_safety.py .......                       [ 42%]
+tests/test_multilane_workflow.py .                                       [ 43%]
+tests/test_no_literal_report_text.py .                                   [ 44%]
+tests/test_pipeline.py ....                                              [ 48%]
+tests/test_question_formulator.py ..                                     [ 50%]
+tests/test_ui_smoke.py s                                                 [ 51%]
+evals/canary/test_canary_acceptance.py ..........                        [ 61%]
+evals/test_phase2_service.py ....                                        [ 65%]
+evals/test_phase3_enterprise.py ...                                      [ 67%]
+evals/test_phase4_synth.py ...                                           [ 70%]
+evals/test_phase5_practitioner_publish.py ..                             [ 72%]
+evals/test_r10_migration.py ..                                           [ 74%]
+evals/test_regression.py ..........................                      [100%]
+
+=============================== warnings summary ===============================
+.venv/lib/python3.9/site-packages/urllib3/__init__.py:35
+  /Users/gauravm/Developer/projects/research-agent-ml-enterprise/.venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================== 102 passed, 1 skipped, 1 warning in 18.08s ==================
+```
+
+> **Note on `test_ui_smoke.py`**: Collected and skipped cleanly (`s`). The Playwright browser UI smoke test requires an active Streamlit server listening on `127.0.0.1:8501` and unsandboxed Mach port access to Chromium on macOS. It is never deselected with `-k` flags.
+
+
 
 
 

@@ -59,7 +59,7 @@ CREATE TABLE IF NOT EXISTS claims (
     extraction_confidence REAL DEFAULT 1.0,
     grade TEXT CHECK(grade IN ('strong', 'moderate', 'weak', 'vendor_claim', 'anecdote')) DEFAULT 'weak',
     grade_reasons_json TEXT,
-    status TEXT CHECK(status IN ('auto', 'approved', 'edited', 'rejected')) DEFAULT 'auto',
+    status TEXT CHECK(status IN ('auto', 'approved', 'edited', 'rejected', 'legacy-ungraded')) DEFAULT 'auto',
     observations_count INTEGER DEFAULT 1,
     created_at TEXT NOT NULL
 );

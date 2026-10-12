@@ -35,11 +35,14 @@ def evaluate_export_permissions(
 ) -> ExportPermissions:
     """Evaluate download permissions for the 5 export formats."""
     status_upper = (status or "NOT_PUBLISHABLE").upper()
-    is_blocked = (status_upper == "BLOCKED")
+    is_legacy_ungraded = (status_upper in ("LEGACY-UNGRADED", "LEGACY_UNGRADED"))
+    is_blocked = (status_upper == "BLOCKED") or is_legacy_ungraded
     is_publish_ready = (status_upper == "PUBLISH_READY") and (allowed is True) and (not is_blocked)
 
     failing_gates: List[str] = []
-    if gate_violations:
+    if is_legacy_ungraded:
+        failing_gates.append("legacy-ungraded: Output created prior to commit A1 quarantined. Contains unverified figures; export permanently blocked.")
+    elif gate_violations:
         for gate_key, errs in gate_violations.items():
             for err in errs:
                 failing_gates.append(f"{gate_key}: {err}")
@@ -53,7 +56,7 @@ def evaluate_export_permissions(
 
     if is_blocked:
         return ExportPermissions(
-            status="BLOCKED",
+            status="LEGACY-UNGRADED" if is_legacy_ungraded else "BLOCKED",
             is_blocked=True,
             can_download_draft=False,
             can_download_full=False,
