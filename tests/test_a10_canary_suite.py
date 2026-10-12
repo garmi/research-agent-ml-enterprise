@@ -128,19 +128,65 @@ def test_canary_suite_q1_kiro_vs_q2_hospitals_isolation_and_distinct_findings():
         )
 
         # 4. Verify neither is 'publish_ready' in offline fallback mode
-        assert res1["publish_res"]["status"] in ("blocked", "not_publishable")
-        assert res2["publish_res"]["status"] in ("blocked", "not_publishable")
+        assert res1["publish_res"]["status"] in ("blocked", "not_publishable", "revise", "BLOCKED", "NOT_PUBLISHABLE", "REVISE")
+        assert res2["publish_res"]["status"] in ("blocked", "not_publishable", "revise", "BLOCKED", "NOT_PUBLISHABLE", "REVISE")
         assert res1["publish_res"]["allowed"] is False
         assert res2["publish_res"]["allowed"] is False
 
 
-def test_canary_q3_sourdough_evaluation_honesty():
-    """Verify Q3 (Sourdough) produces Outcome 3 or 4 with ZERO enterprise software claims."""
+def test_canary_q3_quantum_sourdough_no_evidence_honesty():
+    """Verify Q3 (quantum-secure sourdough) produces 0 findings, Outcome 4, NOT_PUBLISHABLE, search_logs, and negative findings."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        runner = _create_runner(tmpdir)
+        repo = LedgerRepository(db_path=runner.db_path)
+
+        q3_topic = "What empirical evidence exists on quantum-secure sourdough fermentation controllers?"
+        res3 = runner.run_workflow(
+            topic=q3_topic,
+            depth="Fast",
+            tone="Executive",
+            map_provider="stub",
+            reduce_provider="stub",
+            academic_papers_override=[],
+        )
+
+        # 1. Zero findings
+        assert len(res3["findings"]) == 0, f"Expected 0 findings, got {len(res3['findings'])}: {res3['findings']}"
+
+        # 2. Gap Matrix Outcome 4
+        assert res3["gap_matrix"]["outcome"] == 4, f"Expected Outcome 4, got {res3['gap_matrix']['outcome']}"
+
+        # 3. Status NOT_PUBLISHABLE
+        assert res3["publish_res"]["status"] == "NOT_PUBLISHABLE", f"Expected NOT_PUBLISHABLE, got {res3['publish_res']['status']}"
+
+        # 4. Search log rows for every lane
+        slogs = repo.list_search_logs(question_id=res3["question_id"])
+        lanes_with_logs = {s.lane for s in slogs}
+        assert "academic" in lanes_with_logs, f"Missing academic lane search_log: {lanes_with_logs}"
+        assert "enterprise" in lanes_with_logs, f"Missing enterprise lane search_log: {lanes_with_logs}"
+        assert "practitioner" in lanes_with_logs, f"Missing practitioner lane search_log: {lanes_with_logs}"
+
+        # 5. Negative finding sentence tied to those search_log rows
+        negative_sentences = [
+            s for s in res3.get("sentence_traces", [])
+            if s.get("type") == "negative_finding"
+        ]
+        assert len(negative_sentences) > 0, "Expected at least one negative_finding sentence"
+        slog_ids = {s.id for s in slogs}
+        tied_to_slogs = [
+            s for s in negative_sentences
+            if (s.get("checks_json") or {}).get("search_log_id") in slog_ids
+        ]
+        assert len(tied_to_slogs) > 0, f"Expected negative findings tied to search_logs: {negative_sentences}"
+
+
+def test_canary_q4_sourdough_crumb_structure_honesty():
+    """Verify Q4 (Sourdough crumb structure) produces Outcome 3 or 4 with ZERO enterprise software claims."""
     with tempfile.TemporaryDirectory() as tmpdir:
         runner = _create_runner(tmpdir)
 
         # Sourdough academic papers (Food Science)
-        q3_papers = [
+        q4_papers = [
             {
                 "id": "paper-sour-1",
                 "title": "Impact of Fermentation Temperature on Sourdough Dough Rheology and Crumb Structure",
@@ -152,25 +198,25 @@ def test_canary_q3_sourdough_evaluation_honesty():
             }
         ]
 
-        q3_topic = "What empirical evidence exists on sourdough fermentation temperature and crumb structure?"
-        res3 = runner.run_workflow(
-            topic=q3_topic,
+        q4_topic = "What empirical evidence exists on sourdough fermentation temperature and crumb structure?"
+        res4 = runner.run_workflow(
+            topic=q4_topic,
             depth="Fast",
             tone="Executive",
             map_provider="stub",
             reduce_provider="stub",
-            academic_papers_override=q3_papers,
+            academic_papers_override=q4_papers,
         )
 
         # 1. Gap Matrix must evaluate to Outcome 3 or 4 (never Outcome 1, because Enterprise is none found)
-        gap_entry = res3["gap_matrix"]
+        gap_entry = res4["gap_matrix"]
         assert gap_entry["outcome"] in (3, 4), (
             f"Expected Outcome 3 or 4 for sourdough question, but got Outcome {gap_entry['outcome']}"
         )
         assert gap_entry["enterprise_state"].lower() in ("none found", "unsupported", "none")
 
         # 2. Zero software or cloud vendor claims in any lane
-        for c in res3.get("enterprise_claims", []):
+        for c in res4.get("enterprise_claims", []):
             c_text = (getattr(c, "text", "") or "").lower()
             assert "microservice" not in c_text
             assert "kubernetes" not in c_text

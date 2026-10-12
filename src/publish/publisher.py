@@ -140,12 +140,13 @@ class Publisher:
         # 4. Enforce Band or explicit sign-off
         is_band_ready = score_res.get("band") == "PUBLISH_READY"
         if not is_band_ready and not force_publish_non_band:
-            doc.status = "in_review"
+            band_status = score_res.get("band", "NOT_PUBLISHABLE")
+            doc.status = band_status.lower()
             with self.repo._conn() as conn:
-                conn.execute("UPDATE outputs SET status = ? WHERE id = ?;", ("in_review", doc.id))
+                conn.execute("UPDATE outputs SET status = ? WHERE id = ?;", (doc.status, doc.id))
             return False, {
                 "published": False,
-                "status": "IN_REVIEW",
+                "status": band_status,
                 "reason": f"Quality score {score_res['total_score']} is in band '{score_res['band']}'. Requires human sign-off.",
                 "score_results": score_res,
                 "gate_results": gate_res.to_dict(),

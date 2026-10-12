@@ -384,17 +384,24 @@ class MultiLaneResearchRunner:
                 conn.execute("UPDATE outputs SET status = ? WHERE id = ?;", ("blocked", doc.id))
         elif is_fallback:
             publish_success = False
+            gate_res_passed = gate_results.get("passed", True)
+            fallback_status = "BLOCKED" if not gate_res_passed else score_results.get("band", "NOT_PUBLISHABLE")
+            doc.status = "blocked"
+
             pub_res = {
                 "allowed": False,
-                "status": "blocked",
+                "status": fallback_status,
                 "reasons": [
                     "Outputs generated via extractive fallback cannot be published."
                 ],
+                "score_results": score_results,
+                "gate_results": gate_results,
             }
-            score_results["band"] = "NOT_PUBLISHABLE"
+            score_results["band"] = fallback_status
             score_results["total_score"] = min(float(score_results.get("total_score", 50.0)), 65.0)
-            doc.status = "blocked"
             self.repo.insert_output(doc)
+            with self.repo._conn() as conn:
+                conn.execute("UPDATE outputs SET status = ? WHERE id = ?;", (doc.status, doc.id))
         else:
             publish_success, pub_res = self.publisher.publish_output(
                 output_id=doc.id,
@@ -637,6 +644,19 @@ class MultiLaneResearchRunner:
                 query=topic,
                 source_api=p.get("source") or "open_academic_repos",
                 result_count=len(selected),
+                executed_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            )
+            self.repo.insert_search_log(slog)
+
+        if len(selected) == 0:
+            slog = SearchLog(
+                id=f"slog_acad_{uuid.uuid4().hex[:10]}",
+                run_id=run_id,
+                question_id=question_id,
+                lane="academic",
+                query=topic,
+                source_api="open_academic_repos",
+                result_count=0,
                 executed_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
             )
             self.repo.insert_search_log(slog)
@@ -933,7 +953,7 @@ class MultiLaneResearchRunner:
             extractive_findings.append(f"[{c.source_id}] Field observation {verb} that {c.text.strip().rstrip('.')}.")
 
         if not extractive_findings:
-            extractive_findings = ["[None] No verified atomic claims available in evidence ledger."]
+            extractive_findings = []
 
         return {
             "topic": topic,
@@ -1115,9 +1135,13 @@ class MultiLaneResearchRunner:
                 "text": s.text,
                 "type": s.type,
                 "claims": s.claim_ids_json or [],
+                "checks_json": s.checks_json or {},
             })
 
+        status_val = publish_res.get("status", score_results.get("band", "NOT_PUBLISHABLE"))
+
         return {
+            "status": status_val,
             "verdict": executive_synthesis.get("executive_summary", ""),
             "duration": f"{elapsed_seconds}s",
             "question_id": question_obj.id,

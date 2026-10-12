@@ -175,5 +175,5 @@ def test_export_files_not_written_to_disk_when_publish_gate_fails():
             academic_papers_override=[],
         )
 
-        assert results["publish_res"]["status"] in ("blocked", "not_publishable")
+        assert results["publish_res"]["status"] in ("blocked", "not_publishable", "BLOCKED", "NOT_PUBLISHABLE")
         assert results["publish_res"]["allowed"] is False

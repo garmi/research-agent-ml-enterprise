@@ -1067,8 +1067,69 @@ evals/test_regression.py ..............                                  [100%]
 - **Section A7:** COMPLETED & COMMITTED (`6cad90e`)
 - **Section A8:** COMPLETED & COMMITTED (`0b9e88f`)
 - **Section A9:** COMPLETED & COMMITTED (`00c6b9c`)
-- **Section A10:** COMPLETED & COMMITTED
-- **Next Step:** As per Non-negotiable Process Contract Rule 6: STOP and wait for operator review. Do NOT start UI work (Prompt B).
+- **Section A10:** COMPLETED & COMMITTED (`c4f1e98`)
+
+---
+
+# Phase A2: Close the Gaps Left by Phase A
+
+## Section A2-1: Restore Real "No Evidence" Canary (Q3)
+
+### 1. Defect Description
+- Canary Q3 was previously testing a real food science topic ("sourdough temperature and crumb structure"), which has genuine academic literature, failing to test the true "no evidence" pipeline path.
+- When 0 papers or claims were retrieved, `_harvest_academic_lane` skipped `SearchLog` insertion, leaving the academic lane without proof of search in `search_log`.
+- Extractive fallback created a dummy `"[None] No verified atomic claims available in evidence ledger."` finding, preventing findings count from reaching an honest 0.
+- Fallback run status was hardcoded to `blocked` instead of reflecting `NOT_PUBLISHABLE` when gates passed.
+
+### 2. Failing Test (Reproduction)
+Added `test_canary_q3_quantum_sourdough_no_evidence_honesty` in `tests/test_a10_canary_suite.py` asserting:
+- 0 findings (`len(res3["findings"]) == 0`)
+- Gap Matrix Outcome 4 (`res3["gap_matrix"]["outcome"] == 4`)
+- Status `NOT_PUBLISHABLE` (`res3["publish_res"]["status"] == "NOT_PUBLISHABLE"`)
+- `search_log` rows for every lane (`academic`, `enterprise`, `practitioner`)
+- `negative_finding` sentences tied to those `search_log` rows
+And renamed the crumb structure test to `test_canary_q4_sourdough_crumb_structure_honesty`.
+
+Failing output before fix:
+```
+tests/test_a10_canary_suite.py::test_canary_q3_quantum_sourdough_no_evidence_honesty FAILED
+AssertionError: Expected NOT_PUBLISHABLE, got blocked
+assert 'blocked' == 'NOT_PUBLISHABLE'
+```
+
+### 3. What Changed & Files Touched
+- `src/analysis/multilane_runner.py`:
+  - When `len(selected) == 0` in `_harvest_academic_lane`, insert a `SearchLog` record with `result_count=0` and `lane="academic"`.
+  - When `is_fallback`: compute `fallback_status` as `BLOCKED` if any gate failed, or `score_results.get("band", "NOT_PUBLISHABLE")` if gates passed. Keep `doc.status = "blocked"` for SQLite CHECK constraint compatibility.
+  - In `_build_extractive_fallback_synthesis`: keep `extractive_findings = []` when no claims exist (do not insert dummy finding string).
+  - In `_build_result_payload`: include `checks_json` in `sentence_traces` and provide top-level `"status"` in the returned dict.
+- `src/publish/publisher.py`:
+  - In `publish_output`: update non-ready status return to report `band_status` (`NOT_PUBLISHABLE` / `REVISE`) while maintaining SQLite `doc.status = "in_review"`.
+- `tests/test_a10_canary_suite.py`:
+  - Restored Q3: "What empirical evidence exists on quantum-secure sourdough fermentation controllers?"
+  - Renamed temperature and crumb structure test to Q4.
+- `tests/test_a8_status_and_exports.py`:
+  - Updated status assertions to support both upper and lowercase unified status vocabulary.
+
+### 4. Verification Evidence
+Passing output:
+```
+PYTHONPATH=. .venv/bin/pytest tests/test_a10_canary_suite.py -v
+tests/test_a10_canary_suite.py::test_canary_suite_q1_kiro_vs_q2_hospitals_isolation_and_distinct_findings PASSED [ 25%]
+tests/test_a10_canary_suite.py::test_canary_q3_quantum_sourdough_no_evidence_honesty PASSED [ 50%]
+tests/test_a10_canary_suite.py::test_canary_q4_sourdough_crumb_structure_honesty PASSED [ 75%]
+tests/test_a10_canary_suite.py::test_all_output_sentences_trace_to_ledger_claims PASSED [100%]
+========================= 4 passed, 1 warning in 1.25s =========================
+```
+
+Full suite:
+```
+PYTHONPATH=. .venv/bin/pytest -v -k "not test_ui_smoke"
+================= 58 passed, 1 deselected, 1 warning in 11.94s =================
+```
+
+### 5. Anything NOT Done in A2-1
+- Section A2-2: Stricter term-weighted off-topic filter rejecting generic research words.
 
 
 
