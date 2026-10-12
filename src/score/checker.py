@@ -221,14 +221,25 @@ class GateChecker:
                         f"Sentence [{s.id}] (ordinal {s.ordinal}) failed citation support check: Insufficient excerpt overlap ({len(overlap)} < 2 non-stopword terms) with claim {c.id}: '{s_text}'"
                     )
 
-            # Support Check (3): Claim's source shares >= 1 term with the question
+            # Support Check (3): Claim's source substantive term overlap with question
             if question is not None:
                 q_text = f"{getattr(question, 'text', str(question or ''))} {getattr(question, 'scope', '')}".strip()
-                q_terms = {
+                q_words = [
                     w for w in normalize_text(q_text).split()
                     if w not in STOPWORDS and len(w) >= 3
+                ]
+                generic_set = {
+                    "productivity", "adoption", "gains", "evidence", "teams", "impact",
+                    "empirical", "study", "analysis", "evaluation", "practice", "digital",
+                    "technology", "research", "engineering", "delivery", "trade-offs",
+                    "tradeoffs", "model", "models", "assessment", "implications",
+                    "guidance", "perspective", "reforms", "information", "acceptance", "trade"
                 }
-                if q_terms:
+                salient_q = {w for w in q_words if w not in generic_set}
+                if not salient_q:
+                    salient_q = set(q_words)
+
+                if q_words:
                     for c in cited_claims:
                         src_obj = (sources or {}).get(c.source_id)
                         src_text = ""
@@ -242,26 +253,34 @@ class GateChecker:
                                 w for w in normalize_text(src_text).split()
                                 if w not in STOPWORDS and len(w) >= 3
                             }
-                            has_match = bool(q_terms.intersection(src_terms))
-                            if not has_match:
-                                for qt in q_terms:
+                            # Must share at least one salient term or head term (not merely generic research words)
+                            salient_match = bool(salient_q.intersection(src_terms))
+                            if not salient_match:
+                                for qt in salient_q:
                                     for st in src_terms:
                                         if len(qt) >= 4 and len(st) >= 4:
                                             if qt in st or st in qt:
-                                                has_match = True
+                                                salient_match = True
                                                 break
-                                            # Stem / common root check (e.g. develop-er and develop-ment)
-                                            prefix_len = sum(1 for a, b in zip(qt, st) if a == b)
-                                            if prefix_len >= 4 and qt[:prefix_len] == st[:prefix_len]:
-                                                has_match = True
+                                            prefix_len = 0
+                                            for a, b in zip(qt, st):
+                                                if a == b:
+                                                    prefix_len += 1
+                                                else:
+                                                    break
+                                            if prefix_len >= 4 or (prefix_len >= 3 and qt.startswith("cod") and st.startswith("cod")):
+                                                salient_match = True
                                                 break
-                                    if has_match:
+                                    if salient_match:
                                         break
+
+                            has_match = salient_match
+
                             if not has_match:
                                 result.g3_pass = False
                                 src_title = getattr(src_obj, "title", c.source_id) if src_obj else c.source_id
                                 result.violations["G3"].append(
-                                    f"Sentence [{s.id}] (ordinal {s.ordinal}) failed citation support check: Source topic mismatch between source '{src_title}' and question '{getattr(question, 'text', q_text)}' (0 shared terms)"
+                                    f"Sentence [{s.id}] (ordinal {s.ordinal}) failed citation support check: Source topic mismatch between source '{src_title}' and question '{getattr(question, 'text', q_text)}' (insufficient substantive term overlap with question scope)"
                                 )
 
             # G2: Numeric fidelity (Support Check 1)

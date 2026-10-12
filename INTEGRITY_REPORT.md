@@ -1131,6 +1131,86 @@ PYTHONPATH=. .venv/bin/pytest -v -k "not test_ui_smoke"
 ### 5. Anything NOT Done in A2-1
 - Section A2-2: Stricter term-weighted off-topic filter rejecting generic research words.
 
+---
+
+## Section A2-2: Weighted Off-Topic Filter and Generic Term Discounting
+
+### 1. Defect Description
+- The initial off-topic filter rule ("reject only if zero shared terms") allowed completely unrelated papers into Canary Q1 simply because they contained generic research vocabulary:
+  - *"An Empirical Study on the Information Productivity of Trade Practice for Technology Acceptance Model Adoption"*
+  - *"Dissecting Productivity Gains from Trade"*
+  - *"Figure 2.26. Regulatory reforms matter for digital adoption and productivity gains"*
+- Because generic words like "productivity", "adoption", "gains", "empirical", and "study" appeared in both the question and the papers, unweighted zero-overlap logic accepted them as relevant.
+- Similarly, the A4 source-to-question check in `src/score/checker.py` only required a single overlapping term, allowing citations to irrelevant papers if they shared any generic research word.
+
+### 2. Failing Test (Reproduction)
+Added `test_off_topic_filter_rejects_generic_trade_and_regulatory_papers_against_q1` to `tests/test_a7_retrieval_and_venues.py`.
+- Tested the three generic trade/regulatory titles against Q1:
+  - *"An Empirical Study on the Information Productivity of Trade Practice for Technology Acceptance Model Adoption"*
+  - *"Dissecting Productivity Gains from Trade"*
+  - *"Figure 2.26. Regulatory reforms matter for digital adoption and productivity gains"*
+- Asserted that all three are strictly rejected with `off_topic_low_relevance` and recorded in `rejected` list.
+- Asserted that genuine Kiro and specification-driven development titles pass into `accepted`.
+
+Failing output before fix:
+```
+=================================== FAILURES ===================================
+____ test_off_topic_filter_rejects_generic_trade_and_regulatory_papers_against_q1 ____
+    assert len(rejected) == 3, f"Expected 3 generic papers to be rejected, got {len(rejected)}. Rejected: {rejected}"
+E   AssertionError: Expected 3 generic papers to be rejected, got 0. Rejected: []
+E   assert 0 == 3
+tests/test_a7_retrieval_and_venues.py:168: AssertionError
+```
+
+### 3. What Changed & Files Touched
+- `config.yaml`:
+  - Added configurable `generic_research_words`:
+    `["productivity", "adoption", "gains", "evidence", "teams", "impact", "empirical", "study", "trade-offs", "tradeoffs", "delivery", "research", "analysis", "performance", "effects", "results", "evaluation", "development"]`
+  - Added `min_weighted_overlap: 0.18`.
+  - Added `head_term_synonyms`:
+    - `kiro`: `["kiro", "amazon kiro", "spec-driven", "specification-driven", "agentic"]`
+    - `assistants`: `["assistant", "assistants", "copilot", "copilots", "coding assistant", "ai assistant", "agent", "agents"]`
+- `src/analysis/multilane_runner.py`:
+  - In `_harvest_academic_lane`, implemented weighted term scoring:
+    - Salient question terms receive weight `1.0`.
+    - Generic research words receive discounted weight `0.05`.
+    - If question contains specific entities / head terms (e.g. "kiro"), requires title or abstract to match the head term or its synonyms.
+    - Requires normalized weighted overlap score $\ge$ `min_weighted_overlap`.
+    - Off-topic rejections logged to `search_log` with `rejected_reason="off_topic_low_relevance: paper lacks question entity/head terms or sufficient weighted term overlap"`.
+- `src/score/checker.py`:
+  - Fixed stem matching bug: replaced index character zip with contiguous prefix stem matching (`stems_match`), preventing false positives between unrelated words (e.g., "specification-driven" and "decomposition").
+  - In Support Check 3, required substantive non-generic term overlap or head term / synonym match; matches consisting solely of generic words are rejected.
+- `tests/test_a7_retrieval_and_venues.py`:
+  - Added `test_off_topic_filter_rejects_generic_trade_and_regulatory_papers_against_q1`.
+
+### 4. Verification Evidence
+Passing output for A7 test suite:
+```
+PYTHONPATH=. .venv/bin/pytest tests/test_a7_retrieval_and_venues.py -v
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Users/gauravm/Developer/projects/research-agent-ml-enterprise/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/gauravm/Developer/projects/research-agent-ml-enterprise
+collecting ... collected 4 items                                                              
+
+tests/test_a7_retrieval_and_venues.py::test_venue_never_displays_api_provider_and_real_source_types PASSED [ 25%]
+tests/test_a7_retrieval_and_venues.py::test_retrieval_filters_by_min_year_and_logs_rejected_stale_papers PASSED [ 50%]
+tests/test_a7_retrieval_and_venues.py::test_retrieval_rejects_off_topic_papers_by_term_overlap PASSED [ 75%]
+tests/test_a7_retrieval_and_venues.py::test_off_topic_filter_rejects_generic_trade_and_regulatory_papers_against_q1 PASSED [100%]
+
+========================= 4 passed, 1 warning in 1.18s =========================
+```
+
+Passing output across all suites (58 passed):
+```
+PYTHONPATH=. .venv/bin/pytest -v -k "not test_ui_smoke"
+================= 58 passed, 1 deselected, 1 warning in 11.94s =================
+```
+
+### 5. Anything NOT Done in A2-2
+- Section A2-3 deliverables (R15–R26 regression cases, deterministic offline canaries with `--live` flag, `render_matches_ledger` test, Findings before/after text, report reconciliation).
+
+
 
 
 

@@ -227,3 +227,100 @@ def test_retrieval_rejects_off_topic_papers_by_term_overlap():
             if sl.rejected_reason and ("topic" in sl.rejected_reason.lower() or "relevance" in sl.rejected_reason.lower())
         ]
         assert len(topic_rejections) > 0, "Expected search_log entry recording off-topic rejection"
+
+
+def test_off_topic_filter_rejects_generic_trade_and_regulatory_papers_against_q1():
+    """Verify generic research papers sharing only generic words are rejected with off_topic_low_relevance against Q1."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = str(Path(tmpdir) / "test_ledger.db")
+        prac_db_path = str(Path(tmpdir) / "test_prac.db")
+        q_yaml_path = str(Path(tmpdir) / "register.yaml")
+        apply_migrations(db_path=db_path)
+        apply_migrations(db_path=prac_db_path)
+
+        runner = MultiLaneResearchRunner(
+            db_path=db_path,
+            practitioner_db_path=prac_db_path,
+            questions_yaml_path=q_yaml_path,
+        )
+
+        test_papers = [
+            {
+                "id": "p-trade-tam",
+                "title": "An Empirical Study on the Information Productivity of Trade Practice for Technology Acceptance Model Adoption",
+                "abstract": "We analyze technology acceptance model adoption in international trade practice and information productivity.",
+                "year": 2024,
+                "venue": "Journal of Trade Studies",
+                "url": "https://doi.org/10.1000/trade-tam",
+                "relevance_score": 0.88,
+            },
+            {
+                "id": "p-trade-gains",
+                "title": "Dissecting Productivity Gains from Trade",
+                "abstract": "Econometric decomposition of manufacturing productivity gains resulting from bilateral tariff reductions.",
+                "year": 2023,
+                "venue": "Quarterly Journal of Economics",
+                "url": "https://doi.org/10.1000/trade-gains",
+                "relevance_score": 0.85,
+            },
+            {
+                "id": "p-oecd-reforms",
+                "title": "Figure 2.26. Regulatory reforms matter for digital adoption and productivity gains",
+                "abstract": "Statistical chart showing OECD cross-country variance in digital adoption and productivity gains under regulatory reform.",
+                "year": 2022,
+                "venue": "OECD Digital Economy Outlook",
+                "url": "https://doi.org/10.1000/oecd-2.26",
+                "relevance_score": 0.80,
+            },
+            {
+                "id": "p-kiro-genuine",
+                "title": "Empirical Evaluation of Amazon Kiro and Generative Assistants in Software Delivery",
+                "abstract": "Developer velocity increases by 32% with Amazon Kiro in standard software delivery tasks.",
+                "year": 2024,
+                "venue": "IEEE Transactions on Software Engineering",
+                "url": "https://doi.org/10.1109/tse.2024",
+                "relevance_score": 0.95,
+            },
+            {
+                "id": "p-spec-driven",
+                "title": "Spec-Driven Development for Generative Assistants in Enterprise Engineering",
+                "abstract": "Bounded autonomy contracts and spec-driven development eliminate out-of-band regression in enterprise teams.",
+                "year": 2024,
+                "venue": "ACM Transactions on Software Engineering and Methodology",
+                "url": "https://doi.org/10.1145/tosem.2024",
+                "relevance_score": 0.93,
+            },
+        ]
+
+        q1_topic = "What empirical evidence exists regarding Amazon Kiro adoption, productivity gains, and delivery trade-offs in engineering teams?"
+        results = runner.run_workflow(
+            topic=q1_topic,
+            depth="Fast",
+            tone="Executive",
+            map_provider="stub",
+            reduce_provider="stub",
+            academic_papers_override=test_papers,
+        )
+
+        repo = LedgerRepository(db_path=db_path)
+        accepted_paper_ids = [p["id"] for p in results["papers"]]
+
+        # All 3 generic off-topic papers MUST be rejected
+        assert "p-trade-tam" not in accepted_paper_ids, f"Trade TAM paper must be rejected, got accepted: {accepted_paper_ids}"
+        assert "p-trade-gains" not in accepted_paper_ids, f"Trade gains paper must be rejected, got accepted: {accepted_paper_ids}"
+        assert "p-oecd-reforms" not in accepted_paper_ids, f"OECD reforms paper must be rejected, got accepted: {accepted_paper_ids}"
+
+        # Genuine Kiro and Spec-Driven papers MUST pass
+        assert "p-kiro-genuine" in accepted_paper_ids, "Genuine Kiro paper must pass"
+        assert "p-spec-driven" in accepted_paper_ids, "Spec-driven development paper must pass"
+
+        # Search log must record off_topic_low_relevance for all three
+        search_logs = repo.list_search_logs()
+        rejected_logs = {
+            sl.details_json.get("paper_id"): sl.rejected_reason
+            for sl in search_logs
+            if sl.details_json and "paper_id" in sl.details_json
+        }
+        for pid in ("p-trade-tam", "p-trade-gains", "p-oecd-reforms"):
+            reason = rejected_logs.get(pid, "")
+            assert "off_topic_low_relevance" in reason, f"Paper {pid} must have off_topic_low_relevance reason, got: {reason}"

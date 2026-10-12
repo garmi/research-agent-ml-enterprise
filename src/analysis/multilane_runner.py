@@ -537,8 +537,18 @@ class MultiLaneResearchRunner:
         if not selected:
             selected = []
 
-        # Filter candidate papers by min_year and question topic relevance
-        min_year = int(self.config.get("research", {}).get("min_year", 2020))
+        # Filter candidate papers by min_year and weighted question topic relevance
+        research_cfg = self.config.get("research", {}) if isinstance(self.config, dict) else {}
+        min_year = int(research_cfg.get("min_year", 2020))
+        generic_words_list = set(w.lower() for w in research_cfg.get("generic_research_words", [
+            "productivity", "adoption", "gains", "evidence", "teams", "impact",
+            "empirical", "study", "analysis", "evaluation", "practice", "digital",
+            "technology", "research", "engineering", "delivery", "trade-offs",
+            "tradeoffs", "model", "models", "assessment", "implications",
+            "guidance", "perspective", "reforms", "information", "acceptance", "trade"
+        ]))
+        min_weighted_overlap = float(research_cfg.get("min_weighted_overlap", 0.18))
+        synonyms_cfg = research_cfg.get("head_term_synonyms", {})
         accepted_papers: List[Dict[str, Any]] = []
 
         stopwords = {
@@ -547,12 +557,37 @@ class MultiLaneResearchRunner:
             "what", "how", "why", "which", "when", "where", "who", "whom", "whose", "do",
             "does", "did", "can", "could", "should", "would", "may", "might", "must",
             "about", "into", "through", "during", "before", "after", "above", "below",
+            "regarding", "exists", "between",
         }
-        q_tokens = {
-            w.lower() for w in re.findall(r"\b[a-zA-Z]{3,}\b", topic)
-            if w.lower() not in stopwords
-        }
-        q_stems = {w[:4] for w in q_tokens}
+        def stems_match(w1: str, w2: str) -> bool:
+            if w1 == w2:
+                return True
+            if len(w1) >= 4 and len(w2) >= 4 and (w1 in w2 or w2 in w1):
+                return True
+            prefix_len = 0
+            for a, b in zip(w1, w2):
+                if a == b:
+                    prefix_len += 1
+                else:
+                    break
+            if prefix_len >= 4:
+                return True
+            if prefix_len >= 3 and w1.startswith("cod") and w2.startswith("cod"):
+                return True
+            return False
+
+        all_q_words = [w.lower() for w in re.findall(r"\b[a-zA-Z0-9-]{2,}\b", topic)]
+        q_tokens = [w for w in all_q_words if w not in stopwords]
+        salient_q_terms = {w for w in q_tokens if w not in generic_words_list}
+
+        # Extend head terms with configured domain synonyms (e.g. Kiro -> spec-driven)
+        extended_head_terms = set(salient_q_terms)
+        for key, syns in synonyms_cfg.items():
+            if key.lower() in salient_q_terms or any(key.lower() in w for w in salient_q_terms):
+                for syn in syns:
+                    for part in re.findall(r"\b[a-zA-Z0-9-]{2,}\b", syn.lower()):
+                        if part not in stopwords and part not in generic_words_list:
+                            extended_head_terms.add(part)
 
         for p in selected:
             # 1. Year filter enforcement at retrieval time
@@ -575,16 +610,48 @@ class MultiLaneResearchRunner:
                     )
                     continue
 
-            # 2. Topic term overlap filter
-            p_text = f"{p.get('title', '')} {p.get('abstract', '')}"
-            p_tokens = {
-                w.lower() for w in re.findall(r"\b[a-zA-Z]{3,}\b", p_text)
-                if w.lower() not in stopwords
+            # 2. Weighted topic term overlap filter
+            p_text = f"{p.get('title', '')} {p.get('abstract', '')}".lower()
+            p_tokens = set(re.findall(r"\b[a-zA-Z0-9-]{2,}\b", p_text))
+
+            # Match salient / head terms
+            matched_salient = {
+                t for t in salient_q_terms
+                if any(stems_match(t, pt) for pt in p_tokens)
             }
-            p_stems = {w[:4] for w in p_tokens}
-            overlap = (q_tokens & p_tokens) or (q_stems & p_stems)
+            matched_extended_head = {
+                t for t in extended_head_terms
+                if any(stems_match(t, pt) for pt in p_tokens)
+            }
+            has_head_phrase = any(
+                syn.lower() in p_text
+                for syns in synonyms_cfg.values() for syn in syns
+                if any(k.lower() in salient_q_terms for k in synonyms_cfg.keys())
+            )
+
+            # Match generic research words
+            matched_generic = {
+                w for w in q_tokens
+                if w in generic_words_list and any(stems_match(w, pt) for pt in p_tokens)
+            }
+
+            # Weighted scoring: salient terms = 1.0, generic research terms = 0.05
+            salient_weight = len(matched_salient) * 1.0
+            generic_weight = len(matched_generic) * 0.05
+            total_salient_weight = len(salient_q_terms) * 1.0
+            total_q_weight = total_salient_weight + len(set(q_tokens) & generic_words_list) * 0.05
+            overlap_fraction = (salient_weight + generic_weight) / total_q_weight if total_q_weight > 0 else 0.0
+
             relevance = float(p.get("relevance_score", 1.0))
-            if (not overlap and len(q_tokens) > 0) or (relevance < 0.20 and not overlap):
+            is_relevant = False
+            if bool(matched_extended_head) or has_head_phrase:
+                is_relevant = True
+            elif len(salient_q_terms) > 0:
+                is_relevant = (bool(matched_salient) and overlap_fraction >= min_weighted_overlap)
+            else:
+                is_relevant = (overlap_fraction >= min_weighted_overlap and relevance >= 0.20)
+
+            if not is_relevant:
                 self.repo.insert_search_log(
                     SearchLog(
                         id=f"slog_rej_top_{uuid.uuid4().hex[:10]}",
@@ -594,8 +661,14 @@ class MultiLaneResearchRunner:
                         query=topic,
                         source_api=p.get("source") or "open_academic_repos",
                         result_count=0,
-                        rejected_reason=f"off_topic_low_relevance: paper has no substantive term overlap with question scope (overlap={len(overlap)}, relevance={relevance:.2f})",
-                        details_json={"paper_id": p.get("id"), "title": p.get("title"), "matched_terms": list(overlap)},
+                        rejected_reason=f"off_topic_low_relevance: paper has no substantive term overlap with question scope (weighted_overlap={overlap_fraction:.2f} < {min_weighted_overlap}, salient_matched={len(matched_salient)})",
+                        details_json={
+                            "paper_id": p.get("id"),
+                            "title": p.get("title"),
+                            "matched_salient": list(matched_salient),
+                            "matched_generic": list(matched_generic),
+                            "overlap_fraction": round(overlap_fraction, 3),
+                        },
                     )
                 )
                 continue

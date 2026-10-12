@@ -9,6 +9,49 @@ research:
   time_window: "2019-2025"
   min_year: 2020
   vendor_only_max_outcome: 2
+  generic_research_words:
+    - productivity
+    - adoption
+    - gains
+    - evidence
+    - teams
+    - impact
+    - empirical
+    - study
+    - analysis
+    - evaluation
+    - practice
+    - digital
+    - technology
+    - research
+    - engineering
+    - delivery
+    - trade-offs
+    - tradeoffs
+    - model
+    - models
+    - assessment
+    - implications
+    - guidance
+    - perspective
+    - reforms
+    - information
+    - acceptance
+    - trade
+  min_weighted_overlap: 0.18
+  head_term_synonyms:
+    kiro:
+      - kiro
+      - amazon kiro
+      - spec-driven
+      - spec-driven development
+      - specification-driven
+    assistants:
+      - assistant
+      - agent
+      - agents
+      - agentic
+      - copilot
   search_sources:
     - openalex
     - crossref
