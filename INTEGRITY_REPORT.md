@@ -1528,6 +1528,74 @@ tests/test_a8_status_and_exports.py::test_web_app_removes_force_override_checkbo
 ### 5. Anything NOT Done in A2-4
 - Section A2-5: Evidence-based scoring metrics for S4, S6, and S7.
 
+---
+
+## Section A2-5: Evidence-Grounded Scoring Metrics for S4, S6, and S7
+
+### 1. Defect Description & Requirements
+- **Defect:**
+  1. Component S7 (reproducibility) was computed as a static `1.0` or `0.7` flag depending on whether claims had excerpts, which did not evaluate reproducibility.
+  2. Component S6 (human review) counted automated gates passed instead of claims actually reviewed by a human and human governance gates completed.
+  3. Component S4 (gap disclosure) was a binary `1.0` or `0.5` flag (`has_negative_or_gap = any(...)`).
+- **Requirements:**
+  1. S7 must re-run extraction and grading from cached sources and compute agreement. If unmeasured, mark S7 `"not measured"` and cap the quality band at `REVISE`.
+  2. S6 must count claims actually reviewed by a human (`reviewed_claim_ids`) and human gates completed (`human_gates_completed_count`), not automated gates passed.
+  3. S4 must be computed dynamically from gap outcomes stated and ledger contradictions mentioned.
+  4. Tests: changing human review state changes S6; two runs with the same cache give a measured S7; unmeasured S7 caps band at `REVISE`.
+
+### 2. Files Changed
+- `src/score/scorer.py`:
+  - Implemented `compute_reproducibility(cached_papers, ledger_claims)`: re-extracts claims via `extract_claims_from_paper`, grades via `Grader.grade_claim`, and calculates agreement fraction.
+  - Implemented unmeasured S7 handling: marks S7 `"not measured"` and caps band at `REVISE`.
+  - Implemented human-grounded S6: evaluates cited claims against human-reviewed claim IDs and counts human governance gates completed (`human_gates_completed_count`).
+  - Implemented continuous S4 computation from stated gap matrix outcomes / negative findings and ledger contradictions recalled.
+- `src/synth/generator.py`: Updated `calculate_score` invocation to pass `cached_papers=papers` and `human_gates_completed_count=0`.
+- `tests/test_a11_evidence_based_scoring.py`: Added dedicated test suite verifying S4 dynamic computation, S6 human review sensitivity, S7 cache reproducibility, and band capping at `REVISE` when unmeasured.
+
+### 3. Tests Added
+- `test_human_review_state_changes_s6`: Confirms S6 evaluates to `0.0` when zero human review occurs, and strictly increases when human reviews cited claims and completes human gates.
+- `test_two_runs_with_same_cache_give_measured_s7`: Confirms two runs over identical cached paper records yield a measured S7 reproducibility score of `10.0 / 10`.
+- `test_unmeasured_s7_caps_band_at_revise`: Confirms that when S7 is unmeasured (`reproducibility_agreement=None`, `cached_papers=None`), S7 is marked `"not measured"` and quality band is strictly capped at `REVISE` even if composite score exceeds 85.
+- `test_s4_computed_from_gap_outcomes_and_contradictions`: Confirms S4 dynamically distinguishes between zero gap disclosure and explicit negative findings / outcome statements.
+
+### 4. Verification Evidence
+
+#### Failing Test Output (Before Fix):
+```
+=================================== FAILURES ===================================
+______________________ test_human_review_state_changes_s6 ______________________
+    score_unreviewed = scorer.calculate_score(..., human_gates_completed_count=0)
+E   TypeError: calculate_score() got an unexpected keyword argument 'human_gates_completed_count'
+
+________________ test_two_runs_with_same_cache_give_measured_s7 ________________
+    score1 = scorer.calculate_score(..., cached_papers=cached_papers)
+E   TypeError: calculate_score() got an unexpected keyword argument 'cached_papers'
+
+____________ test_s4_computed_from_gap_outcomes_and_contradictions _____________
+>   assert s4_b > s4_a, f"Expected higher S4 with explicit gap outcomes! A: {s4_a}, B: {s4_b}"
+E   AssertionError: Expected higher S4 with explicit gap outcomes! A: 10.0, B: 10.0
+E   assert 10.0 > 10.0
+```
+
+#### Passing Test Output (After Fix):
+```
+PYTHONPATH=. .venv/bin/pytest tests/test_a11_evidence_based_scoring.py -v
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/gauravm/Developer/projects/research-agent-ml-enterprise
+collected 4 items
+
+tests/test_a11_evidence_based_scoring.py::test_human_review_state_changes_s6 PASSED [ 25%]
+tests/test_a11_evidence_based_scoring.py::test_two_runs_with_same_cache_give_measured_s7 PASSED [ 50%]
+tests/test_a11_evidence_based_scoring.py::test_unmeasured_s7_caps_band_at_revise PASSED [ 75%]
+tests/test_a11_evidence_based_scoring.py::test_s4_computed_from_gap_outcomes_and_contradictions PASSED [100%]
+
+============================== 4 passed in 0.15s ===============================
+```
+
+### 5. Anything NOT Done in A2-5
+- Section A2-6: Hosted demo mode lockdown (`HOSTED_DEMO=1`).
+
 
 
 

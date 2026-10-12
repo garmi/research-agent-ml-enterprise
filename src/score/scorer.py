@@ -57,8 +57,10 @@ class QualityScorer:
         questions: List[Question],
         reviewed_claim_ids: Optional[Set[str]] = None,
         gates_completed_count: int = 0,
-        gap_outcomes_disclosed: float = 1.0,
-        reproducibility_agreement: float = 1.0,
+        human_gates_completed_count: Optional[int] = None,
+        gap_outcomes_disclosed: Optional[float] = None,
+        reproducibility_agreement: Optional[float] = None,
+        cached_papers: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
         """Compute all 7 quality score components and composite score."""
         assertive_sentences = [s for s in sentences if s.type == "assertive"]
@@ -105,7 +107,39 @@ class QualityScorer:
         s3_score = covered_questions * weights.get("S3_question_coverage", 15)
 
         # S4: Gap disclosure (Weight: 10)
-        s4_score = gap_outcomes_disclosed * weights.get("S4_gap_disclosure", 10)
+        # Computed from gap outcomes stated and ledger contradictions mentioned
+        if gap_outcomes_disclosed is not None:
+            s4_score = gap_outcomes_disclosed * weights.get("S4_gap_disclosure", 10)
+        else:
+            gap_outcomes_count = sum(
+                1 for s in sentences
+                if s.type == "negative_finding"
+                or any(p in s.text.lower() for p in (
+                    "outcome 1", "outcome 2", "outcome 3", "outcome 4",
+                    "strategic gap", "gap matrix", "evidence does not support",
+                    "unsupported", "what the evidence does not support"
+                ))
+            )
+            target_gaps = max(1, len(questions))
+            gap_ratio = min(1.0, gap_outcomes_count / target_gaps)
+
+            known_contradictions = sum(
+                1 for c in ledger_claims.values()
+                if (c.context_json and c.context_json.get("has_contradiction")) or getattr(c, "has_contradiction", False)
+            )
+            contradictions_mentioned = sum(
+                1 for s in sentences
+                if any(w in s.text.lower() for w in (
+                    "contradict", "diverg", "conflict", "discrepan", "tension", "inconsistent", "unresolved"
+                ))
+            )
+            if known_contradictions > 0:
+                contradiction_ratio = min(1.0, contradictions_mentioned / known_contradictions)
+            else:
+                contradiction_ratio = 1.0 if (gap_outcomes_count > 0 or contradictions_mentioned > 0) else 0.5
+
+            s4_ratio = 0.6 * gap_ratio + 0.4 * contradiction_ratio
+            s4_score = s4_ratio * weights.get("S4_gap_disclosure", 10)
 
         # S5: Freshness & scope (Weight: 10)
         fresh_claims = 0
@@ -120,20 +154,48 @@ class QualityScorer:
         s5_score = freshness_ratio * weights.get("S5_freshness_scope", 10)
 
         # S6: Human review (Weight: 10)
-        # 0.6 * share of cited claims reviewed at Gate 3 + 0.4 * share of Gates 1-6 completed
+        # Count claims actually reviewed by a human and human gates completed, not automated gates passed.
         reviewed_claims = reviewed_claim_ids or set()
-        share_reviewed = len(all_cited_claim_ids.intersection(reviewed_claims)) / len(all_cited_claim_ids) if all_cited_claim_ids else 0.0
-        share_gates = min(1.0, gates_completed_count / 6.0)
+        cited_reviewed = all_cited_claim_ids.intersection(reviewed_claims)
+        share_reviewed = len(cited_reviewed) / len(all_cited_claim_ids) if all_cited_claim_ids else 0.0
+
+        if human_gates_completed_count is not None:
+            effective_human_gates = human_gates_completed_count
+        else:
+            effective_human_gates = 0
+        share_gates = min(1.0, effective_human_gates / 3.0)
         s6_score = (0.6 * share_reviewed + 0.4 * share_gates) * weights.get("S6_human_review", 10)
 
         # S7: Reproducibility (Weight: 10)
-        s7_score = reproducibility_agreement * weights.get("S7_reproducibility", 10)
+        # Re-run extraction and grading from cached sources and compute agreement,
+        # or mark S7 'not measured' and cap band at REVISE.
+        s7_measured = False
+        s7_agreement = 0.0
+        if reproducibility_agreement is not None:
+            s7_measured = True
+            s7_agreement = float(reproducibility_agreement)
+        elif cached_papers is not None:
+            s7_agreement = self.compute_reproducibility(cached_papers, ledger_claims)
+            s7_measured = True
 
-        total_score = round(s1_score + s2_score + s3_score + s4_score + s5_score + s6_score + s7_score, 1)
+        if s7_measured:
+            s7_score = s7_agreement * weights.get("S7_reproducibility", 10)
+            s7_display: Any = round(s7_score, 1)
+        else:
+            s7_score = 0.0
+            s7_display = "not measured"
+
+        total_score = round(s1_score + s2_score + s3_score + s4_score + s5_score + s6_score + (s7_score if s7_measured else 0.0), 1)
 
         # Determine band
         if not gate_result.passed:
             band = "BLOCKED"
+        elif not s7_measured:
+            # Band is capped at REVISE while any component is unmeasured
+            if total_score >= self.cfg.get("bands", {}).get("revise", 70):
+                band = "REVISE"
+            else:
+                band = "NOT_PUBLISHABLE"
         elif total_score >= self.cfg.get("bands", {}).get("publish_ready", 85):
             band = "PUBLISH_READY"
         elif total_score >= self.cfg.get("bands", {}).get("revise", 70):
@@ -145,6 +207,8 @@ class QualityScorer:
         recommendations = []
         if not gate_result.passed:
             recommendations.append("Resolve hard gate violations (G1-G6) to unblock publication.")
+        if not s7_measured:
+            recommendations.append("Measure reproducibility: re-run extraction and grading from cached sources to verify agreement.")
         if s1_score < 20:
             recommendations.append("Upgrade claim evidence base: replace weak/unverified sources with empirical studies from verified venues.")
         if s2_score < 8:
@@ -165,7 +229,55 @@ class QualityScorer:
                 "S4_gap_disclosure": round(s4_score, 1),
                 "S5_freshness_scope": round(s5_score, 1),
                 "S6_human_review": round(s6_score, 1),
-                "S7_reproducibility": round(s7_score, 1),
+                "S7_reproducibility": s7_display,
             },
             "top_3_improvements": recommendations[:3],
         }
+
+    def compute_reproducibility(
+        self,
+        cached_papers: List[Dict[str, Any]],
+        ledger_claims: Dict[str, Claim],
+    ) -> float:
+        """Re-run extraction and grading from cached sources and compute agreement."""
+        if not cached_papers and not ledger_claims:
+            return 1.0
+        if not cached_papers or not ledger_claims:
+            return 0.0
+
+        from src.extract.claim_extractor import extract_claims_from_paper
+        from src.grade.grader import Grader
+
+        grader = Grader()
+        re_extracted_claims: List[Claim] = []
+        for paper in cached_papers:
+            extracted = extract_claims_from_paper(paper)
+            venue = paper.get("venue")
+            source_type = "peer_reviewed" if paper.get("doi") else "preprint"
+            venue_tier = grader.resolve_venue_tier(venue, source_type)
+            source_obj = Source(
+                id=paper.get("id") or "src_cached",
+                lane="academic",
+                source_type=source_type,
+                title=paper.get("title", "Untitled"),
+                venue=venue,
+                venue_tier=venue_tier,
+                pub_date=str(paper.get("year", "2024")),
+            )
+            for c in extracted:
+                c.grade, c.grade_reasons_json = grader.grade_claim(c, source_obj)
+                re_extracted_claims.append(c)
+
+        if not re_extracted_claims:
+            return 0.0
+
+        matches = 0
+        for c in ledger_claims.values():
+            for r in re_extracted_claims:
+                if r.source_id == c.source_id and r.source_excerpt == c.source_excerpt:
+                    matches += 1
+                    break
+
+        agreement = matches / max(len(ledger_claims), len(re_extracted_claims))
+        return round(min(1.0, agreement), 4)
+
