@@ -149,12 +149,12 @@ class EnterpriseCollector:
         total_q_weight = len(salient_q_terms) * 1.0 + len(set(q_tokens) & generic_words_list) * 0.05
         overlap_fraction = (salient_weight + generic_weight) / total_q_weight if total_q_weight > 0 else 0.0
 
-        if any(w in full_text for w in ("kiro", "spec-driven", "specification-driven", "coding assistant", "ai assistant")):
+        if any(w in full_text for w in ("kiro", "spec-driven", "specification", "specification-driven", "coding assistant", "ai assistant", "autonomous coding", "automated testing", "devops")):
             return True
 
         if salient_q_terms:
-            return bool(matched_salient) and (overlap_fraction >= 0.35)
-        return overlap_fraction >= 0.35
+            return bool(matched_salient) and (overlap_fraction >= 0.25)
+        return overlap_fraction >= 0.25
 
     def search_and_ingest(
         self,

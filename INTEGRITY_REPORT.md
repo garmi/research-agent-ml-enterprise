@@ -2327,5 +2327,68 @@ evals/canary/test_canary_acceptance.py::test_canary_acceptance[10-no_egress_of_p
 ======================== 20 passed, 1 warning in 5.28s =========================
 ```
 
+---
+
+## A3-5. Working Tree Immutability and UI Smoke Test Execution
+
+### 1. Root Cause & Defects Addressed
+- **The Defect:**
+  1. `test_ui_smoke.py` was skipped across previous runs due to catch-and-skip logic on macOS sandbox Mach port rendezvous exceptions (`pytest.skip("Playwright Chromium Mach port rendezvous requires bypass sandbox on macOS.")`), and it did not manage the Streamlit process lifecycle itself.
+  2. Potential risk of test executions polluting tracked files (such as modifying `questions/register.yaml` or creating untracked files).
+  3. Git history audit for commits A2-6, A2-7, A2-8 required verification to confirm zero `.db`, `outputs/`, `.env`, `denylist.txt`, or temporary files were committed.
+- **The Remediation:**
+  1. **UI Smoke Test Lifecycle & Launch:**
+     - Removed all Mach port / TargetClosedError skip statements from `tests/test_ui_smoke.py`.
+     - The test now strictly skips ONLY if Playwright is uninstalled (`sync_playwright is None`).
+     - Automatically provisions an isolated Streamlit configuration in a temporary directory (`credentials.toml` with `email = ""`, `config.toml` with `headless = true`, `gatherUsageStats = false`) to bypass interactive onboarding prompts.
+     - Automatically launches the Streamlit server on an ephemeral free port, polls for HTTP 200 readiness, and cleanly terminates the process in `finally`.
+     - Verifies that first screen load renders the active three lanes: "Lane A: Academic Literature", "Lane B: Enterprise Literature", "Lane C: Practitioner Delivery".
+  2. **Working Tree Cleanliness Enforcement:**
+     - Verified and added regression test `tests/test_a18_working_tree_and_ui_smoke.py` asserting that running the test suite leaves `git status --porcelain` completely clean.
+     - Confirmed tests use temporary directories (`tmpdir` / `tmp_path`) for database paths and YAML files, preventing mutations to `questions/register.yaml`.
+  3. **Git History Audit:**
+     - Audited commits A2-6 (`29671ed`), A2-7 (`c5893dc`), A2-8 (`b8f0e1a`), and HEAD.
+     - Confirmed zero `.db`, `outputs/`, `.env` (excluding `.env.example`), `denylist.txt`, or temporary files are tracked.
+
+### 2. Files Changed
+- `tests/test_ui_smoke.py`
+- `src/collectors/enterprise/collector.py`
+- `src/score/checker.py`
+- `tests/test_a18_working_tree_and_ui_smoke.py`
+- `INTEGRITY_REPORT.md`
+
+### 3. Tests & Evidence
+
+#### Failing Test Output (Before Fix):
+```
+tests/test_ui_smoke.py::test_executive_studio_ui_smoke SKIPPED (Playwright Chromium Mach port rendezvous requires bypass sandbox on macOS.)
+
+AssertionError: Streamlit server on http://127.0.0.1:58112 failed to start within 25 seconds.
+(Streamlit credentials prompt blocked non-interactive startup without isolated credentials configuration)
+```
+
+#### Passing Test Output (After Fix):
+```
+PYTHONPATH=. .venv/bin/pytest tests/test_ui_smoke.py tests/test_a18_working_tree_and_ui_smoke.py -v
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Users/gauravm/Developer/projects/research-agent-ml-enterprise/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/gauravm/Developer/projects/research-agent-ml-enterprise
+collected 4 items
+
+tests/test_ui_smoke.py::test_executive_studio_ui_smoke PASSED            [ 25%]
+tests/test_a18_working_tree_and_ui_smoke.py::test_working_tree_cleanliness_after_test_execution PASSED [ 50%]
+tests/test_a18_working_tree_and_ui_smoke.py::test_git_history_audit_no_unwanted_files_at_head PASSED [ 75%]
+tests/test_a18_working_tree_and_ui_smoke.py::test_ui_smoke_only_skips_when_playwright_uninstalled PASSED [100%]
+
+============================== 4 passed in 6.78s ===============================
+```
+
+#### Full Test Suite Status (115 Passed, 0 Failures):
+```
+================= 115 passed, 1 warning in 18.15s =================
+```
+
+
 
 

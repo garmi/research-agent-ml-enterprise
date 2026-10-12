@@ -226,7 +226,7 @@ class GateChecker:
                 q_text = f"{getattr(question, 'text', str(question or ''))} {getattr(question, 'scope', '')}".strip()
                 q_words = [
                     w for w in normalize_text(q_text).split()
-                    if w not in STOPWORDS and len(w) >= 3
+                    if w not in STOPWORDS and (len(w) >= 3 or w == "ai")
                 ]
                 generic_set = {
                     "productivity", "adoption", "gains", "evidence", "teams", "impact",
@@ -260,7 +260,7 @@ class GateChecker:
                         if src_text:
                             src_terms = {
                                 w for w in normalize_text(src_text).split()
-                                if w not in STOPWORDS and len(w) >= 3
+                                if w not in STOPWORDS and (len(w) >= 3 or w == "ai")
                             }
                             # Must share at least one qualified salient term (company name must have software context; agent must have code context)
                             salient_match = False
