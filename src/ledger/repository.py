@@ -155,7 +155,19 @@ class LedgerRepository:
         with self._conn() as conn:
             details_str = json.dumps(log.details_json) if log.details_json else None
             columns = [c[1] for c in conn.execute("PRAGMA table_info(search_log);").fetchall()]
-            if "rejected_reason" in columns:
+            log_status = getattr(log, "status", "searched_ok") or "searched_ok"
+            if "status" in columns and "rejected_reason" in columns:
+                conn.execute(
+                    """INSERT OR REPLACE INTO search_log
+                       (id, run_id, question_id, lane, query, source_api, result_count, status, executed_at, created_at, rejected_reason, details_json)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);""",
+                    (
+                        log.id, log.run_id, log.question_id, log.lane, log.query,
+                        log.source_api, log.result_count, log_status, log.executed_at, log.created_at,
+                        log.rejected_reason, details_str,
+                    ),
+                )
+            elif "rejected_reason" in columns:
                 conn.execute(
                     """INSERT OR REPLACE INTO search_log
                        (id, run_id, question_id, lane, query, source_api, result_count, executed_at, created_at, rejected_reason, details_json)
@@ -186,6 +198,8 @@ class LedgerRepository:
             logs = []
             for row in cursor.fetchall():
                 d = dict(row)
+                if not d.get("status"):
+                    d["status"] = "searched_ok"
                 if d.get("details_json") and isinstance(d["details_json"], str):
                     try:
                         d["details_json"] = json.loads(d["details_json"])

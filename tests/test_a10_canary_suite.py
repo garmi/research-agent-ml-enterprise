@@ -153,8 +153,8 @@ def test_canary_q3_quantum_sourdough_no_evidence_honesty():
         # 1. Zero findings
         assert len(res3["findings"]) == 0, f"Expected 0 findings, got {len(res3['findings'])}: {res3['findings']}"
 
-        # 2. Gap Matrix Outcome 4
-        assert res3["gap_matrix"]["outcome"] == 4, f"Expected Outcome 4, got {res3['gap_matrix']['outcome']}"
+        # 2. Gap Matrix Outcome: Practice not assessed (or Outcome 4 if all searched)
+        assert res3["gap_matrix"]["outcome"] in (4, "Practice not assessed"), f"Expected Outcome 4 or Practice not assessed, got {res3['gap_matrix']['outcome']}"
 
         # 3. Status NOT_PUBLISHABLE
         assert res3["publish_res"]["status"] == "NOT_PUBLISHABLE", f"Expected NOT_PUBLISHABLE, got {res3['publish_res']['status']}"
@@ -210,10 +210,10 @@ def test_canary_q4_sourdough_crumb_structure_honesty():
 
         # 1. Gap Matrix must evaluate to Outcome 3 or 4 (never Outcome 1, because Enterprise is none found)
         gap_entry = res4["gap_matrix"]
-        assert gap_entry["outcome"] in (3, 4), (
-            f"Expected Outcome 3 or 4 for sourdough question, but got Outcome {gap_entry['outcome']}"
+        assert gap_entry["outcome"] in (3, 4, "Practice not assessed"), (
+            f"Expected Outcome 3, 4 or Practice not assessed for sourdough question, but got Outcome {gap_entry['outcome']}"
         )
-        assert gap_entry["enterprise_state"].lower() in ("none found", "unsupported", "none")
+        assert gap_entry["enterprise_state"].lower() in ("none found", "unsupported", "none", "not searched")
 
         # 2. Zero software or cloud vendor claims in any lane
         for c in res4.get("enterprise_claims", []):

@@ -1749,6 +1749,7 @@ if results:
             | **Outcome 2: Practice Without Evidence** | None Found | Supported / Partial | **High Risk:** Teams are actively adopting in production, but peer-reviewed empirical evidence is absent. |
             | **Outcome 3: Evidence Without Practice** | Supported / Partial | None Found | **Unrealized Opportunity:** Academic research proves capabilities, but enterprise production adoption is unmeasured. |
             | **Outcome 4: Unmeasured** | None Found | None Found | **Exploratory:** Rigorous evidence is currently lacking across both academic and enterprise lanes. |
+            | **Practice Not Assessed** | Any State | Not Searched | **Incomplete Coverage:** Enterprise lane was not searched (no working fetcher implemented). Practice adoption cannot be determined. |
             """
         )
 

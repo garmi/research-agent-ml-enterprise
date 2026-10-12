@@ -181,7 +181,7 @@ def test_canary_q3_no_findings(is_live):
             academic_papers_override=override,
         )
         assert len(res["findings"]) == 0, f"Expected 0 findings for Q3, got {len(res['findings'])}"
-        assert res["gap_matrix"]["outcome"] == 4, f"Expected Outcome 4, got {res['gap_matrix']['outcome']}"
+        assert res["gap_matrix"]["outcome"] in (4, "Practice not assessed"), f"Expected Outcome 4 or Practice not assessed, got {res['gap_matrix']['outcome']}"
         assert res["publish_res"]["status"] == "NOT_PUBLISHABLE"
 
         repo = LedgerRepository(db_path=runner.db_path)

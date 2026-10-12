@@ -314,21 +314,37 @@ class SynthesisEngine:
         )
         ordinal += 1
 
-        zero_slogs = [s for s in self.repo.list_search_logs(question_id=question_id) if s.result_count == 0]
-        if zero_slogs:
-            for slog in zero_slogs:
+        slogs = self.repo.list_search_logs(question_id=question_id)
+        searched_zero = [s for s in slogs if getattr(s, "status", "searched_ok") == "searched_ok" and s.result_count == 0]
+        unsearched = [s for s in slogs if getattr(s, "status", "searched_ok") in ("not_implemented", "not_searched", "skipped_by_scope")]
+
+        if searched_zero or unsearched:
+            for slog in searched_zero:
                 sentences.append(
                     OutputSentence(
                         id=f"{output_id}_{ordinal}",
                         output_id=output_id,
                         ordinal=ordinal,
-                        text=f"Literature search in {slog.lane} lane ('{slog.query}') returned 0 matching records in evidence ledger.",
+                        text=f"Literature search in {slog.lane} lane ({slog.source_api}) for '{slog.query}' returned 0 matching records in evidence ledger.",
                         type="negative_finding",
                         checks_json={"search_log_id": slog.id},
                     )
                 )
                 ordinal += 1
-        elif gap_entry and getattr(gap_entry, "outcome", 1) in (2, 3, 4):
+            for slog in unsearched:
+                reason = "no fetcher" if getattr(slog, "status", "") == "not_implemented" else "no observations recorded"
+                sentences.append(
+                    OutputSentence(
+                        id=f"{output_id}_{ordinal}",
+                        output_id=output_id,
+                        ordinal=ordinal,
+                        text=f"{slog.lane.capitalize()} source '{slog.source_api}' not searched for '{slog.query}': {reason}.",
+                        type="negative_finding",
+                        checks_json={"search_log_id": slog.id},
+                    )
+                )
+                ordinal += 1
+        elif gap_entry and getattr(gap_entry, "outcome", 1) in (2, 3, 4, "Practice not assessed"):
             sentences.append(
                 OutputSentence(
                     id=f"{output_id}_{ordinal}",
@@ -353,12 +369,13 @@ class SynthesisEngine:
             ordinal += 1
 
         # Section: The Strategic Gap (Matrix Outcome)
+        gap_outcome_str = f"Outcome {gap_entry.outcome}" if isinstance(gap_entry.outcome, int) else str(gap_entry.outcome)
         sentences.append(
             OutputSentence(
                 id=f"{output_id}_{ordinal}",
                 output_id=output_id,
                 ordinal=ordinal,
-                text=f"The Strategic Gap (Outcome {gap_entry.outcome}): {gap_entry.rationale}",
+                text=f"The Strategic Gap ({gap_outcome_str}): {gap_entry.rationale}",
                 type="heading",
             )
         )

@@ -97,10 +97,15 @@ class EnterpriseCollector:
 
             # Query data (either mock/fixture override or actual feed parsing)
             items = []
+            has_working_fetcher = False
             if feed_data_override and src_id in feed_data_override:
                 items = feed_data_override[src_id]
+                has_working_fetcher = True
 
-            # Log search attempt in search_log (proof of 'searched, nothing found')
+            # Determine status: only sources with working fetchers or overrides log searched_ok
+            search_status = "searched_ok" if has_working_fetcher else "not_implemented"
+
+            # Log search attempt in search_log
             log_entry = SearchLog(
                 id=f"slog_{uuid.uuid4().hex[:12]}",
                 run_id=run_id,
@@ -109,6 +114,7 @@ class EnterpriseCollector:
                 query=query,
                 source_api=src_id,
                 result_count=len(items),
+                status=search_status,
                 executed_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
             )
             if os.getenv("HOSTED_DEMO") != "1":

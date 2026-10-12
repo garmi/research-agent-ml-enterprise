@@ -309,15 +309,18 @@ def render_gap_matrix_view(service: LedgerService) -> None:
         c1.metric("Academic Lane", current.academic_state.upper())
         c2.metric("Enterprise Lane", current.enterprise_state.upper())
         c3.metric("Field Lane", current.field_state.upper())
-        c4.metric("Strategic Outcome", f"Outcome {current.outcome}")
+        outcome_disp = f"Outcome {current.outcome}" if isinstance(current.outcome, int) or (isinstance(current.outcome, str) and current.outcome.isdigit()) else str(current.outcome)
+        c4.metric("Strategic Outcome", outcome_disp)
 
         outcome_names = {
             1: "1: Supported (Academic + Enterprise Aligned)",
             2: "2: Practice Without Evidence (Enterprise Active, Academic Void)",
             3: "3: Evidence Without Practice (Academic Proven, Enterprise Unmeasured)",
             4: "4: Unmeasured (Thin/Zero Evidence Across All Lanes)",
+            "Practice not assessed": "Practice not assessed: Enterprise lane not searched (no working fetcher)",
+            "practice_not_assessed": "Practice not assessed: Enterprise lane not searched (no working fetcher)",
         }
-        st.info(f"**Classification:** {outcome_names.get(current.outcome, 'Unknown')}\n\n**Strategic Rationale:** {current.rationale}")
+        st.info(f"**Classification:** {outcome_names.get(current.outcome, str(current.outcome))}\n\n**Strategic Rationale:** {current.rationale}")
     else:
         st.info("Click 'Evaluate Lane Evidence' above to compute the current Gap Matrix.")
 

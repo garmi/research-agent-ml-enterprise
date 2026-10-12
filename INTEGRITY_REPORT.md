@@ -2021,17 +2021,61 @@ evals/test_regression.py ..........................                      [100%]
 
 > **Note on `test_ui_smoke.py`**: Collected and skipped cleanly (`s`). The Playwright browser UI smoke test requires an active Streamlit server listening on `127.0.0.1:8501` and unsandboxed Mach port access to Chromium on macOS. It is never deselected with `-k` flags.
 
+---
 
+# Phase A3 — Integrity and Honesty Remediation
 
+## A3-1. The Enterprise Lane Claims Searches It Never Ran
 
+### 1. Root Cause & Defects Addressed
+- **The Defect:** Earlier runs logged 5 search log entries with `result_count=0` even when no working fetcher was implemented, causing the pipeline to falsely claim: `"Literature search in enterprise lane returned 0 matching records in evidence ledger"`, asserting a search occurred when it never did.
+- **Outcome Distortion:** The gap matrix asserted Outcome 3 ("Evidence without practice") or Outcome 4 ("Unmeasured") even when Lane B had never been searched.
+- **The Remediation:**
+  1. Applied forward migration `005_add_status_to_search_log.sql`: added `status` column to `search_log` (`searched_ok`, `searched_error`, `not_implemented`, `not_searched`, `skipped_by_scope`).
+  2. In `EnterpriseCollector`, sources without working fetchers log `status="not_implemented"`, `result_count=0`.
+  3. In `MultiLaneResearchRunner`, unconfigured/empty practitioner lane logs `status="not_searched"`. Only live searches record `searched_ok`.
+  4. In `SynthesisEngine` (`src/synth/generator.py`), only `searched_ok` with `result_count=0` renders as `"Literature search in {lane} lane ({source}) returned 0 matching records"`. Unimplemented sources render truthfully as `"{Lane} source '{source}' not searched for '{query}': no fetcher."`
+  5. In `GapMatrixBuilder`, when Lane B was not searched, the outcome evaluates to `"Practice not assessed"` (never Outcome 3 or 4), with rationale: `"Practice not assessed: Enterprise lane was not searched (no working fetcher implemented). Practice adoption cannot be determined."`
+  6. Added `"Practice not assessed"` to the strategic taxonomy glossary in `web_app.py` and `ui_views.py`.
+  7. Corrected the record in `DECISIONS.md` under DEC-011.
 
+### 2. Files Changed
+- `ledger/migrations/005_add_status_to_search_log.sql` (new)
+- `src/ledger/models.py`
+- `src/ledger/repository.py`
+- `src/collectors/enterprise/collector.py`
+- `src/analysis/multilane_runner.py`
+- `src/gaps/matrix_builder.py`
+- `src/synth/generator.py`
+- `src/score/scorer.py`
+- `src/ledger/ui_views.py`
+- `web_app.py`
+- `DECISIONS.md`
+- `tests/test_a14_search_log_honesty_and_unsearched_lanes.py` (new)
+- `tests/test_a5_lane_scoping.py`
+- `tests/test_a10_canary_suite.py`
+- `evals/canary/test_canary_acceptance.py`
+- `INTEGRITY_REPORT.md`
 
+### 3. Tests & Evidence
 
+#### Failing Test Output (Before Fix):
+```
+FAILED tests/test_a14_search_log_honesty_and_unsearched_lanes.py::test_search_log_migration_has_status_column
+FAILED tests/test_a14_search_log_honesty_and_unsearched_lanes.py::test_unimplemented_enterprise_sources_log_not_implemented
+FAILED tests/test_a14_search_log_honesty_and_unsearched_lanes.py::test_gap_matrix_outcome_is_practice_not_assessed_when_enterprise_unsearched
+FAILED tests/test_a14_search_log_honesty_and_unsearched_lanes.py::test_multilane_runner_negative_findings_honest_language_for_unsearched_lanes
 
+AssertionError: Should not assert Outcome 3 or 4 when Lane B is unsearched, got 4
+AssertionError: Expected Outcome 4 to be Practice not assessed, got 4
+```
 
+#### Passing Test Output (After Fix):
+```
+PYTHONPATH=. .venv/bin/pytest tests/test_a14_search_log_honesty_and_unsearched_lanes.py
+============================= test session starts ==============================
+collected 4 items
 
-
-
-
-
-
+tests/test_a14_search_log_honesty_and_unsearched_lanes.py ....           [100%]
+============================== 4 passed in 0.52s ===============================
+```

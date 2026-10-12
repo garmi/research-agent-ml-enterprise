@@ -116,7 +116,7 @@ class QualityScorer:
                 if s.type == "negative_finding"
                 or any(p in s.text.lower() for p in (
                     "outcome 1", "outcome 2", "outcome 3", "outcome 4",
-                    "strategic gap", "gap matrix", "evidence does not support",
+                    "practice not assessed", "strategic gap", "gap matrix", "evidence does not support",
                     "unsupported", "what the evidence does not support"
                 ))
             )

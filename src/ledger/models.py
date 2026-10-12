@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import datetime
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional, Union
 from pydantic import BaseModel, Field
 
 LaneType = Literal["academic", "enterprise", "practitioner"]
@@ -103,6 +103,9 @@ class Run(BaseModel):
     created_at: str = Field(default_factory=now_utc_iso)
 
 
+SearchLogStatus = Literal["searched_ok", "searched_error", "not_implemented", "not_searched", "skipped_by_scope"]
+
+
 class SearchLog(BaseModel):
     id: str
     run_id: Optional[str] = None
@@ -111,6 +114,7 @@ class SearchLog(BaseModel):
     query: str
     source_api: str
     result_count: int = 0
+    status: SearchLogStatus = "searched_ok"
     rejected_reason: Optional[str] = None
     details_json: Optional[Dict[str, Any]] = None
     executed_at: str = Field(default_factory=now_utc_iso)
@@ -124,7 +128,7 @@ class GapMatrixEntry(BaseModel):
     academic_state: Optional[str] = "none found"
     enterprise_state: Optional[str] = "none found"
     field_state: Optional[str] = "none found"
-    outcome: Literal[1, 2, 3, 4]
+    outcome: Union[int, str] = 4
     rationale: Optional[str] = None
     status: str = "active"
     created_at: str = Field(default_factory=now_utc_iso)

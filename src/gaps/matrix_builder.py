@@ -73,9 +73,21 @@ class GapMatrixBuilder:
             elif src.lane == "practitioner":
                 field_claims.append(c)
 
+        # Determine whether lanes were actually searched
+        ent_logs = [s for s in search_logs if s.lane == "enterprise"]
+        ent_searched_ok = any(getattr(s, "status", "searched_ok") == "searched_ok" for s in ent_logs)
+
+        field_logs = [s for s in search_logs if s.lane == "practitioner"]
+        field_searched_ok = any(getattr(s, "status", "searched_ok") == "searched_ok" for s in field_logs)
+
+        acad_logs = [s for s in search_logs if s.lane == "academic"]
+        acad_searched_ok = any(getattr(s, "status", "searched_ok") == "searched_ok" for s in acad_logs)
+
         # Helper to determine lane state
-        def determine_state(claims: List[Claim], lane_name: str) -> str:
+        def determine_state(claims: List[Claim], lane_name: str, searched_ok: bool) -> str:
             if not claims:
+                if lane_name == "enterprise":
+                    return "none found" if searched_ok else "not searched"
                 return "none found"
 
             # Check for contradictions
@@ -85,6 +97,8 @@ class GapMatrixBuilder:
 
             active_claims = [c for c in claims if c.status != "rejected"]
             if not active_claims:
+                if lane_name == "enterprise":
+                    return "none found" if searched_ok else "not searched"
                 return "none found"
 
             if lane_name == "academic":
@@ -100,9 +114,9 @@ class GapMatrixBuilder:
 
             return "partial"
 
-        acad_state = determine_state(academic_claims, "academic")
-        ent_state = determine_state(enterprise_claims, "enterprise")
-        field_state = determine_state(field_claims, "practitioner")
+        acad_state = determine_state(academic_claims, "academic", acad_searched_ok or bool(academic_claims))
+        ent_state = determine_state(enterprise_claims, "enterprise", ent_searched_ok or bool(enterprise_claims))
+        field_state = determine_state(field_claims, "practitioner", field_searched_ok or bool(field_claims))
 
         # Check if enterprise lane consists solely of vendor sources
         only_vendor_sources = False
@@ -127,21 +141,28 @@ class GapMatrixBuilder:
         elif self.config:
             vendor_cap = self.config.get("vendor_only_max_outcome")
 
-        # Determine Outcome 1 to 4
-        outcome: int
+        # Determine Outcome: 1 to 4, or "Practice not assessed"
+        outcome: Union[int, str]
         rationale: str
 
         if acad_state in ("supported", "partial") and (ent_state in ("supported", "partial") or field_state in ("supported", "partial")):
-            if only_vendor_sources and field_state == "none found" and vendor_cap is not None:
+            if only_vendor_sources and field_state in ("none found", "not searched") and vendor_cap is not None:
                 outcome = min(2, vendor_cap)
                 rationale = "Outcome 2: Practice without evidence — Enterprise claims originate solely from vendor sources without independent empirical corroboration."
             else:
                 outcome = 1
                 rationale = "Outcome 1: Supported — Empirical academic research is corroborated by active enterprise practice."
-        elif (ent_state in ("supported", "partial") or field_state in ("supported", "partial")) and acad_state == "none found":
+        elif (ent_state in ("supported", "partial") or field_state in ("supported", "partial")) and acad_state in ("none found", "not searched"):
             outcome = 2
             rationale = "Outcome 2: Practice without evidence — Enterprise teams are actively adopting, but peer-reviewed empirical evidence is absent."
-        elif acad_state in ("supported", "partial") and ent_state == "none found" and field_state == "none found":
+        elif ent_state == "not searched" and not enterprise_claims and not field_claims:
+            # Rule A3-1: When Lane B was not searched, cannot assert Outcome 3 or 4
+            outcome = "Practice not assessed"
+            if acad_state in ("supported", "partial"):
+                rationale = "Practice not assessed: Academic research exists, but enterprise lane was not searched (no working fetcher implemented). Practice adoption cannot be determined."
+            else:
+                rationale = "Practice not assessed: Enterprise lane was not searched (no working fetcher implemented). Practice adoption cannot be determined."
+        elif acad_state in ("supported", "partial") and ent_state == "none found" and field_state in ("none found", "not searched"):
             outcome = 3
             rationale = "Outcome 3: Evidence without practice — Academic research demonstrates capabilities, but enterprise delivery measurement is missing."
         else:

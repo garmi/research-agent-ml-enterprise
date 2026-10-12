@@ -95,9 +95,9 @@ def test_canary_hospital_question_isolated_from_software_delivery_observations()
 
         # Gap Matrix must NOT be Outcome 1 (Supported)
         gap_res = results["gap_matrix"]
-        assert gap_res["field_state"] == "none found", f"Expected field_state 'none found', got {gap_res['field_state']}"
-        assert gap_res["enterprise_state"] == "none found", f"Expected enterprise_state 'none found', got {gap_res['enterprise_state']}"
-        assert gap_res["outcome"] in (3, 4), f"Expected Outcome 3 or 4, but got Outcome {gap_res['outcome']}"
+        assert gap_res["field_state"] in ("none found", "not searched"), f"Expected field_state 'none found' or 'not searched', got {gap_res['field_state']}"
+        assert gap_res["enterprise_state"] in ("none found", "not searched"), f"Expected enterprise_state 'none found' or 'not searched', got {gap_res['enterprise_state']}"
+        assert gap_res["outcome"] in (3, 4, "Practice not assessed"), f"Expected Outcome 3, 4 or Practice not assessed, but got Outcome {gap_res['outcome']}"
         assert gap_res["outcome"] != 1, "Hospital question must NEVER evaluate to Outcome 1 without enterprise or field claims!"
 
 

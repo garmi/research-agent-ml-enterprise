@@ -22,6 +22,7 @@ import json
 import logging
 import os
 import re
+import shutil
 import time
 import uuid
 from pathlib import Path
@@ -150,7 +151,15 @@ class MultiLaneResearchRunner:
     ):
         self.db_path = db_path
         self.practitioner_db_path = practitioner_db_path
-        self.questions_yaml_path = questions_yaml_path
+
+        # Isolate questions_yaml_path for test databases to avoid modifying the tracked register.yaml
+        if self.db_path != "ledger/ledger.db" and questions_yaml_path == "questions/register.yaml":
+            temp_q_yaml = os.path.join(os.path.dirname(self.db_path), "register.yaml")
+            if os.path.exists("questions/register.yaml") and not os.path.exists(temp_q_yaml):
+                shutil.copy("questions/register.yaml", temp_q_yaml)
+            self.questions_yaml_path = temp_q_yaml
+        else:
+            self.questions_yaml_path = questions_yaml_path
         self.sources_registry_path = sources_registry_path
         self.rules_path = rules_path
         self.venue_tiers_path = venue_tiers_path
@@ -766,6 +775,7 @@ class MultiLaneResearchRunner:
                 query=topic,
                 source_api=p.get("source") or "open_academic_repos",
                 result_count=len(selected),
+                status="searched_ok",
                 executed_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
             )
             self._safe_insert_search_log(slog)
@@ -779,6 +789,7 @@ class MultiLaneResearchRunner:
                 query=topic,
                 source_api="open_academic_repos",
                 result_count=0,
+                status="searched_ok",
                 executed_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
             )
             self._safe_insert_search_log(slog)
@@ -916,6 +927,8 @@ class MultiLaneResearchRunner:
                     logger.debug("Practitioner claim export note: %s", e)
 
         # Log search log for practitioner lane
+        existing_obs = prac_collector.list_observations(question_id=question_obj.id)
+        prac_status = "searched_ok" if (existing_obs or exported_claims) else "not_searched"
         slog = SearchLog(
             id=f"slog_prac_{uuid.uuid4().hex[:10]}",
             run_id=run_id,
@@ -924,6 +937,7 @@ class MultiLaneResearchRunner:
             query=topic,
             source_api="practitioner_field_notes_sqlite",
             result_count=len(exported_claims),
+            status=prac_status,
             executed_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
         )
         self._safe_insert_search_log(slog)
@@ -1150,8 +1164,14 @@ class MultiLaneResearchRunner:
             2: "Outcome 2: Practice Without Evidence (Enterprise Active, Academic Void)",
             3: "Outcome 3: Evidence Without Practice (Academic Proven, Enterprise Unmeasured)",
             4: "Outcome 4: Unmeasured (Thin Evidence Across Lanes)",
+            "Practice not assessed": "Practice not assessed: Enterprise lane not searched (no working fetcher)",
+            "practice_not_assessed": "Practice not assessed: Enterprise lane not searched (no working fetcher)",
         }
-        outcome_int = int(getattr(gap_entry, "outcome", 1))
+        outcome_raw = getattr(gap_entry, "outcome", 1)
+        if isinstance(outcome_raw, int) or (isinstance(outcome_raw, str) and outcome_raw.isdigit()):
+            outcome_val = int(outcome_raw)
+        else:
+            outcome_val = str(outcome_raw)
 
         # Derive all user-facing presentation items strictly from output_sentences
         ui_findings = [{"id": s.id, "text": s.text} for s in sentences if s.type in ("finding", "assertive")]
@@ -1278,8 +1298,8 @@ class MultiLaneResearchRunner:
                 "academic_state": getattr(gap_entry, "academic_state", "supported"),
                 "enterprise_state": getattr(gap_entry, "enterprise_state", "supported"),
                 "field_state": getattr(gap_entry, "field_state", "supported"),
-                "outcome": outcome_int,
-                "outcome_label": outcome_names.get(outcome_int, f"Outcome {outcome_int}"),
+                "outcome": outcome_val,
+                "outcome_label": outcome_names.get(outcome_val, f"Outcome {outcome_val}" if isinstance(outcome_val, int) else str(outcome_val)),
                 "rationale": getattr(gap_entry, "rationale", ""),
             },
             "lane_breakdown": {
