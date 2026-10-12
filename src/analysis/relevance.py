@@ -9,6 +9,7 @@ STOPWORDS = {
     "those", "we", "our", "you", "your", "they", "their", "the", "a", "an", "in",
     "on", "at", "to", "of", "with", "do", "does", "did", "effectively", "maximize",
     "maximise", "pro", "license", "best", "give", "show", "tell", "about",
+    "and", "or", "from", "as", "into", "between", "among", "regarding", "exists", "exist",
 }
 
 TOPIC_HINTS = {

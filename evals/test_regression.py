@@ -544,6 +544,365 @@ def test_r12_practitioner_claim_unabstracted_blocked(test_env):
         assert "Gate 6 Abstraction Violation" in str(exc_info.value)
 
 
+def test_r15_d1_canned_findings_rejected(test_env):
+    """R15: Output sentences must never contain the D1 hardcoded canned strings."""
+    sentence = OutputSentence(
+        id="s_canned",
+        output_id="out1",
+        ordinal=1,
+        text="Empirical velocity increases by 32% across standard delivery tasks [P1].",
+        type="assertive",
+        claim_ids_json=[],
+    )
+    checker, _ = test_env
+    res = checker.check_output([sentence], {})
+    assert not res.g1_pass
+    assert not res.passed
+
+
+def test_r16_d2_silent_fallback_prevented_and_sanitized():
+    """R16: Runtime errors during synthesis must be captured with sanitized details, blocking publication."""
+    import tempfile
+    from pathlib import Path
+    from src.analysis.multilane_runner import MultiLaneResearchRunner
+    from src.ledger.migrations import apply_migrations
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = str(Path(tmpdir) / "test_ledger.db")
+        prac_db_path = str(Path(tmpdir) / "test_prac.db")
+        apply_migrations(db_path=db_path)
+        apply_migrations(db_path=prac_db_path)
+        runner = MultiLaneResearchRunner(
+            db_path=db_path,
+            practitioner_db_path=prac_db_path,
+        )
+        res = runner.run_workflow(
+            topic="Test topic for fallback verification",
+            depth="Fast",
+            tone="Executive",
+            map_provider="stub",
+            reduce_provider="stub",
+            academic_papers_override=[],
+        )
+        assert res.get("generation_mode") == "extractive_fallback"
+        assert res["publish_res"]["allowed"] is False
+        assert res["publish_res"]["status"] in ("NOT_PUBLISHABLE", "BLOCKED")
+
+
+def test_r17_d3_uncited_assertive_sentence_fails_g1_unless_negative_finding(test_env):
+    """R17: An assertive sentence without claims fails G1; negative_finding with search_log passes."""
+    checker, _ = test_env
+
+    # 1. Uncited assertive sentence
+    s_uncited = OutputSentence(
+        id="s_uncited",
+        output_id="out1",
+        ordinal=1,
+        text="The evidence does not support claims of complete autonomous lifecycle displacement without human oversight.",
+        type="assertive",
+        claim_ids_json=[],
+    )
+    res1 = checker.check_output([s_uncited], {})
+    assert not res1.g1_pass
+    assert not res1.passed
+
+    # 2. Negative finding with search_log_id
+    s_neg = OutputSentence(
+        id="s_neg",
+        output_id="out1",
+        ordinal=2,
+        text="No empirical evidence identified across academic literature for this topic.",
+        type="negative_finding",
+        claim_ids_json=[],
+        checks_json={"search_log_id": "slog_123"},
+    )
+    res2 = checker.check_output([s_neg], {})
+    assert res2.g1_pass
+
+
+def test_r18_d3_template_verb_stutter_detected():
+    """R18: Sentences with doubled verb phrases ('suggests that The study reports that') must fail linting."""
+    from src.synth.generator import lint_output_text
+
+    stutter_sentences = [
+        OutputSentence(
+            id="s_stutter",
+            output_id="out1",
+            ordinal=1,
+            text="Empirical literature suggests that The study reports that developer velocity improved.",
+            type="assertive",
+            claim_ids_json=["c1"],
+        )
+    ]
+    is_clean, violations = lint_output_text(stutter_sentences)
+    assert not is_clean, "Expected lint failure on template verb stutter"
+    assert any("Template verb stutter detected" in v for v in violations)
+
+
+def test_r19_d4_practitioner_observation_leakage_prevented():
+    """R19: Practitioner observations entered for Question A must not leak into Question B."""
+    import tempfile
+    from pathlib import Path
+    from src.collectors.practitioner.collector import PractitionerCollector
+    from src.ledger.migrations import apply_migrations
+    from src.ledger.models import Question
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        prac_db = str(Path(tmpdir) / "test_prac.db")
+        apply_migrations(db_path=prac_db)
+        col = PractitionerCollector(db_path=prac_db)
+
+        q1 = Question(id="q1", text="Question One (Software)")
+        q2 = Question(id="q2", text="Question Two (Healthcare)")
+        col.repo.insert_question(q1)
+        col.repo.insert_question(q2)
+
+        col.add_observation(
+            question_id="q1",
+            situation="140 enterprise microservices migration",
+            decision="Enforced gate",
+            action="Executed deployment",
+            outcome="No regressions",
+            sector="software",
+            abstraction_confirmed=True,
+        )
+
+        q2_obs = col.repo.list_claims(question_id="q2")
+        assert len(q2_obs) == 0, f"Leaked observations into Q2: {q2_obs}"
+
+
+def test_r20_d4_registry_counted_as_sources_not_claims():
+    """R20: Enterprise feeds are counted as sources, not claims; vendor-only sources cap at Outcome 2."""
+    import tempfile
+    from pathlib import Path
+    from src.gaps.matrix_builder import GapMatrixBuilder
+    from src.ledger.migrations import apply_migrations
+    from src.ledger.models import Claim, Question, Source
+    from src.ledger.repository import LedgerRepository
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = str(Path(tmpdir) / "test_ledger.db")
+        apply_migrations(db_path=db_path)
+        repo = LedgerRepository(db_path=db_path)
+        builder = GapMatrixBuilder(db_path=db_path, rules_path="grade/rules.yaml")
+
+        q = Question(id="q-reg", text="Enterprise feed test")
+        repo.insert_question(q)
+
+        # Peer-reviewed academic source
+        acad_src = Source(
+            id="src_acad", lane="academic", source_type="peer_reviewed",
+            title="Academic Research", venue="ACM", venue_tier="verified",
+            commercial_stake="none", status="active",
+        )
+        repo.insert_source(acad_src)
+        repo.insert_claim(
+            Claim(
+                id="c_acad", question_id=q.id, source_id=acad_src.id,
+                text="Academic claim", source_excerpt="Academic excerpt",
+                grade="strong", status="approved",
+            )
+        )
+
+        # Vendor-only enterprise sources
+        for i in range(4):
+            v_src = Source(
+                id=f"src_v{i}", lane="enterprise", source_type="vendor_blog",
+                title=f"Vendor Blog {i}", venue_tier="unverified", commercial_stake="vendor", status="active",
+            )
+            repo.insert_source(v_src)
+            repo.insert_claim(
+                Claim(
+                    id=f"c_v{i}", question_id=q.id, source_id=v_src.id, text=f"Vendor claim {i}",
+                    source_excerpt=f"Vendor claim excerpt {i}",
+                    grade="vendor_claim", context_json={"source_stake": "vendor"}, status="approved",
+                )
+            )
+
+        entry = builder.evaluate_question_lanes(question_id=q.id, run_id="run_reg")
+        assert entry.outcome == 2, f"Expected Outcome 2 due to vendor capping, got {entry.outcome}"
+        assert "vendor" in entry.rationale.lower()
+
+
+def test_r21_d5_stale_year_rejected_at_retrieval():
+    """R21: Papers published before min_year (2020) must be rejected with year_below_minimum."""
+    import tempfile
+    from pathlib import Path
+    from src.analysis.multilane_runner import MultiLaneResearchRunner
+    from src.ledger.migrations import apply_migrations
+    from src.ledger.models import Question, Run
+    from src.ledger.repository import LedgerRepository
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = str(Path(tmpdir) / "test_ledger.db")
+        prac_db = str(Path(tmpdir) / "test_prac.db")
+        apply_migrations(db_path=db_path)
+        apply_migrations(db_path=prac_db)
+        runner = MultiLaneResearchRunner(db_path=db_path, practitioner_db_path=prac_db)
+        repo = LedgerRepository(db_path=db_path)
+
+        q = Question(id="q-stale", text="Modern AI adoption in teams")
+        repo.insert_question(q)
+        run = Run(id="run-stale", question_id=q.id, engine="stub", status="completed")
+        repo.insert_run(run)
+
+        stale_paper = {
+            "id": "paper-stale-2008",
+            "title": "A Technology Acceptance Study in Legacy Systems",
+            "abstract": "We explore user acceptance of automation frameworks in corporate settings.",
+            "year": 2008,
+            "venue": "Legacy Journal",
+            "url": "https://doi.org/10.1000/2008.01",
+        }
+
+        harvested = runner._harvest_academic_lane(
+            topic="Modern AI adoption in teams",
+            query_limit=1,
+            max_per_query=5,
+            max_papers=5,
+            override=[stale_paper],
+            question_id=q.id,
+            run_id=run.id,
+        )
+        assert len(harvested) == 0, "Stale paper from 2008 should have been rejected"
+
+        logs = repo.list_search_logs(question_id="q-stale")
+        rejected_logs = [l for l in logs if l.rejected_reason and "year_below_minimum" in l.rejected_reason]
+        assert len(rejected_logs) > 0, "Expected search_log with year_below_minimum rejection"
+
+
+def test_r22_d5_venue_never_equals_api_provider_name():
+    """R22: Resolved venue must never display API provider names like 'Crossref' or 'Semantic Scholar'."""
+    from src.analysis.multilane_runner import resolve_honest_venue_and_type
+
+    raw_paper = {
+        "title": "Study on Software Systems",
+        "venue": "Crossref",
+        "container_title": "IEEE Transactions on Software Engineering",
+        "publisher": "IEEE",
+    }
+    venue, stype = resolve_honest_venue_and_type(raw_paper)
+    assert venue != "Crossref", f"Venue should not be 'Crossref', got '{venue}'"
+    assert "IEEE" in venue
+    assert stype in ("Peer-Reviewed Journal", "Conference", "Preprint")
+
+
+def test_r23_d6_contradictory_status_banner_blocked():
+    """R23: QualityScorer with failing gates must yield BLOCKED, not publishable, and never DO_NOT_PUBLISH."""
+    from src.score.checker import GateCheckResult
+    from src.score.scorer import QualityScorer
+
+    scorer = QualityScorer()
+    gate_fail = GateCheckResult()
+    gate_fail.g1_pass = False
+    gate_fail.violations["G1"].append("Uncited assertive sentence")
+    score_res = scorer.calculate_score(gate_result=gate_fail, sentences=[], ledger_claims={}, sources={}, questions=[])
+
+    assert score_res["band"] in ("BLOCKED", "NOT_PUBLISHABLE")
+    assert score_res["band"] != "DO_NOT_PUBLISH"
+    assert score_res["is_blocked"] is True
+
+
+def test_r24_d7_unconfirmed_practitioner_abstraction_blocks_gate_6():
+    """R24: Custom practitioner observations without human sign-off must fail Gate 6 and block publication."""
+    import tempfile
+    from pathlib import Path
+    from src.analysis.multilane_runner import MultiLaneResearchRunner
+    from src.ledger.migrations import apply_migrations
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = str(Path(tmpdir) / "test_ledger.db")
+        prac_db = str(Path(tmpdir) / "test_prac.db")
+        apply_migrations(db_path=db_path)
+        apply_migrations(db_path=prac_db)
+        questions_yaml = str(Path(tmpdir) / "register.yaml")
+        runner = MultiLaneResearchRunner(db_path=db_path, practitioner_db_path=prac_db, questions_yaml_path=questions_yaml)
+
+        res = runner.run_workflow(
+            topic="How do engineering teams prevent latency regressions?",
+            depth="Fast",
+            tone="Executive",
+            map_provider="stub",
+            reduce_provider="stub",
+            custom_prac_urls=["Incident observation: unconfirmed private database dump"],
+            practitioner_abstraction_confirmed=False,
+            academic_papers_override=[],
+        )
+        assert res["publish_res"]["status"] == "BLOCKED"
+        assert "Gate 6: Practitioner abstraction not confirmed by operator." in (
+            res["publish_res"].get("reason", "") + " " + str(res["publish_res"].get("gate_results", {}).get("violations", {}))
+        )
+
+
+def test_r25_d8_unsourced_roadmap_numerals_fail_g2(test_env):
+    """R25: Roadmap statements containing numbers (e.g. 20%, 80%) not grounded in claims fail Gate 2."""
+    checker, _ = test_env
+
+    claim = Claim(
+        id="c_general",
+        source_id="src_p1",
+        text="Teams reported improvements in workflow efficiency.",
+        source_excerpt="Improvements in efficiency.",
+        grade="moderate",
+    )
+    roadmap_sentence = OutputSentence(
+        id="s_road",
+        output_id="out1",
+        ordinal=1,
+        text="Target milestone: achieve a Cycle time reduction of 20% and Developer adoption > 80%.",
+        type="assertive",
+        claim_ids_json=["c_general"],
+    )
+    res = checker.check_output([roadmap_sentence], {"c_general": claim})
+    assert not res.g2_pass, "Expected G2 Numeric Fidelity failure for ungrounded numbers 20% and 80%"
+    assert not res.passed
+    assert any("20%" in v or "80%" in v for v in res.violations["G2"])
+
+
+def test_r26_wrong_topic_paper_citation_blocked(test_env):
+    """R26: Citing a healthcare paper for a software engineering question fails Gate 1 Support Check 3."""
+    from src.ledger.models import Question
+    checker, _ = test_env
+
+    health_claim = Claim(
+        id="c_health_1",
+        source_id="src_health",
+        text="The EU AI Act specifies implications and compliance guidance for healthcare facilities.",
+        source_excerpt="The EU AI Act outlines compliance guidance for healthcare facilities.",
+        value_json={"value": "32%", "unit": "%"},
+        entity="EU AI Act Healthcare",
+        grade="moderate",
+    )
+    soft_sentence = OutputSentence(
+        id="s_mismatch",
+        output_id="out1",
+        ordinal=1,
+        text="Empirical velocity increases by 32% across standard delivery tasks in engineering teams.",
+        type="assertive",
+        claim_ids_json=["c_health_1"],
+    )
+    source = Source(
+        id="src_health",
+        lane="academic",
+        source_type="peer_reviewed",
+        title="The EU AI Act: implications and compliance guidance for healthcare facilities",
+    )
+    question = Question(
+        id="q_soft",
+        text="What empirical evidence exists regarding Amazon Kiro adoption, productivity gains, and delivery trade-offs in engineering teams?",
+    )
+
+    res = checker.check_output(
+        sentences=[soft_sentence],
+        ledger_claims={"c_health_1": health_claim},
+        sources={"src_health": source},
+        question=question,
+    )
+    assert not res.g3_pass or not res.passed, "Expected Gate failure due to source-to-question topic mismatch (D1 defect)"
+    assert any("Source topic mismatch" in v or "citation support check" in v for v in res.violations["G3"])
+
+
+
 
 
 

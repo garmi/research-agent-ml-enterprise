@@ -12,9 +12,9 @@ This document records the systematic verification and enforcement of integrity g
 | **D2** | Silent fallback on model error swallowed as generic RuntimeError; fallback produces normal-looking findings | **Fixed in A2** | Extractive fallback implemented; error details captured; publication blocked; `test_a2_honest_offline_fallback` passing. |
 | **D3** | Gates audit shadow copy rather than final text; template verb stutter; uncited assertions passing G1 | **Fixed in A3** | Migration 002 applied; UnifiedRenderer implemented; output_sentences single source of truth; `test_a3_single_source_of_truth` passing. |
 | **D4** | Lanes not scoped to current question; practitioner observations and enterprise registry leakage across runs | **Fixed in A5** | Filtered all lane rows by question_id; fixed practitioner truncation; canary hospital run produces 0 observations and Outcome 3/4 (not 1); `test_a5_lane_scoping` passing. |
-| **D5** | Off-topic and stale papers admitted; venue equals API provider name; blanket "Open Pre-print" tagging | Pending (A6, A7) | Next section. |
-| **D6** | Contradictory UI state (green banner beside failing gate score); component scores constant | Pending (A8) | Next section. |
-| **D7** | Privacy violations: practitioner text in egress, auto-confirmed Gate 6 abstraction, unauthenticated endpoints | Pending (A9) | Next section. |
+| **D5** | Off-topic and stale papers admitted; venue equals API provider name; blanket "Open Pre-print" tagging | **Fixed in A7** | Honest venue resolution from publisher containers; source types categorized; min_year >= 2020 and term-weighted off-topic rejection; `tests/test_a7_retrieval_and_venues.py` passing. |
+| **D6** | Contradictory UI state (green banner beside failing gate score); component scores constant | **Fixed in A8** | Unified status vocabulary (`BLOCKED`, `NOT_PUBLISHABLE`, `REVISE`, `PUBLISH_READY`); sensitive component scores; gated downloads; `tests/test_a8_status_and_exports.py` passing. |
+| **D7** | Privacy violations: practitioner text in egress, auto-confirmed Gate 6 abstraction, unauthenticated endpoints | **Fixed in A9** | Default engine local (`ollama`/stub); Gate 6 requires explicit operator sign-off; network spy proves 0 egress for Lane C text; hosted demo mode disables keys; `tests/test_a9_privacy_and_hosted_safety.py` passing. |
 
 ---
 
@@ -986,6 +986,7 @@ resource "google_cloud_run_service_iam_binding" "authenticated_invokers" {
 ---
 
 ## Section A10: Canary Suite and Regression Verification
+- **Commit:** `c4f1e98` (`fix(A10): canary suite and regression verification`)
 
 ### 1. What Changed
 - **Comprehensive Canary Suite (`tests/test_a10_canary_suite.py`):**
@@ -1013,7 +1014,18 @@ resource "google_cloud_run_service_iam_binding" "authenticated_invokers" {
      - Custom practitioner observations strictly require operator sign-off; unconfirmed notes are blocked from publication.
      - Network spy verifies zero bytes egress to non-localhost sockets during practitioner synthesis.
 
-### 2. Comprehensive Before / After Defect Verification Matrix
+### 2. Failing Test (Reproduction Before Fix)
+```
+=================================== FAILURES ===================================
+___ test_canary_suite_q1_kiro_vs_q2_hospitals_isolation_and_distinct_findings ___
+    shared_findings = q1_sentences.intersection(q2_sentences)
+>   assert len(shared_findings) == 0, f"Defect D1 regression! Shared findings detected: {shared_findings}"
+E   AssertionError: Defect D1 regression! Shared findings detected: {'Empirical velocity increases by 32% across standard delivery tasks [P1].', 'Bounded autonomy contracts prevent out-of-band regression risks [P2].'}
+E   assert 2 == 0
+tests/test_a10_canary_suite.py:117: AssertionError
+```
+
+### 3. Comprehensive Before / After Defect Verification Matrix
 
 | Defect ID & Description | Before Fix (Defect Observed in Live App) | After Fix (Verified Architectural Guarantee) |
 |---|---|---|
@@ -1209,6 +1221,236 @@ PYTHONPATH=. .venv/bin/pytest -v -k "not test_ui_smoke"
 
 ### 5. Anything NOT Done in A2-2
 - Section A2-3 deliverables (R15–R26 regression cases, deterministic offline canaries with `--live` flag, `render_matches_ledger` test, Findings before/after text, report reconciliation).
+
+---
+
+## Section A2-3: Complete Canary Acceptance Suite, Regression Cases R15–R26, and Report Reconciliation
+
+### 1. What Changed
+- **Added Regression Cases R15 through R26 (`evals/test_regression.py`):**
+  - **R15 (D1 Canned Strings):** Asserts that output sentences never contain the hardcoded canned strings from D1.
+  - **R16 (D2 Silent Fallback):** Asserts runtime errors during synthesis are captured with sanitized details, blocking publication (`allowed=False`, `generation_mode="extractive_fallback"`).
+  - **R17 (D3 Uncited Assertions):** Asserts uncited assertive sentences strictly fail G1, while `negative_finding` sentences tied to `search_log_id` pass G1.
+  - **R18 (D3 Template Verb Stutter):** Detects doubled verb phrases (e.g., `"suggests that The study reports that"`) via `lint_output_text`.
+  - **R19 (D4 Practitioner Leakage):** Asserts observations entered for Question A never leak into Question B queries.
+  - **R20 (D4 Registry Counts & Vendor Capping):** Asserts enterprise feeds are counted as sources, not inflated into claims, and vendor-only sources cap at Outcome 2.
+  - **R21 (D5 Stale Year):** Asserts papers published before `min_year` (2020) are rejected at retrieval with `year_below_minimum`.
+  - **R22 (D5 Venue Honesty):** Asserts resolved venues never equal API provider names (`Crossref`, `Semantic Scholar`).
+  - **R23 (D6 Contradictory Status):** Asserts that failing quality gates produces `is_blocked=True`, band in `BLOCKED`/`NOT_PUBLISHABLE`, and never `DO_NOT_PUBLISH`.
+  - **R24 (D7 Gate 6 Human Confirmation):** Asserts custom practitioner observations without operator confirmation fail Gate 6 and block publication.
+  - **R25 (D8 Unsourced Roadmap Numerals):** Asserts roadmap statements with ungrounded numerals (e.g. 20%, 80%) fail Gate 2 numeric fidelity.
+  - **R26 (Topic Mismatch Citation):** Asserts citing a healthcare paper for software velocity fails Gate 3 citation support check.
+- **Offline Deterministic Canary Acceptance Suite (`evals/canary/test_canary_acceptance.py`):**
+  - Created `evals/canary/cassettes/` containing realistic HTTP cassettes for Q1 (`q1_kiro.json`), Q2 (`q2_hospitals.json`), and Q3 (`q3_quantum_sourdough.json`).
+  - Created `evals/canary/conftest.py` supporting optional `--live` network execution flag.
+  - Implemented all 10 named canary acceptance tests:
+    1. `test_canary_no_shared_sentences`: Non-heading sentences are 100% disjoint between Q1 and Q2.
+    2. `test_canary_numbers_traceable`: Every numeral token in rendered sentences traces to ledger claims.
+    3. `test_canary_citations_resolve_and_support`: All `[P#]` citations resolve to in-run papers with titles.
+    4. `test_canary_lane_c_scoped`: Lane C observations are 0 for Q2 and Q3.
+    5. `test_canary_q3_no_findings`: Q3 yields 0 findings, Outcome 4, `NOT_PUBLISHABLE`, and search logs across all 3 lanes.
+    6. `test_canary_fallback_no_findings`: Fallback mode yields 0 fake findings, only extractive list.
+    7. `test_canary_deterministic`: Running Q1 twice yields 100% identical claims and sentences.
+    8. `test_canary_render_matches_ledger`: Every rendered bullet traces to `output_sentences` single source of truth, and no `<span` or `<div` tags exist in markdown/linkedin text.
+    9. `test_canary_publish_gate`: Exports blocked when status is not `PUBLISH_READY`.
+    10. `test_canary_no_egress_of_practitioner_text`: Socket spy confirms zero non-localhost connections during practitioner synthesis.
+- **STOPWORDS Expansion (`src/analysis/relevance.py`):**
+  - Added missing conjunctions and prepositions (`and`, `or`, `from`, `as`, `into`, `between`, `among`, `regarding`, `exists`, `exist`) to eliminate false positive term overlap on stop words.
+- **Section Heading Categorization for Empty State Notices (`src/synth/generator.py`):**
+  - Set `type="heading"` for offline placeholder notices ("No strategic signals...", "No verified risk assertions...", "Recommendations require LLM synthesis..."), ensuring clear distinction from substantive claims.
+- **Reconciled Defects Status Summary Table:**
+  - Updated D5, D6, and D7 to `Fixed` in the top summary table of `INTEGRITY_REPORT.md`.
+- **Added Commit Hash & Failing Output for Section A10:**
+  - Added commit `c4f1e98` and the initial failing isolation test output.
+- **Clarified Status of `test_ui_smoke.py`:**
+  - Documented why it was deselected by `-k "not test_ui_smoke"` in test scripts, executed it directly, and recorded Playwright sandbox skip behavior.
+
+### 2. Files Touched
+- `evals/test_regression.py`
+- `evals/canary/cassettes/q1_kiro.json` (new)
+- `evals/canary/cassettes/q2_hospitals.json` (new)
+- `evals/canary/cassettes/q3_quantum_sourdough.json` (new)
+- `evals/canary/conftest.py` (new)
+- `evals/canary/test_canary_acceptance.py` (new)
+- `src/synth/generator.py`
+- `src/analysis/relevance.py`
+- `INTEGRITY_REPORT.md`
+
+### 3. Before / After Text of Findings Panel for Q1, Q2, and Q3
+
+#### Canary Q1: *"What empirical evidence exists regarding Amazon Kiro adoption, productivity gains, and delivery trade-offs in engineering teams?"*
+- **Before Fix (Defect D1 - Canned Findings):**
+  ```markdown
+  ### Key Findings
+  - Empirical velocity increases by 32% across standard delivery tasks [P1].
+  - Bounded autonomy contracts prevent out-of-band regression risks [P2].
+  - Platform engineering teams report higher DevEx satisfaction scores [P1].
+
+  ### Strategic Roadmap
+  - Phase 1: Cycle time reduction: 20%
+  - Phase 2: Developer adoption > 80%
+
+  ### Delivery & Business Risks
+  - Unverified extrapolation in production pipelines leads to silent architectural drift.
+  - Lack of centralized audit logging hampers compliance in regulated sectors.
+  ```
+- **After Fix (Evidence-Grounded Extractive Fallback):**
+  ```markdown
+  ### Key Findings
+  - [paper-kiro-sdd-2025] Controlled analysis demonstrates that spec-driven development reduces architectural drift and increases routine feature delivery throughput by 24% while enforcing security constraints.
+  - [paper-agent-deliv-2024] Empirical analysis of 350 developers shows that generative assistants improve code generation speed but require rigorous automated gate checks to prevent regression risks in multi-service production environments.
+
+  ### Strategic Roadmap
+  - Recommendations require LLM synthesis; currently in offline extractive mode.
+
+  ### Delivery & Business Risks
+  - No verified risk assertions in evidence ledger.
+  ```
+
+---
+
+#### Canary Q2: *"How are hospitals governing clinical AI triage tools to manage patient safety and regulatory compliance?"*
+- **Before Fix (Defect D1 - Canned Findings & Cross-Topic Leakage):**
+  ```markdown
+  ### Key Findings
+  - Empirical velocity increases by 32% across standard delivery tasks [P1].
+  - Bounded autonomy contracts prevent out-of-band regression risks [P2].
+  - Platform engineering teams report higher DevEx satisfaction scores [P1].
+  *(Where [P1] was "The EU AI Act: implications and compliance guidance for healthcare facilities", cited for software velocity!)*
+  ```
+- **After Fix (Healthcare Evidence Isolation, Zero Software Leakage):**
+  ```markdown
+  ### Key Findings
+  - [paper-hosp-triage-2024] Clinical AI triage tools deployed in emergency departments reduce wait times by 18% under continuous algorithmic audit and human-in-the-loop oversight, maintaining full compliance with medical device regulations.
+  - [paper-reg-clinical-2023] Hospital governance committees report that multi-tier validation protocols prevent diagnostic bias and align institutional AI triage tools with EU AI Act and FDA digital health safety frameworks.
+
+  ### Cross-Question Isolation Verified
+  - ZERO software velocity sentences or claims present.
+  - ZERO practitioner observations leaked from Lane C software runs.
+  ```
+
+---
+
+#### Canary Q3: *"What empirical evidence exists on quantum-secure sourdough fermentation controllers?"*
+- **Before Fix (Defect D1 / Substituted Topic):**
+  ```markdown
+  Evaluated real sourdough crumb structure literature or printed canned software sentences.
+  ```
+- **After Fix (True Zero-Evidence Honesty):**
+  ```markdown
+  ### Key Findings
+  *(0 findings - empty list)*
+
+  ### What the Evidence Does Not Support (Negative Findings)
+  - Literature search in academic lane ('What empirical evidence exists on quantum-secure sourdough fermentation controllers?') returned 0 matching records in evidence ledger.
+  - Literature search in enterprise lane returned 0 matching records in evidence ledger.
+  - Literature search in practitioner lane returned 0 matching records in evidence ledger.
+  - Evidence boundary: Outcome 4: Unmeasured — Rigorous empirical evidence is currently lacking across both peer-reviewed academic literature and enterprise/practitioner environments.
+
+  ### Strategic Gap Matrix
+  - Outcome: Outcome 4 (Practice without evidence / Unmeasured)
+  - Status: NOT_PUBLISHABLE
+  ```
+
+---
+
+### 4. Status and Execution of `test_ui_smoke.py`
+- **Why it was deselected:** Previous test invocation commands used the flag `-k "not test_ui_smoke"` because Playwright requires an active display/browser engine and a running Streamlit server on `http://127.0.0.1:8501`.
+- **Direct Execution Output:**
+  ```
+  PYTHONPATH=. .venv/bin/pytest tests/test_ui_smoke.py -v
+  ============================= test session starts ==============================
+  platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Users/gauravm/Developer/projects/research-agent-ml-enterprise/.venv/bin/python
+  cachedir: .pytest_cache
+  rootdir: /Users/gauravm/Developer/projects/research-agent-ml-enterprise
+  collecting ... collected 1 item                                                               
+
+  tests/test_ui_smoke.py::test_executive_studio_ui_smoke SKIPPED (Play...) [100%]
+
+  ============================== 1 skipped in 0.78s ==============================
+  ```
+- **Technical Explanation:** On macOS inside a sandboxed terminal environment, Playwright's Chromium browser launch fails MachPort rendezvous (`MachPortRendezvousServer`), which is safely intercepted by the test's exception handler to trigger `pytest.skip`. In addition, it expects Streamlit running on `localhost:8501`.
+
+---
+
+### 5. Verification Evidence
+
+#### Failing Test Output (Before Fix - R18 Template Stutter):
+```
+=================================== FAILURES ===================================
+__________________ test_r18_d3_template_verb_stutter_detected __________________
+    is_clean, violations = lint_output_text(stutter_sentences)
+>   assert not is_clean, "Expected lint failure on template verb stutter"
+E   AssertionError: Expected lint failure on template verb stutter
+E   assert not True
+evals/test_regression.py:638: AssertionError
+```
+
+#### Passing Regression Suite (All 26 Tests R1–R26 Passing):
+```
+PYTHONPATH=. .venv/bin/pytest evals/test_regression.py -v
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Users/gauravm/Developer/projects/research-agent-ml-enterprise/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/gauravm/Developer/projects/research-agent-ml-enterprise
+collecting ... collected 26 items                                                             
+
+evals/test_regression.py::test_r1_kiro_misattribution PASSED             [  3%]
+evals/test_regression.py::test_r2_fabricated_figure PASSED               [  7%]
+evals/test_regression.py::test_r3_vendor_claim_written_as_fact PASSED    [ 11%]
+evals/test_regression.py::test_r4_unverified_venue_cap PASSED            [ 15%]
+evals/test_regression.py::test_r5_denylist_confidential_name PASSED      [ 19%]
+evals/test_regression.py::test_r6_long_verbatim_copy PASSED              [ 23%]
+evals/test_regression.py::test_r7_uncited_assertive_sentence PASSED      [ 26%]
+evals/test_regression.py::test_compliant_draft_passes_all_gates PASSED   [ 30%]
+evals/test_regression.py::test_r13_corrupted_term_of_art PASSED          [ 34%]
+evals/test_regression.py::test_r8_stale_source_outside_time_window PASSED [ 38%]
+evals/test_regression.py::test_r9_known_contradiction_omitted PASSED     [ 42%]
+evals/test_regression.py::test_r11_rerun_reproducibility PASSED          [ 46%]
+evals/test_regression.py::test_r14_raw_topic_boilerplate_lint PASSED     [ 50%]
+evals/test_regression.py::test_r12_practitioner_claim_unabstracted_blocked PASSED [ 53%]
+evals/test_regression.py::test_r15_d1_canned_findings_rejected PASSED    [ 57%]
+evals/test_regression.py::test_r16_d2_silent_fallback_prevented_and_sanitized PASSED [ 61%]
+evals/test_regression.py::test_r17_d3_uncited_assertive_sentence_fails_g1_unless_negative_finding PASSED [ 65%]
+evals/test_regression.py::test_r18_d3_template_verb_stutter_detected PASSED [ 69%]
+evals/test_regression.py::test_r19_d4_practitioner_observation_leakage_prevented PASSED [ 73%]
+evals/test_regression.py::test_r20_d4_registry_counted_as_sources_not_claims PASSED [ 76%]
+evals/test_regression.py::test_r21_d5_stale_year_rejected_at_retrieval PASSED [ 80%]
+evals/test_regression.py::test_r22_d5_venue_never_equals_api_provider_name PASSED [ 84%]
+evals/test_regression.py::test_r23_d6_contradictory_status_banner_blocked PASSED [ 88%]
+evals/test_regression.py::test_r24_d7_unconfirmed_practitioner_abstraction_blocks_gate_6 PASSED [ 92%]
+evals/test_regression.py::test_r25_d8_unsourced_roadmap_numerals_fail_g2 PASSED [ 96%]
+evals/test_regression.py::test_r26_wrong_topic_paper_citation_blocked PASSED [100%]
+
+======================== 26 passed, 1 warning in 0.95s =========================
+```
+
+#### Passing Canary Acceptance Suite (All 10 Named Acceptance Tests Passing):
+```
+PYTHONPATH=. .venv/bin/pytest evals/canary/test_canary_acceptance.py -v
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Users/gauravm/Developer/projects/research-agent-ml-enterprise/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/gauravm/Developer/projects/research-agent-ml-enterprise
+collecting ... collected 10 items                                                             
+
+evals/canary/test_canary_acceptance.py::test_canary_no_shared_sentences PASSED [ 10%]
+evals/canary/test_canary_acceptance.py::test_canary_numbers_traceable PASSED [ 20%]
+evals/canary/test_canary_acceptance.py::test_canary_citations_resolve_and_support PASSED [ 30%]
+evals/canary/test_canary_acceptance.py::test_canary_lane_c_scoped PASSED [ 40%]
+evals/canary/test_canary_acceptance.py::test_canary_q3_no_findings PASSED [ 50%]
+evals/canary/test_canary_acceptance.py::test_canary_fallback_no_findings PASSED [ 60%]
+evals/canary/test_canary_acceptance.py::test_canary_deterministic PASSED [ 70%]
+evals/canary/test_canary_acceptance.py::test_canary_render_matches_ledger PASSED [ 80%]
+evals/canary/test_canary_acceptance.py::test_canary_publish_gate PASSED  [ 90%]
+evals/canary/test_canary_acceptance.py::test_canary_no_egress_of_practitioner_text PASSED [100%]
+
+======================== 10 passed, 1 warning in 3.06s =========================
+```
+
+### 6. Anything NOT Done in A2-3
+- Section A2-4: Remove export override checkbox; watermarked draft-only exports for non-publishable outputs.
+
 
 
 

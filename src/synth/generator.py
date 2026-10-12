@@ -55,6 +55,13 @@ def lint_output_text(
                 )
             seen_texts.add(norm_text)
 
+        # Check for template verb stutter (doubled verb phrases, D3 / R18)
+        if s.type == "assertive":
+            if re.search(r"\b(suggests|reports|finds|indicates|shows|states|demonstrates)\s+that\s+(the\s+(?:study|paper|author|literature)\s+)?(suggests|reports|finds|indicates|shows|states|demonstrates)\s+that", norm_text):
+                violations.append(
+                    f"R18 Lint Violation: Template verb stutter detected: '{text}'"
+                )
+
     return len(violations) == 0, violations
 
 
@@ -241,7 +248,7 @@ class SynthesisEngine:
                     output_id=output_id,
                     ordinal=ordinal,
                     text="No strategic signals in evidence ledger.",
-                    type="signal",
+                    type="heading",
                 )
             )
             ordinal += 1
@@ -279,7 +286,7 @@ class SynthesisEngine:
                     output_id=output_id,
                     ordinal=ordinal,
                     text="No verified risk assertions in evidence ledger.",
-                    type="risk",
+                    type="heading",
                 )
             )
             ordinal += 1
@@ -383,7 +390,7 @@ class SynthesisEngine:
                     output_id=output_id,
                     ordinal=ordinal,
                     text="Recommendations require LLM synthesis; currently in offline extractive mode.",
-                    type="roadmap",
+                    type="heading",
                 )
             )
             ordinal += 1
