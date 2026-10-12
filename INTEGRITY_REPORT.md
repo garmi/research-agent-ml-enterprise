@@ -2079,3 +2079,90 @@ collected 4 items
 tests/test_a14_search_log_honesty_and_unsearched_lanes.py ....           [100%]
 ============================== 4 passed in 0.52s ===============================
 ```
+
+---
+
+## A3-2. Build Real Enterprise Retrieval for at Least Three Sources
+
+### 1. Requirements & Architecture
+- **Mandate:** Implement real automated fetchers for at least three enterprise sources in `collectors/enterprise/sources_registry.yaml`, stopping at three that work. Honour terms/robots.txt, enforce per-domain rate limiting and local caching with TTL, truncate excerpts to $\le 25$ words max, classify vendor sources as `venue_tier='vendor'` and `commercial_stake='vendor'`, apply weighted question relevance filtering matching Lane A, and log real search statuses.
+- **Implemented Sources (Stopping Rule: First 3 Working Sources):**
+  1. `aws-dev-blog`: AWS Developer Blog RSS syndication (`https://aws.amazon.com/blogs/developer/feed/`).
+  2. `ms-engineering-blog`: Microsoft Engineering Blog RSS syndication (`https://devblogs.microsoft.com/engineering-at-microsoft/feed/`).
+  3. `google-cloud-blog`: Google Cloud Blog RSS syndication (`https://cloudblog.withgoogle.com/rss/`).
+- **Unimplemented Sources (Documented Rationale):**
+  4. `sec-edgar-filings`: Left `status="not_implemented"`. The SEC EDGAR REST submissions API provides filings organized by CIK company identifier, not ad-hoc semantic keyword search across document bodies. The EFTS web search endpoint blocks scripted scrapers without commercial headers and CAPTCHA handling.
+  5. `dora-dev-survey`: Left `status="not_implemented"`. Annual DORA research is published as monolithic PDF reports and interactive web decks without standard RSS/Atom syndication or an open public API.
+- **Components Built:**
+  - `src/collectors/enterprise/feed_fetcher.py`: `EnterpriseFeedFetcher` handling XML RSS/Atom parsing, rate limiting (`_rate_limit`), file-based caching with TTL in `data/cache/enterprise/`, and excerpt length enforcement (`strip_html_and_truncate(text, max_words=25)`).
+  - `src/collectors/enterprise/collector.py`: Wired `feed_fetcher`, added `get_implemented_fetcher_ids()`, weighted question relevance filter matching Lane A semantics (`_is_item_relevant`), ensured unique claim IDs (`c_{src_id}_{item_idx}_{c_idx}`), and logged real search statuses (`searched_ok`, `searched_error`, `not_implemented`).
+  - `DECISIONS.md`: Added DEC-014 documenting stopping rule and rationales.
+
+### 2. Files Changed
+- `src/collectors/enterprise/feed_fetcher.py` (new)
+- `src/collectors/enterprise/collector.py`
+- `collectors/enterprise/sources_registry.yaml`
+- `DECISIONS.md`
+- `tests/test_a15_real_enterprise_retrieval.py` (new)
+- `INTEGRITY_REPORT.md`
+
+### 3. Tests & Evidence
+
+#### Failing Test Output (Before Fix):
+```
+FAILED tests/test_a15_real_enterprise_retrieval.py::test_enterprise_fetchers_record_searched_ok_and_filter_excerpts
+AssertionError: Expected at least 3 implemented fetchers, got []
+```
+
+#### Passing Test Output (After Fix):
+```
+PYTHONPATH=. .venv/bin/pytest tests/test_a15_real_enterprise_retrieval.py tests/test_a14_search_log_honesty_and_unsearched_lanes.py tests/test_a6_enterprise_honesty.py tests/test_multilane_workflow.py -v
+============================= test session starts ==============================
+tests/test_a15_real_enterprise_retrieval.py::test_enterprise_fetchers_record_searched_ok_and_filter_excerpts PASSED [ 10%]
+tests/test_a15_real_enterprise_retrieval.py::test_enterprise_caching_and_rate_limiting PASSED [ 20%]
+tests/test_a14_search_log_honesty_and_unsearched_lanes.py::test_search_log_migration_has_status_column PASSED [ 30%]
+tests/test_a14_search_log_honesty_and_unsearched_lanes.py::test_unimplemented_enterprise_sources_log_not_implemented PASSED [ 40%]
+tests/test_a14_search_log_honesty_and_unsearched_lanes.py::test_gap_matrix_outcome_is_practice_not_assessed_when_enterprise_unsearched PASSED [ 50%]
+tests/test_a14_search_log_honesty_and_unsearched_lanes.py::test_multilane_runner_negative_findings_honest_language_for_unsearched_lanes PASSED [ 60%]
+tests/test_a6_enterprise_honesty.py::test_enterprise_sources_and_claims_schema_integrity PASSED [ 70%]
+tests/test_a6_enterprise_honesty.py::test_sources_and_claims_counted_separately_in_runner_payload PASSED [ 80%]
+tests/test_a6_enterprise_honesty.py::test_only_vendor_sources_caps_outcome_at_two PASSED [ 90%]
+tests/test_multilane_workflow.py::test_multilane_workflow_execution PASSED [100%]
+========================= 10 passed, 1 warning in 1.45s =========================
+```
+
+#### Live Canary Q1 Retrieval Output:
+Live execution against production feeds with `allow_live=True`:
+```
+=== LIVE SEARCH LOGS ===
+Source: aws-dev-blog        | Status: searched_ok      | Results: 6
+Source: ms-engineering-blog | Status: searched_ok      | Results: 4
+Source: google-cloud-blog   | Status: searched_ok      | Results: 4
+Source: sec-edgar-filings   | Status: not_implemented  | Results: 0
+Source: dora-dev-survey     | Status: not_implemented  | Results: 0
+
+=== RETRIEVED CLAIMS (<= 25 words max excerpt) ===
+ID: c_aws-dev-blog_2_1 | Source: aws-dev-blog
+Excerpt: AI coding agents such as Kiro, Claude Code, Codex, Cursor, and others play an increasingly important role in developer workflows. (Location: Abstract)
+
+ID: c_aws-dev-blog_3_1 | Source: aws-dev-blog
+Excerpt: Amazon Bedrock AgentCore is a managed service for running AI agents in production. (Location: Abstract)
+
+ID: c_ms-engineering-blog_1_1 | Source: ms-engineering-blog
+Excerpt: Aditya Challapally leads post-training research and infrastructure for Copilot agent capabilities that process millions of multimodal interactions. (Location: Abstract)
+
+ID: c_ms-engineering-blog_2_1 | Source: ms-engineering-blog
+Excerpt: Discover how treating AI agents as collaborators, not automation, transforms engineering workflows and accelerates complex projects The post The Interaction Changes Everything: Treating AI Agents
+
+ID: c_google-cloud-blog_1_1 | Source: google-cloud-blog
+Excerpt: Co-authors: Stenal Jolly , Strategic Cloud Engineer, Google Anubhav Dhawan , Software Engineer, Google Following the landmark announcement of MCP Toolbox v1.0, we're thrilled to
+
+ID: c_google-cloud-blog_3_1 | Source: google-cloud-blog
+Excerpt: For modern AI and RAG applications, achieving high search relevance requires that you combine at least two techniques: vector search for semantic context, and full-text
+```
+
+#### Full Test Suite Status (108 Passed, 1 Skipped, 0 Regressions):
+```
+================== 108 passed, 1 skipped, 1 warning in 17.95s ==================
+```
+

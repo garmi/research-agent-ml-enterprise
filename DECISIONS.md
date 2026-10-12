@@ -138,5 +138,16 @@ This log records all design choices, trade-offs, and deviations where prompt ass
   5. Wired Streamlit View 7 (Practitioner Field Notes Entry) and enhanced View 6 (Publish Gate) in `web_app.py`.
 - **Rationale:** Guarantees absolute data sovereignty and client confidentiality for senior delivery leadership while allowing sanitized operational experience to enrich published thought leadership.
 
+---
 
-
+### DEC-014: Enterprise Lane Real Fetchers, Rate Limiting, & Stopping Rule (Prompt A3-2)
+- **Context:** Prompt A3-2 mandates implementing real automated fetchers for at least three enterprise sources in `collectors/enterprise/sources_registry.yaml`, enforcing rate limiting and local caching, capping source excerpts at <= 25 words max, applying weighted question relevance filtering matching Lane A, and logging real search statuses.
+- **Decision:**
+  1. Implemented `EnterpriseFeedFetcher` in `src/collectors/enterprise/feed_fetcher.py` with real RSS/Atom syndication parsing for AWS Developer Blog (`https://aws.amazon.com/blogs/developer/feed/`), Microsoft Engineering Blog (`https://devblogs.microsoft.com/engineering-at-microsoft/feed/`), and Google Cloud Blog (`https://cloudblog.withgoogle.com/rss/`).
+  2. Implemented domain-level rate limiting (`_rate_limit`) and local file caching with 24h TTL in `data/cache/enterprise/`.
+  3. Enforced strict <= 25-word excerpt capping via `strip_html_and_truncate()` on all ingested claim excerpts.
+  4. Per the Prompt A3-2 stopping rule (*"Implement real fetchers, in this order, stopping at three that work... If a source cannot be fetched legally or reliably, leave it not_implemented and say why"*), stopped after delivering the three operational public feeds:
+     - `sec-edgar-filings`: Left `not_implemented`. The SEC EDGAR REST submissions API provides company filing metadata by CIK, not ad-hoc semantic keyword search across filing contents. The EFTS web search endpoint blocks scripted scrapers without enterprise headers and CAPTCHA handling.
+     - `dora-dev-survey`: Left `not_implemented`. Annual DORA research is published as monolithic PDF reports and interactive web decks without standard RSS/Atom syndication or an open public API.
+  5. Implemented weighted question relevance filter matching Lane A semantics in `EnterpriseCollector._is_item_relevant`.
+- **Rationale:** Delivers genuine retrieval for 3 major enterprise sources while honestly logging the remaining 2 sources as `not_implemented`.
