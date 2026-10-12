@@ -572,9 +572,11 @@ def test_r16_d2_silent_fallback_prevented_and_sanitized():
         prac_db_path = str(Path(tmpdir) / "test_prac.db")
         apply_migrations(db_path=db_path)
         apply_migrations(db_path=prac_db_path)
+        questions_yaml = str(Path(tmpdir) / "register.yaml")
         runner = MultiLaneResearchRunner(
             db_path=db_path,
             practitioner_db_path=prac_db_path,
+            questions_yaml_path=questions_yaml,
         )
         res = runner.run_workflow(
             topic="Test topic for fallback verification",
@@ -738,7 +740,8 @@ def test_r21_d5_stale_year_rejected_at_retrieval():
         prac_db = str(Path(tmpdir) / "test_prac.db")
         apply_migrations(db_path=db_path)
         apply_migrations(db_path=prac_db)
-        runner = MultiLaneResearchRunner(db_path=db_path, practitioner_db_path=prac_db)
+        questions_yaml = str(Path(tmpdir) / "register.yaml")
+        runner = MultiLaneResearchRunner(db_path=db_path, practitioner_db_path=prac_db, questions_yaml_path=questions_yaml)
         repo = LedgerRepository(db_path=db_path)
 
         q = Question(id="q-stale", text="Modern AI adoption in teams")

@@ -1451,6 +1451,84 @@ evals/canary/test_canary_acceptance.py::test_canary_no_egress_of_practitioner_te
 ### 6. Anything NOT Done in A2-3
 - Section A2-4: Remove export override checkbox; watermarked draft-only exports for non-publishable outputs.
 
+---
+
+## Section A2-4: Watermarked Draft-Only Exports for Non-Publishable Outputs and Override Removal
+
+### 1. Defect Description & Requirements
+- **Defect:** The `--force` checkbox (`"⚠️ Enable \`--force\` override to download unverified/blocked artifacts"`) in `web_app.py` allowed users to bypass governance gates and download all five publication deliverables (Executive Brief, Evidence Ledger, Paper Index, LinkedIn Pack, and HTML Presentation Deck) regardless of status or gate failures.
+- **Requirement:**
+  1. Remove the `--force` override checkbox completely.
+  2. For `BLOCKED` status: Absolutely zero exports are allowed (all download buttons disabled, no overrides).
+  3. For non-`PUBLISH_READY` status (e.g. `NOT_PUBLISHABLE`, `REVISE`): Only draft exports (`.md` and `.json`) are permitted, watermarked with `"DRAFT, NOT FOR PUBLICATION"` and listing failing gates at the top. LinkedIn pack and presentation deck are strictly disabled until `PUBLISH_READY`.
+  4. For `PUBLISH_READY` status: All five deliverables enabled without watermarks.
+  5. Test watermarks in both draft formats (`.md` and `.json`).
+
+### 2. Files Changed
+- `src/publish/export_policy.py`: Created export permissions evaluation service (`evaluate_export_permissions`, `ExportPermissions`).
+- `src/output/unified_renderer.py`: Added `render_draft_markdown(failing_gates, status)` and `to_draft_json_dict(failing_gates, status)`.
+- `src/output/report_builder.py`: Added `build_draft_markdown(topic, synthesis, failing_gates, status)`.
+- `web_app.py`: Removed `--force` override checkbox; integrated `evaluate_export_permissions`; disabled LinkedIn pack, deck, and CSV for non-publishable outputs; served watermarked draft `.md` and `.json` when in draft status; disabled all 5 exports when `BLOCKED`.
+- `tests/test_a8_status_and_exports.py`: Added comprehensive unit tests for markdown draft watermark, json draft watermark, export permissions policy, and removal of `--force` override.
+- `evals/test_regression.py`: Fixed `MultiLaneResearchRunner` test isolation in `test_r16` and `test_r21` to use ephemeral `questions_yaml_path`.
+
+### 3. Tests Added
+- `test_draft_watermark_in_markdown_format`: Confirms markdown draft export has `# DRAFT, NOT FOR PUBLICATION` and lists failing gates at top.
+- `test_draft_watermark_in_json_format`: Confirms JSON draft export contains top-level `"watermark": "DRAFT, NOT FOR PUBLICATION"`, `"is_draft": true`, and `"failing_gates"` array.
+- `test_export_permissions_blocked_and_draft_and_publish_ready`: Verifies:
+  - `BLOCKED`: zero downloads allowed (`can_download_draft=False`, `can_download_full=False`).
+  - `NOT_PUBLISHABLE`: only draft `.md` and `.json` permitted (`can_download_draft=True`, `can_download_full=False`, `can_download_deck=False`, `can_download_linkedin=False`).
+  - `PUBLISH_READY`: all formats permitted.
+- `test_web_app_removes_force_override_checkbox`: Verifies source code of `web_app.py` has no trace of `--force`, `force_export`, or `"Override Gate & Download Draft"`.
+
+### 4. Verification Evidence
+
+#### Failing Test Output (Before Fix):
+```
+=================================== FAILURES ===================================
+___________________ test_draft_watermark_in_markdown_format ____________________
+    renderer = UnifiedRenderer(...)
+>   md_draft = renderer.render_draft_markdown(failing_gates=failing_gates, status="NOT_PUBLISHABLE")
+E   AttributeError: 'UnifiedRenderer' object has no attribute 'render_draft_markdown'
+
+_____________________ test_draft_watermark_in_json_format ______________________
+    renderer = UnifiedRenderer(...)
+>   json_draft = renderer.to_draft_json_dict(failing_gates=failing_gates, status="NOT_PUBLISHABLE")
+E   AttributeError: 'UnifiedRenderer' object has no attribute 'to_draft_json_dict'
+
+_________ test_export_permissions_blocked_and_draft_and_publish_ready __________
+>   from src.publish.export_policy import evaluate_export_permissions
+E   ModuleNotFoundError: No module named 'src.publish.export_policy'
+
+_________________ test_web_app_removes_force_override_checkbox _________________
+    web_app_code = Path("web_app.py").read_text(encoding="utf-8")
+>   assert "--force" not in web_app_code
+E   assert '--force' not in 'from __futu....rerun()\n\n'
+```
+
+#### Passing Test Output (After Fix):
+```
+PYTHONPATH=. .venv/bin/pytest tests/test_a8_status_and_exports.py -v
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/gauravm/Developer/projects/research-agent-ml-enterprise
+collected 7 items
+
+tests/test_a8_status_and_exports.py::test_unified_status_vocabulary_and_no_do_not_publish PASSED [ 14%]
+tests/test_a8_status_and_exports.py::test_scorer_yields_distinct_scores_for_different_evidence_sets PASSED [ 28%]
+tests/test_a8_status_and_exports.py::test_export_files_not_written_to_disk_when_publish_gate_fails PASSED [ 42%]
+tests/test_a8_status_and_exports.py::test_draft_watermark_in_markdown_format PASSED [ 57%]
+tests/test_a8_status_and_exports.py::test_draft_watermark_in_json_format PASSED [ 71%]
+tests/test_a8_status_and_exports.py::test_export_permissions_blocked_and_draft_and_publish_ready PASSED [ 85%]
+tests/test_a8_status_and_exports.py::test_web_app_removes_force_override_checkbox PASSED [100%]
+
+========================= 7 passed, 1 warning in 0.44s =========================
+```
+
+### 5. Anything NOT Done in A2-4
+- Section A2-5: Evidence-based scoring metrics for S4, S6, and S7.
+
+
 
 
 

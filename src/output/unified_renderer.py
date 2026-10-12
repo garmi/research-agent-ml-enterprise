@@ -156,6 +156,27 @@ class UnifiedRenderer:
 
         return "\n".join(lines) + "\n"
 
+    def render_draft_markdown(
+        self,
+        failing_gates: Optional[List[str]] = None,
+        status: str = "NOT_PUBLISHABLE",
+    ) -> str:
+        """Render research_report.md watermarked as DRAFT with failing gates listed at top."""
+        header = [
+            "# DRAFT, NOT FOR PUBLICATION",
+            "",
+            "> **WARNING: DRAFT EXPORT ONLY — NOT FOR PUBLICATION**",
+            f"> **Quality Status:** {status}",
+            "> **Failing Gates / Unmet Governance Criteria:**",
+        ]
+        if failing_gates:
+            for g in failing_gates:
+                header.append(f"> - {g}")
+        else:
+            header.append("> - Output has not met PUBLISH_READY composite quality criteria (≥ 85)")
+        header.extend(["", "---", ""])
+        return "\n".join(header) + "\n" + self.render_markdown()
+
     def render_linkedin_pack(self) -> str:
         """Render linkedin_professional_pack.md strictly from output_sentences."""
         findings_block = "\n".join(f"- {f.text}" for f in self.findings) if self.findings else "- No verified empirical findings available."
@@ -243,6 +264,26 @@ class UnifiedRenderer:
             "papers": self.papers,
             "metadata": self.metadata,
         }
+
+    def to_draft_json_dict(
+        self,
+        failing_gates: Optional[List[str]] = None,
+        status: str = "NOT_PUBLISHABLE",
+    ) -> Dict[str, Any]:
+        """Produce full JSON dictionary watermarked as DRAFT with failing gates listed."""
+        data = self.to_json_dict()
+        data["watermark"] = "DRAFT, NOT FOR PUBLICATION"
+        data["is_draft"] = True
+        data["status"] = status
+        data["failing_gates"] = failing_gates or ["Unmet PUBLISH_READY quality threshold"]
+        ordered = {
+            "watermark": data["watermark"],
+            "status": data["status"],
+            "failing_gates": data["failing_gates"],
+            "is_draft": True,
+        }
+        ordered.update(data)
+        return ordered
 
     def write_all(self) -> Dict[str, Path]:
         """Write all report deliverables to disk."""

@@ -141,6 +141,29 @@ class ReportBuilder:
 
         return "\n".join(sections) + "\n"
 
+    def build_draft_markdown(
+        self,
+        topic: str,
+        synthesis: Dict[str, Any],
+        failing_gates: Optional[List[str]] = None,
+        status: str = "NOT_PUBLISHABLE",
+    ) -> str:
+        """Render report markdown watermarked as DRAFT with failing gates listed at top."""
+        header = [
+            "# DRAFT, NOT FOR PUBLICATION",
+            "",
+            "> **WARNING: DRAFT EXPORT ONLY — NOT FOR PUBLICATION**",
+            f"> **Quality Status:** {status}",
+            "> **Failing Gates / Unmet Governance Criteria:**",
+        ]
+        if failing_gates:
+            for g in failing_gates:
+                header.append(f"> - {g}")
+        else:
+            header.append("> - Output has not met PUBLISH_READY composite quality criteria (≥ 85)")
+        header.extend(["", "---", ""])
+        return "\n".join(header) + "\n" + self.build_markdown(topic, synthesis)
+
     def write_markdown(self, topic: str, synthesis: Dict[str, Any], filename: str = "research_report.md") -> Path:
         content = self.build_markdown(topic, synthesis)
         path = self.reports_dir / filename

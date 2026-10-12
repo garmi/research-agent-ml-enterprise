@@ -39,6 +39,7 @@ from src.fetchers.semantic_scholar_client import SemanticScholarClient
 from src.llm.factory import build_llm
 from src.output.content_pack import ContentPackBuilder
 from src.output.report_builder import ReportBuilder
+from src.publish.export_policy import evaluate_export_permissions
 
 from src.ledger.service import LedgerService
 from src.ledger.ui_views import (
@@ -1859,23 +1860,55 @@ if results:
     )
 
     status = (results.get("publish_res", {}).get("status") or results.get("quality_scorecard", {}).get("band") or "NOT_PUBLISHABLE").upper()
-    is_publish_ready = (status == "PUBLISH_READY") and (results.get("publish_res", {}).get("allowed") is True)
+    is_allowed = results.get("publish_res", {}).get("allowed") is True
+    gate_violations = (results.get("gates_audit") or results.get("publish_res", {}).get("gate_results") or {}).get("violations", {})
+    pub_reasons = results.get("publish_res", {}).get("reasons", [])
+    quality_score = results.get("quality_scorecard", {}).get("total_score")
 
-    force_export = False
-    if not is_publish_ready:
-        st.warning(f"🔒 **Artifact Downloads Gated:** Current status is `{status}`. Publication packaging requires `PUBLISH_READY` status (composite quality score ≥ 85 and 100% G1–G6 gate compliance).")
-        force_export = st.checkbox("⚠️ Enable `--force` override to download unverified/blocked artifacts", value=False)
+    perm = evaluate_export_permissions(
+        status=status,
+        allowed=is_allowed,
+        gate_violations=gate_violations,
+        reasons=pub_reasons,
+        quality_score=quality_score,
+    )
 
-    can_download = is_publish_ready or force_export
+    if perm.is_blocked:
+        st.error(
+            f"🚫 **Export Prohibited (BLOCKED):** Hard governance gate violations prevent publication or draft generation. "
+            f"Failing gates: {', '.join(perm.failing_gates) if perm.failing_gates else 'Hard gate failures present'}. "
+            "No overrides are permitted."
+        )
+    elif not perm.can_download_full:
+        st.warning(
+            f"🔒 **Draft Export Only ({status}):** Output has not achieved `PUBLISH_READY` status. "
+            "Only watermarked draft deliverables (.md and .json) are available. "
+            "LinkedIn pack and presentation deck are disabled until publication gates pass."
+        )
 
     export_col1, export_col2, export_col3, export_col4, export_col5 = st.columns(5)
 
     builder = ReportBuilder()
     syn_raw = results.get("synthesis", {})
-    topic_str = st.session_state["current_question"]
-    brief_content = builder.build_markdown(topic_str, syn_raw) if syn_raw else f"# Executive Research Brief\n\n**Topic:** {topic_str}\n\n## Verdict\n{results['verdict']}\n"
-    json_content = json.dumps(syn_raw or results, indent=2)
-    papers_df = pd.DataFrame(results["papers"])
+    topic_str = st.session_state.get("current_question", results.get("strategic_question", "Executive Briefing"))
+
+    if perm.can_download_full:
+        brief_content = builder.build_markdown(topic_str, syn_raw) if syn_raw else f"# Executive Research Brief\n\n**Topic:** {topic_str}\n\n## Verdict\n{results.get('verdict', '')}\n"
+        json_content = json.dumps(syn_raw or results, indent=2)
+    elif perm.can_download_draft:
+        brief_content = builder.build_draft_markdown(topic_str, syn_raw, failing_gates=perm.failing_gates, status=status)
+        draft_json_obj = {
+            "watermark": "DRAFT, NOT FOR PUBLICATION",
+            "status": status,
+            "failing_gates": perm.failing_gates,
+        }
+        draft_json_obj.update(syn_raw or results)
+        json_content = json.dumps(draft_json_obj, indent=2)
+    else:
+        brief_content = ""
+        json_content = ""
+
+    papers_df = pd.DataFrame(results.get("papers", []))
     csv_content = papers_df.to_csv(index=False)
     linkedin_pack = builder.build_linkedin_pack(topic_str, syn_raw) if syn_raw else "# LinkedIn Executive Thought Leadership Pack\n\n"
     deck_path = Path("outputs/reports/strategic_storyline.html")
@@ -1883,20 +1916,20 @@ if results:
 
     with export_col1:
         st.download_button(
-            label="📄 Executive Brief (.md)",
+            label="📄 " + ("Executive Brief (.md)" if perm.can_download_full else "Draft Brief (.md)"),
             data=brief_content,
-            file_name="Executive_Research_Brief.md",
+            file_name="Executive_Research_Brief.md" if perm.can_download_full else "Executive_Research_Brief_DRAFT.md",
             mime="text/markdown",
-            disabled=not can_download,
+            disabled=not (perm.can_download_full or perm.can_download_draft),
             use_container_width=True,
         )
     with export_col2:
         st.download_button(
-            label="📊 JSON Ledger (.json)",
+            label="📊 " + ("JSON Ledger (.json)" if perm.can_download_full else "Draft Ledger (.json)"),
             data=json_content,
-            file_name="evidence_ledger.json",
+            file_name="evidence_ledger.json" if perm.can_download_full else "evidence_ledger_DRAFT.json",
             mime="application/json",
-            disabled=not can_download,
+            disabled=not (perm.can_download_full or perm.can_download_draft),
             use_container_width=True,
         )
     with export_col3:
@@ -1905,7 +1938,7 @@ if results:
             data=csv_content,
             file_name="paper_index.csv",
             mime="text/csv",
-            disabled=not can_download,
+            disabled=not perm.can_download_csv,
             use_container_width=True,
         )
     with export_col4:
@@ -1914,7 +1947,7 @@ if results:
             data=linkedin_pack,
             file_name="LinkedIn_Executive_Pack.md",
             mime="text/markdown",
-            disabled=not can_download,
+            disabled=not perm.can_download_linkedin,
             use_container_width=True,
         )
     with export_col5:
@@ -1923,7 +1956,7 @@ if results:
             data=deck_html,
             file_name="Executive_Deck.html",
             mime="text/html",
-            disabled=not can_download,
+            disabled=not perm.can_download_deck,
             use_container_width=True,
         )
 

@@ -177,3 +177,132 @@ def test_export_files_not_written_to_disk_when_publish_gate_fails():
 
         assert results["publish_res"]["status"] in ("blocked", "not_publishable", "BLOCKED", "NOT_PUBLISHABLE")
         assert results["publish_res"]["allowed"] is False
+
+
+def test_draft_watermark_in_markdown_format():
+    """Verify that draft markdown export contains 'DRAFT, NOT FOR PUBLICATION' and lists failing gates at top."""
+    from src.output.unified_renderer import UnifiedRenderer
+    from src.output.report_builder import ReportBuilder
+    from src.ledger.models import OutputDoc, OutputSentence
+
+    doc = OutputDoc(id="out_draft_1", question_id="q1", run_id="run1", status="draft", kind="field_note")
+    sentences = [
+        OutputSentence(id="s1", output_id="out_draft_1", ordinal=1, text="Empirical findings show adoption benefits.", type="finding", claim_ids_json=["c1"]),
+    ]
+    failing_gates = ["Gate 1: 1 ungrounded numeral assertion", "Gate 6: Unverified attribution"]
+
+    # 1. UnifiedRenderer draft markdown
+    renderer = UnifiedRenderer(
+        topic="AI Adoption Governance",
+        doc=doc,
+        sentences=sentences,
+        papers=[{"title": "Paper 1", "year": "2024"}],
+    )
+    md_draft = renderer.render_draft_markdown(failing_gates=failing_gates, status="NOT_PUBLISHABLE")
+
+    assert "# DRAFT, NOT FOR PUBLICATION" in md_draft
+    assert "Gate 1: 1 ungrounded numeral assertion" in md_draft
+    assert "Gate 6: Unverified attribution" in md_draft
+    # The watermark must be at the very top of the document
+    first_lines = md_draft.strip().split("\n")[:5]
+    assert any("DRAFT, NOT FOR PUBLICATION" in line for line in first_lines)
+
+    # 2. ReportBuilder draft markdown
+    builder = ReportBuilder()
+    syn = {
+        "executive_summary": "Executive summary draft.",
+        "key_findings": ["Finding 1"],
+    }
+    builder_md_draft = builder.build_draft_markdown(
+        topic="AI Adoption Governance",
+        synthesis=syn,
+        failing_gates=failing_gates,
+        status="NOT_PUBLISHABLE",
+    )
+    assert "# DRAFT, NOT FOR PUBLICATION" in builder_md_draft
+    assert "Gate 1: 1 ungrounded numeral assertion" in builder_md_draft
+    assert "Gate 6: Unverified attribution" in builder_md_draft
+
+
+def test_draft_watermark_in_json_format():
+    """Verify that draft JSON export contains top-level watermark and failing_gates."""
+    from src.output.unified_renderer import UnifiedRenderer
+    from src.ledger.models import OutputDoc, OutputSentence
+
+    doc = OutputDoc(id="out_draft_2", question_id="q1", run_id="run1", status="draft", kind="field_note")
+    sentences = [
+        OutputSentence(id="s1", output_id="out_draft_2", ordinal=1, text="Empirical findings show adoption benefits.", type="finding", claim_ids_json=["c1"]),
+    ]
+    failing_gates = ["Gate 2: Citation mismatch"]
+
+    renderer = UnifiedRenderer(
+        topic="AI Adoption Governance",
+        doc=doc,
+        sentences=sentences,
+        papers=[{"title": "Paper 1", "year": "2024"}],
+    )
+    json_draft = renderer.to_draft_json_dict(failing_gates=failing_gates, status="NOT_PUBLISHABLE")
+
+    assert json_draft.get("watermark") == "DRAFT, NOT FOR PUBLICATION"
+    assert json_draft.get("status") == "NOT_PUBLISHABLE"
+    assert json_draft.get("failing_gates") == failing_gates
+    assert "output_sentences" in json_draft
+
+
+def test_export_permissions_blocked_and_draft_and_publish_ready():
+    """Verify export permissions logic:
+    - BLOCKED: zero exports, no overrides allowed.
+    - NOT_PUBLISHABLE / REVISE: only draft .md and .json allowed, deck and linkedin disabled.
+    - PUBLISH_READY: all 5 exports allowed without watermarks.
+    """
+    from src.publish.export_policy import evaluate_export_permissions
+
+    # 1. BLOCKED
+    perm_blocked = evaluate_export_permissions(
+        status="BLOCKED",
+        allowed=False,
+        gate_violations={"G1": ["Traceability error"]},
+    )
+    assert perm_blocked.can_download_draft is False
+    assert perm_blocked.can_download_full is False
+    assert perm_blocked.can_download_deck is False
+    assert perm_blocked.can_download_linkedin is False
+    assert perm_blocked.can_download_csv is False
+    assert perm_blocked.is_blocked is True
+    assert "Traceability error" in str(perm_blocked.failing_gates)
+
+    # 2. NOT_PUBLISHABLE
+    perm_draft = evaluate_export_permissions(
+        status="NOT_PUBLISHABLE",
+        allowed=False,
+        gate_violations={},
+        reasons=["Quality score 62/100 below 85"],
+    )
+    assert perm_draft.can_download_draft is True
+    assert perm_draft.can_download_full is False
+    assert perm_draft.can_download_deck is False
+    assert perm_draft.can_download_linkedin is False
+    assert perm_draft.can_download_csv is False
+    assert perm_draft.is_blocked is False
+
+    # 3. PUBLISH_READY
+    perm_ready = evaluate_export_permissions(
+        status="PUBLISH_READY",
+        allowed=True,
+        gate_violations={},
+    )
+    assert perm_ready.can_download_draft is False
+    assert perm_ready.can_download_full is True
+    assert perm_ready.can_download_deck is True
+    assert perm_ready.can_download_linkedin is True
+    assert perm_ready.can_download_csv is True
+    assert perm_ready.is_blocked is False
+
+
+def test_web_app_removes_force_override_checkbox():
+    """Verify that web_app.py has completely removed the --force override checkbox."""
+    web_app_code = Path("web_app.py").read_text(encoding="utf-8")
+    assert "--force" not in web_app_code
+    assert "force_export" not in web_app_code
+    assert "Override Gate & Download Draft" not in web_app_code
+
