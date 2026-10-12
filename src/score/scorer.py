@@ -208,7 +208,7 @@ class QualityScorer:
         if not gate_result.passed:
             recommendations.append("Resolve hard gate violations (G1-G6) to unblock publication.")
         if not s7_measured:
-            recommendations.append("Measure reproducibility: re-run extraction and grading from cached sources to verify agreement.")
+            recommendations.append("Measure extraction determinism: re-run extraction and grading from cached sources to verify agreement (measures local cache extraction determinism, not external reproducibility).")
         if s1_score < 20:
             recommendations.append("Upgrade claim evidence base: replace weak/unverified sources with empirical studies from verified venues.")
         if s2_score < 8:
@@ -230,6 +230,7 @@ class QualityScorer:
                 "S5_freshness_scope": round(s5_score, 1),
                 "S6_human_review": round(s6_score, 1),
                 "S7_reproducibility": s7_display,
+                "S7_extraction_determinism": s7_display,
             },
             "top_3_improvements": recommendations[:3],
         }

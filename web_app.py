@@ -1798,7 +1798,7 @@ if results:
                 "S4_gap_disclosure": 10,
                 "S5_freshness_scope": 10,
                 "S6_human_review": 10,
-                "S7_term_integrity": 10,
+                "S7_extraction_determinism": 10,
             })
             s_df = [{"Component": k, "Score": v} for k, v in comp_scores.items()]
             render_safe_table(s_df, use_container_width=True)

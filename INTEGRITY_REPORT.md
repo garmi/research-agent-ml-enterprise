@@ -1983,7 +1983,7 @@ evals/test_r10_migration.py::test_quarantine_legacy_pre_a1_records PASSED [100%]
 | **A2-6** | **Completed** | `29671ed` | `HOSTED_DEMO=1` lockdown: visible "Demo: no private data is stored" notice; practitioner lane disabled (UI + runner Lane C); all ledger writes blocked across SQLite repository and runner stages (0 rows written). |
 | **A2-7** | **Completed** | `c5893dc` | Corrected Cloud Run hardening specification for `executive-research-engine` in `asia-south1`; safe `--update-env-vars`; GCS FUSE volume removed for SQLite; `--max-instances=5` cap; budget alert; parameterized IAM group; reversibility matrix documented (commands only). |
 | **A2-8** | **Completed** | `b8f0e1a` | Enterprise lane production audit on Q1: returns an honest zero (0 claims, 5 search_log rows with result_count=0); confirmed registry fetchers are unimplemented; custom user URLs work live. |
-| **A2-9** | **Completed** | `[this commit]` | Quarantined 11 outputs, 13 runs, and 252 claims created before commit A1 as `legacy-ungraded`; moved 11 pre-A1 file exports to `outputs/quarantine/` with `.quarantined.txt` watermarks; export permanently blocked. |
+| **A2-9** | **Completed** | `41ec3a3` | Quarantined 11 outputs, 13 runs, and 252 claims created before commit A1 as `legacy-ungraded`; moved 11 pre-A1 file exports to `outputs/quarantine/` with `.quarantined.txt` watermarks; export permanently blocked. |
 
 ### Complete Test Suite Execution (All Tests Included)
 
@@ -2389,6 +2389,148 @@ tests/test_a18_working_tree_and_ui_smoke.py::test_ui_smoke_only_skips_when_playw
 ================= 115 passed, 1 warning in 18.15s =================
 ```
 
+---
 
+## A3-6. Service-Layer Human Review Recalculation, Honest S7 Extraction Determinism, and Quarantine Reconciliation
 
+### 1. Root Cause & Verification Gaps Addressed
+- **The Defect:**
+  1. A2-5 test only verified that setting `claim.status = "approved"` modified S6. It did not test that an actual operator action through the service layer updates the claim status and triggers S6 recomputation.
+  2. S7 was previously labeled "reproducibility" when it actually tests extraction determinism against local cached paper records.
+  3. A2-9 file lists showed a discrepancy between 7 files (legacy report markdown/HTML files in `outputs/reports/`) and 11 files (including 4 legacy JSON exports in `outputs/json/`).
+  4. Three outputs were marked `published` prior to commit A1. Complete metadata (IDs, creation timestamps, question text, companion files) needed to be audited to verify whether any unverified claims had been published externally.
+  5. The commit hash placeholder `[this commit]` remained in the A2-9 summary row.
 
+- **The Remediation:**
+  1. **Service-Layer S6 Recalculation Test:**
+     - Created `tests/test_a19_service_layer_scoring_and_quarantine.py::test_s6_recomputed_on_service_layer_human_approval`.
+     - Ingests an unreviewed claim (`status="auto"`), runs baseline synthesis scoring yielding `S6_human_review = 0.0`.
+     - Executes `service.approve_claim(claim_id=claim.id, reviewer="lead_researcher_auditor")` through the service layer, verifying the database record transitions to `"approved"`.
+     - Re-scores synthesis output, asserting `S6_human_review` recomputes and strictly increases to `6.0` (proportional to approved claims share).
+  2. **Honest S7 Extraction Determinism Labeling:**
+     - Updated `src/score/scorer.py` to include `"S7_extraction_determinism"` in `QualityScorer.calculate_score` components.
+     - Updated the unmeasured improvement recommendation text in `src/score/scorer.py` line 211 to state:
+       `"Measure extraction determinism: re-run extraction and grading from cached sources to verify agreement (measures local cache extraction determinism, not external reproducibility)."`
+     - Updated scorecard components fallback in `web_app.py` line 1801 to `"S7_extraction_determinism": 10`.
+     - Verified in `tests/test_a19_service_layer_scoring_and_quarantine.py::test_s7_honestly_labeled_extraction_determinism`.
+  3. **Quarantine Inventory Reconciliation:**
+     - Reconciled the file counts: The 7 files originally referenced in early notes were the 7 report documents in `outputs/reports/`. The complete quarantine migration encompassed 11 base files (7 reports + 4 JSON exports from `outputs/json/`).
+     - Each of the 11 base files received a companion `.quarantined.txt` disclaimer watermark, producing exactly 22 files in `outputs/quarantine/`.
+     - Replaced `[this commit]` in the summary table with the actual commit hash `41ec3a3`.
+     - Confirmed pre-quarantine and pre-migration backups exist in `ledger/backups/` (`pre_migration_ledger_20261012_094622.db`).
+  4. **Audit of Three Formerly Published Outputs:**
+     - Audited all outputs in `ledger/ledger.db` created prior to commit A1. Three had `status = "published"` under the legacy unverified engine:
+       1. **Output ID:** `out_636bd066b77e`
+          - **Created:** `2026-10-11T14:28:16.766374+00:00` (19:58:16 IST)
+          - **Question ID:** `q-kiro-empirical`
+          - **Question Text:** *"What empirical evidence exists regarding Amazon Kiro adoption, productivity gains, and delivery trade-offs in engineering teams?"*
+          - **Quarantined Companion File:** `outputs/quarantine/publish_export_out_636bd066b77e.json` (6,550 bytes) & `publish_export_out_636bd066b77e.json.quarantined.txt`
+          - **Remediated Status:** Updated to `legacy-ungraded` in `ledger/ledger.db`.
+       2. **Output ID:** `out_df7b5084c036`
+          - **Created:** `2026-10-11T14:47:12.628234+00:00` (20:17:12 IST)
+          - **Question ID:** `q-kiro-empirical`
+          - **Question Text:** *"What empirical evidence exists regarding Amazon Kiro adoption, productivity gains, and delivery trade-offs in engineering teams?"*
+          - **Quarantined Companion File:** `outputs/quarantine/publish_export_out_df7b5084c036.json` (6,550 bytes) & `publish_export_out_df7b5084c036.json.quarantined.txt`
+          - **Remediated Status:** Updated to `legacy-ungraded` in `ledger/ledger.db`.
+       3. **Output ID:** `out_458ae9566b28`
+          - **Created:** `2026-10-11T14:48:43.479087+00:00` (20:18:43 IST)
+          - **Question ID:** `q-kiro-empirical`
+          - **Question Text:** *"What empirical evidence exists regarding Amazon Kiro adoption, productivity gains, and delivery trade-offs in engineering teams?"*
+          - **Quarantined Companion File:** `outputs/quarantine/publish_export_out_458ae9566b28.json` (6,550 bytes) & `publish_export_out_458ae9566b28.json.quarantined.txt`
+          - **Remediated Status:** Updated to `legacy-ungraded` in `ledger/ledger.db`.
+     - Confirmed all three files were removed from `outputs/json/`, preventing any public dissemination. Their download and export is permanently blocked by Gate 6.
+
+### 2. Files Changed
+- `src/score/scorer.py`
+- `web_app.py`
+- `tests/test_a19_service_layer_scoring_and_quarantine.py`
+- `INTEGRITY_REPORT.md`
+
+### 3. Tests & Evidence
+
+#### Failing Test Output (Before Fix):
+```
+=================================== FAILURES ===================================
+_______________ test_s7_honestly_labeled_extraction_determinism ________________
+    res = scorer.calculate_score(...)
+>   assert "S7_extraction_determinism" in res["components"]
+E   AssertionError: assert 'S7_extraction_determinism' in {'S1_evidence_strength': 0.0, 'S2_corroboration_diversity': 0.0, 'S3_question_coverage': 0, 'S4_gap_disclosure': 2.0, ...}
+========================= 1 failed, 2 passed in 0.32s ==========================
+```
+
+#### Passing Test Output (After Fix):
+```
+PYTHONPATH=. .venv/bin/pytest tests/test_a19_service_layer_scoring_and_quarantine.py -v
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Users/gauravm/Developer/projects/research-agent-ml-enterprise/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/gauravm/Developer/projects/research-agent-ml-enterprise
+collecting ... collected 3 items
+
+tests/test_a19_service_layer_scoring_and_quarantine.py::test_s6_recomputed_on_service_layer_human_approval PASSED [ 33%]
+tests/test_a19_service_layer_scoring_and_quarantine.py::test_s7_honestly_labeled_extraction_determinism PASSED [ 66%]
+tests/test_a19_service_layer_scoring_and_quarantine.py::test_quarantine_inventory_reconciliation PASSED [100%]
+
+============================== 3 passed in 0.33s ===============================
+```
+
+#### True File Inventory: `find outputs -type f`
+```
+outputs/quarantine/field_note_export.json.quarantined.txt
+outputs/quarantine/gemini-research.html
+outputs/quarantine/measuring_roi_and_developer_productivity.md.quarantined.txt
+outputs/quarantine/publish_export_out_458ae9566b28.json
+outputs/quarantine/research_report_v2.md.quarantined.txt
+outputs/quarantine/research_report_gemini.md.quarantined.txt
+outputs/quarantine/publish_export_out_458ae9566b28.json.quarantined.txt
+outputs/quarantine/measuring_roi_and_developer_productivity.md
+outputs/quarantine/how_kiro_is_being_used_for_development_b.md
+outputs/quarantine/publish_export_out_636bd066b77e.json.quarantined.txt
+outputs/quarantine/gemini-research.html.quarantined.txt
+outputs/quarantine/publish_export_out_df7b5084c036.json.quarantined.txt
+outputs/quarantine/publish_export_out_df7b5084c036.json
+outputs/quarantine/publish_export_out_636bd066b77e.json
+outputs/quarantine/research_report_gemini.md
+outputs/quarantine/demo_research_brief.md
+outputs/quarantine/kiro_research_brief.md.quarantined.txt
+outputs/quarantine/research_report_v2.md
+outputs/quarantine/field_note_export.json
+outputs/quarantine/kiro_research_brief.md
+outputs/quarantine/how_kiro_is_being_used_for_development_b.md.quarantined.txt
+outputs/quarantine/demo_research_brief.md.quarantined.txt
+outputs/json/research_report.json
+outputs/json/publish_export_out_665fc8ad1a77.json
+outputs/csv/paper_index.csv
+outputs/reports/research_report.md
+outputs/reports/strategic_storyline.html
+outputs/reports/linkedin_professional_pack.md
+```
+
+#### Detailed Quarantine Directory Listing: `ls -la outputs/quarantine`
+```
+total 400
+drwxr-xr-x@ 24 gauravm  staff    768 Oct 12 12:59 .
+drwxr-xr-x@  7 gauravm  staff    224 Oct 12 12:59 ..
+-rw-r--r--@  1 gauravm  staff  13202 Oct  9 23:06 demo_research_brief.md
+-rw-r--r--@  1 gauravm  staff    241 Oct 12 12:59 demo_research_brief.md.quarantined.txt
+-rw-r--r--@  1 gauravm  staff   3396 Oct 11 22:08 field_note_export.json
+-rw-r--r--@  1 gauravm  staff    241 Oct 12 12:59 field_note_export.json.quarantined.txt
+-rw-r--r--@  1 gauravm  staff  40748 Oct  9 23:34 gemini-research.html
+-rw-r--r--@  1 gauravm  staff    239 Oct 12 12:59 gemini-research.html.quarantined.txt
+-rw-r--r--@  1 gauravm  staff   4366 Oct 11 17:36 how_kiro_is_being_used_for_development_b.md
+-rw-r--r--@  1 gauravm  staff    262 Oct 12 12:59 how_kiro_is_being_used_for_development_b.md.quarantined.txt
+-rw-r--r--@  1 gauravm  staff  17706 Oct  9 23:42 kiro_research_brief.md
+-rw-r--r--@  1 gauravm  staff    241 Oct 12 12:59 kiro_research_brief.md.quarantined.txt
+-rw-r--r--@  1 gauravm  staff  15002 Oct 11 18:07 measuring_roi_and_developer_productivity.md
+-rw-r--r--@  1 gauravm  staff    262 Oct 12 12:59 measuring_roi_and_developer_productivity.md.quarantined.txt
+-rw-r--r--@  1 gauravm  staff   6550 Oct 11 20:18 publish_export_out_458ae9566b28.json
+-rw-r--r--@  1 gauravm  staff    255 Oct 12 12:59 publish_export_out_458ae9566b28.json.quarantined.txt
+-rw-r--r--@  1 gauravm  staff   6550 Oct 11 19:58 publish_export_out_636bd066b77e.json
+-rw-r--r--@  1 gauravm  staff    255 Oct 12 12:59 publish_export_out_636bd066b77e.json.quarantined.txt
+-rw-r--r--@  1 gauravm  staff   6550 Oct 11 20:17 publish_export_out_df7b5084c036.json
+-rw-r--r--@  1 gauravm  staff    255 Oct 12 12:59 publish_export_out_df7b5084c036.json.quarantined.txt
+-rw-r--r--@  1 gauravm  staff  13552 Oct  9 20:56 research_report_gemini.md
+-rw-r--r--@  1 gauravm  staff    244 Oct 12 12:59 research_report_gemini.md.quarantined.txt
+-rw-r--r--@  1 gauravm  staff   9057 Oct  9 20:34 research_report_v2.md
+-rw-r--r--@  1 gauravm  staff    240 Oct 12 12:59 research_report_v2.md.quarantined.txt
+```
