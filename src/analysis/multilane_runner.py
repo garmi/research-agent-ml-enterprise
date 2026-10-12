@@ -604,11 +604,40 @@ class MultiLaneResearchRunner:
             "empirical", "study", "analysis", "evaluation", "practice", "digital",
             "technology", "research", "engineering", "delivery", "trade-offs",
             "tradeoffs", "model", "models", "assessment", "implications",
-            "guidance", "perspective", "reforms", "information", "acceptance", "trade"
+            "guidance", "perspective", "reforms", "information", "acceptance", "trade", "development"
         ]))
-        min_weighted_overlap = float(research_cfg.get("min_weighted_overlap", 0.18))
+        min_weighted_overlap = float(research_cfg.get("min_weighted_overlap", 0.35))
         synonyms_cfg = research_cfg.get("head_term_synonyms", {})
         accepted_papers: List[Dict[str, Any]] = []
+
+        COMPANY_NAMES = {"amazon", "google", "microsoft", "meta", "apple", "ibm", "oracle"}
+        AGENT_BARE_TERMS = {"agent", "agents", "agentic"}
+        CODE_SOFTWARE_DEV_TERMS = {
+            "code", "coding", "software", "developer", "developers", "engineering",
+            "programmer", "programming", "repository", "repositories", "ide", "commit",
+            "copilot", "kiro", "sdd", "spec-driven", "assistant", "assistants"
+        }
+        SOFTWARE_CONTEXT_TERMS = CODE_SOFTWARE_DEV_TERMS | {"cloud", "bedrock", "ai", "llm", "triage", "clinical"}
+
+        def is_valid_company_match(company: str, p_text: str, p_tokens: Set[str]) -> bool:
+            comp = company.lower()
+            if comp not in COMPANY_NAMES:
+                return True
+            compound_phrases = (
+                f"{comp} kiro", f"{comp} bedrock", f"{comp} cloud", f"{comp} ai",
+                f"{comp} copilot", f"{comp} web services", "aws kiro", "aws cloud"
+            )
+            if any(phrase in p_text for phrase in compound_phrases):
+                return True
+            if comp == "amazon" and "aws" in p_tokens and bool(p_tokens & SOFTWARE_CONTEXT_TERMS):
+                return True
+            return bool(p_tokens & SOFTWARE_CONTEXT_TERMS)
+
+        def is_valid_agent_match(term: str, p_text: str, p_tokens: Set[str]) -> bool:
+            t = term.lower()
+            if t not in AGENT_BARE_TERMS:
+                return True
+            return bool(p_tokens & CODE_SOFTWARE_DEV_TERMS)
 
         stopwords = {
             "the", "and", "or", "of", "to", "in", "a", "an", "is", "for", "on", "with",
@@ -640,12 +669,21 @@ class MultiLaneResearchRunner:
         salient_q_terms = {w for w in q_tokens if w not in generic_words_list}
 
         # Extend head terms with configured domain synonyms (e.g. Kiro -> spec-driven)
-        extended_head_terms = set(salient_q_terms)
+        # Bare company names and bare agent terms are excluded from standalone head terms
+        extended_head_terms = {
+            t for t in salient_q_terms
+            if t not in COMPANY_NAMES and t not in AGENT_BARE_TERMS
+        }
         for key, syns in synonyms_cfg.items():
             if key.lower() in salient_q_terms or any(key.lower() in w for w in salient_q_terms):
                 for syn in syns:
                     for part in re.findall(r"\b[a-zA-Z0-9-]{2,}\b", syn.lower()):
-                        if part not in stopwords and part not in generic_words_list:
+                        if (
+                            part not in stopwords
+                            and part not in generic_words_list
+                            and part not in COMPANY_NAMES
+                            and part not in AGENT_BARE_TERMS
+                        ):
                             extended_head_terms.add(part)
 
         for p in selected:
@@ -673,20 +711,50 @@ class MultiLaneResearchRunner:
             p_text = f"{p.get('title', '')} {p.get('abstract', '')}".lower()
             p_tokens = set(re.findall(r"\b[a-zA-Z0-9-]{2,}\b", p_text))
 
-            # Match salient / head terms
-            matched_salient = {
-                t for t in salient_q_terms
-                if any(stems_match(t, pt) for pt in p_tokens)
-            }
-            matched_extended_head = {
-                t for t in extended_head_terms
-                if any(stems_match(t, pt) for pt in p_tokens)
-            }
-            has_head_phrase = any(
-                syn.lower() in p_text
-                for syns in synonyms_cfg.values() for syn in syns
-                if any(k.lower() in salient_q_terms for k in synonyms_cfg.keys())
-            )
+            # Match salient terms (with company and agent qualifications)
+            matched_salient = set()
+            for t in salient_q_terms:
+                for pt in p_tokens:
+                    if stems_match(t, pt):
+                        if t in COMPANY_NAMES and not is_valid_company_match(t, p_text, p_tokens):
+                            continue
+                        if t in AGENT_BARE_TERMS and not is_valid_agent_match(t, p_text, p_tokens):
+                            continue
+                        matched_salient.add(t)
+                        break
+
+            matched_extended_head = set()
+            for t in extended_head_terms:
+                for pt in p_tokens:
+                    if stems_match(t, pt):
+                        if t in COMPANY_NAMES and not is_valid_company_match(t, p_text, p_tokens):
+                            continue
+                        if t in AGENT_BARE_TERMS and not is_valid_agent_match(t, p_text, p_tokens):
+                            continue
+                        matched_extended_head.add(t)
+                        break
+
+            has_head_phrase = False
+            for syns in synonyms_cfg.values():
+                for syn in syns:
+                    syn_lower = syn.lower()
+                    if " " in syn_lower:
+                        if syn_lower in p_text:
+                            parts = set(syn_lower.split())
+                            comp_in_phrase = parts & COMPANY_NAMES
+                            if comp_in_phrase and not any(is_valid_company_match(c, p_text, p_tokens) for c in comp_in_phrase):
+                                continue
+                            agent_in_phrase = parts & AGENT_BARE_TERMS
+                            if agent_in_phrase and not any(is_valid_agent_match(a, p_text, p_tokens) for a in agent_in_phrase):
+                                continue
+                            has_head_phrase = True
+                            break
+                    elif syn_lower not in COMPANY_NAMES and syn_lower not in AGENT_BARE_TERMS:
+                        if any(stems_match(syn_lower, pt) for pt in p_tokens):
+                            has_head_phrase = True
+                            break
+                if has_head_phrase:
+                    break
 
             # Match generic research words
             matched_generic = {
@@ -703,11 +771,13 @@ class MultiLaneResearchRunner:
 
             relevance = float(p.get("relevance_score", 1.0))
             is_relevant = False
-            if bool(matched_extended_head) or has_head_phrase:
+            if bool(matched_salient) and overlap_fraction >= min_weighted_overlap:
                 is_relevant = True
-            elif len(salient_q_terms) > 0:
-                is_relevant = (bool(matched_salient) and overlap_fraction >= min_weighted_overlap)
-            else:
+            elif has_head_phrase:
+                is_relevant = True
+            elif bool(matched_extended_head) and bool(p_tokens & SOFTWARE_CONTEXT_TERMS):
+                is_relevant = True
+            elif len(salient_q_terms) == 0:
                 is_relevant = (overlap_fraction >= min_weighted_overlap and relevance >= 0.20)
 
             if not is_relevant:

@@ -38,7 +38,8 @@ research:
     - information
     - acceptance
     - trade
-  min_weighted_overlap: 0.18
+    - development
+  min_weighted_overlap: 0.35
   head_term_synonyms:
     kiro:
       - kiro
@@ -46,11 +47,15 @@ research:
       - spec-driven
       - spec-driven development
       - specification-driven
+      - ai coding assistant
+      - coding assistant
+      - ai assistant
+      - copilot
     assistants:
-      - assistant
-      - agent
-      - agents
-      - agentic
+      - ai assistant
+      - coding assistant
+      - ai agent
+      - coding agent
       - copilot
   search_sources:
     - openalex

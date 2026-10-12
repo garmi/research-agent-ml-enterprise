@@ -103,7 +103,16 @@ class EnterpriseCollector:
             "empirical", "study", "analysis", "results", "evaluation", "insights",
             "benchmark", "survey", "report", "outcomes", "metrics", "practices",
             "trade-offs", "effects", "findings", "case", "investigation", "review",
+            "development",
         }
+        COMPANY_NAMES = {"amazon", "google", "microsoft", "meta", "apple", "ibm", "oracle"}
+        AGENT_BARE_TERMS = {"agent", "agents", "agentic"}
+        CODE_SOFTWARE_DEV_TERMS = {
+            "code", "coding", "software", "developer", "developers", "engineering",
+            "programmer", "programming", "repository", "repositories", "ide", "commit",
+            "copilot", "kiro", "sdd", "spec-driven", "assistant", "assistants"
+        }
+        SOFTWARE_CONTEXT_TERMS = CODE_SOFTWARE_DEV_TERMS | {"cloud", "bedrock", "ai", "llm", "triage", "clinical"}
 
         all_q_words = [w.lower() for w in re.findall(r"\b[a-zA-Z0-9-]{2,}\b", query)]
         q_tokens = [w for w in all_q_words if w not in stopwords]
@@ -118,11 +127,18 @@ class EnterpriseCollector:
                 return w1.startswith(w2[:4]) or w2.startswith(w1[:4])
             return False
 
-        # Check salient / head terms match
-        matched_salient = {
-            t for t in salient_q_terms
-            if any(stems_match(t, it) for it in item_tokens)
-        }
+        # Check salient / head terms match (with company and agent qualifications)
+        matched_salient = set()
+        for t in salient_q_terms:
+            for it in item_tokens:
+                if stems_match(t, it):
+                    if t in COMPANY_NAMES and not bool(item_tokens & SOFTWARE_CONTEXT_TERMS):
+                        continue
+                    if t in AGENT_BARE_TERMS and not bool(item_tokens & CODE_SOFTWARE_DEV_TERMS):
+                        continue
+                    matched_salient.add(t)
+                    break
+
         matched_generic = {
             w for w in q_tokens
             if w in generic_words_list and any(stems_match(w, it) for it in item_tokens)
@@ -133,12 +149,12 @@ class EnterpriseCollector:
         total_q_weight = len(salient_q_terms) * 1.0 + len(set(q_tokens) & generic_words_list) * 0.05
         overlap_fraction = (salient_weight + generic_weight) / total_q_weight if total_q_weight > 0 else 0.0
 
-        if any(w in full_text for w in ("kiro", "spec-driven", "specification", "coding assistant", "ai assistant")):
+        if any(w in full_text for w in ("kiro", "spec-driven", "specification-driven", "coding assistant", "ai assistant")):
             return True
 
         if salient_q_terms:
-            return bool(matched_salient) and (overlap_fraction >= 0.10)
-        return overlap_fraction >= 0.10
+            return bool(matched_salient) and (overlap_fraction >= 0.35)
+        return overlap_fraction >= 0.35
 
     def search_and_ingest(
         self,

@@ -1178,7 +1178,7 @@ tests/test_a7_retrieval_and_venues.py:168: AssertionError
 - `config.yaml`:
   - Added configurable `generic_research_words`:
     `["productivity", "adoption", "gains", "evidence", "teams", "impact", "empirical", "study", "trade-offs", "tradeoffs", "delivery", "research", "analysis", "performance", "effects", "results", "evaluation", "development"]`
-  - Added `min_weighted_overlap: 0.18`.
+  - Added `min_weighted_overlap: 0.35` (reconciled across config, code, and report).
   - Added `head_term_synonyms`:
     - `kiro`: `["kiro", "amazon kiro", "spec-driven", "specification-driven", "agentic"]`
     - `assistants`: `["assistant", "assistants", "copilot", "copilots", "coding assistant", "ai assistant", "agent", "agents"]`
@@ -2256,5 +2256,76 @@ evals/canary/test_canary_acceptance.py::test_canary_acceptance[10-no_egress_of_p
   > *(0 moderate/strong empirical quantitative findings; doctrinal analyses of EU AI Act hospital triage obligations correctly graded weak/anecdotal)*
 - **Canary Q3 Findings (Quantum-Secure Sourdough):**
   > *(0 findings - empty list; negative findings report searched lanes and unsearched enterprise sources without fetchers; Strategic Gap Matrix evaluates to "Practice not assessed")*
+
+---
+
+## A3-4. Strict Entity and Phrase Head Term Filter with Adversarial Cases
+
+### 1. Root Cause & Defects Addressed
+- **The Defect:**
+  1. The off-topic filter could previously be satisfied by a single generic company entity (`amazon`, `google`, `microsoft`) or generic agent term (`agent`, `agents`, `agentic`). This allowed entirely unrelated papers to pass for Q1:
+     - Amazon marketplace retail pricing papers ("Amazon Marketplace Dynamic Pricing Algorithms")
+     - Economics principal-agent governance papers ("Principal-Agent Problems in Corporate Governance")
+     - Epidemic contagion simulation models ("Agent-Based Modeling of Epidemic Spread")
+     - Macroeconomic development papers ("Economic Development and Industrial Policy in East Asia")
+  2. The threshold was inconsistent between config (`0.18`) and the report summary (`0.35`).
+- **The Remediation:**
+  1. **Company Name Qualification:** A company name alone (`amazon`, `google`, `microsoft`, etc.) cannot pass the head-term test. It must either appear as part of a recognized compound technology phrase (e.g., "Amazon Kiro", "Amazon Bedrock", "Google Cloud", "Microsoft Copilot", "AWS Kiro") OR the paper must simultaneously match software/engineering/AI terms (`SOFTWARE_CONTEXT_TERMS`).
+  2. **Agent Term Qualification:** "Agent", "agents", or "agentic" alone cannot pass without code/software/developer/engineering terms (`CODE_SOFTWARE_DEV_TERMS`), preventing economics and simulation models from matching.
+  3. **Generic Research Words Expansion:** Added `development` to `generic_research_words` in both `config.yaml` and code defaults, preventing isolated words from multi-word phrases (e.g., "spec-driven development") from polluting extended head terms.
+  4. **Threshold Reconciled:** Standardized `min_weighted_overlap: 0.35` across `config.yaml`, `src/analysis/multilane_runner.py`, `src/collectors/enterprise/collector.py`, `src/score/checker.py`, and `INTEGRITY_REPORT.md`.
+  5. **Adversarial Negative and Positive Tests Added:** Created `tests/test_a17_adversarial_topic_filter.py` testing all 4 adversarial negative papers (all rejected with `off_topic_low_relevance`) and 3 positive papers (Kiro, spec-driven development, and AI coding assistant RCT - all pass).
+
+### 2. Files Changed
+- `config.yaml`
+- `src/analysis/multilane_runner.py`
+- `src/collectors/enterprise/collector.py`
+- `src/score/checker.py`
+- `tests/test_a17_adversarial_topic_filter.py`
+- `INTEGRITY_REPORT.md`
+
+### 3. Tests & Evidence
+
+#### Failing Test Output (Before Fix):
+```
+FAILED tests/test_a17_adversarial_topic_filter.py::test_adversarial_negative_and_positive_topic_filtering_for_q1
+AssertionError: Amazon pricing paper passed! Accepted: ['p-adv-amazon-pricing', 'p-adv-principal-agent', 'p-adv-agent-epidemic', 'p-adv-east-asia-econ', 'p-pos-kiro', 'p-pos-spec-driven', 'p-pos-assistant-rct']
+
+FAILED tests/test_a17_adversarial_topic_filter.py::test_config_and_code_reconciliation_threshold
+AssertionError: config.yaml min_weighted_overlap should be 0.35, got: 0.18
+```
+
+#### Passing Test Output (After Fix):
+```
+PYTHONPATH=. .venv/bin/pytest tests/test_a17_adversarial_topic_filter.py tests/test_a7_retrieval_and_venues.py tests/test_a4_traceable_citations.py tests/test_a15_real_enterprise_retrieval.py evals/canary/test_canary_acceptance.py -v
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/gauravm/Developer/projects/research-agent-ml-enterprise
+collected 20 items
+
+tests/test_a17_adversarial_topic_filter.py::test_adversarial_negative_and_positive_topic_filtering_for_q1 PASSED [  5%]
+tests/test_a17_adversarial_topic_filter.py::test_config_and_code_reconciliation_threshold PASSED [ 10%]
+tests/test_a7_retrieval_and_venues.py::test_venue_never_displays_api_provider_and_real_source_types PASSED [ 15%]
+tests/test_a7_retrieval_and_venues.py::test_retrieval_filters_by_min_year_and_logs_rejected_stale_papers PASSED [ 20%]
+tests/test_a7_retrieval_and_venues.py::test_retrieval_rejects_off_topic_papers_by_term_overlap PASSED [ 25%]
+tests/test_a7_retrieval_and_venues.py::test_off_topic_filter_rejects_generic_trade_and_regulatory_papers_against_q1 PASSED [ 30%]
+tests/test_a4_traceable_citations.py::test_d1_defect_blocked_source_topic_mismatch_and_ungrounded_numeral PASSED [ 35%]
+tests/test_a4_traceable_citations.py::test_valid_citation_matching_numeral_and_topic_passes PASSED [ 40%]
+tests/test_a15_real_enterprise_retrieval.py::test_enterprise_fetchers_record_searched_ok_and_filter_excerpts PASSED [ 45%]
+tests/test_a15_real_enterprise_retrieval.py::test_enterprise_caching_and_rate_limiting PASSED [ 50%]
+evals/canary/test_canary_acceptance.py::test_canary_acceptance[1-no_shared_sentences] PASSED [ 55%]
+evals/canary/test_canary_acceptance.py::test_canary_acceptance[2-numbers_traceable] PASSED [ 60%]
+evals/canary/test_canary_acceptance.py::test_canary_acceptance[3-citations_resolve_and_support] PASSED [ 65%]
+evals/canary/test_canary_acceptance.py::test_canary_acceptance[4-lane_c_scoped] PASSED [ 70%]
+evals/canary/test_canary_acceptance.py::test_canary_acceptance[5-q3_no_findings] PASSED [ 75%]
+evals/canary/test_canary_acceptance.py::test_canary_acceptance[6-fallback_no_findings] PASSED [ 80%]
+evals/canary/test_canary_acceptance.py::test_canary_acceptance[7-deterministic] PASSED [ 85%]
+evals/canary/test_canary_acceptance.py::test_canary_acceptance[8-render_matches_ledger] PASSED [ 90%]
+evals/canary/test_canary_acceptance.py::test_canary_acceptance[9-publish_gate] PASSED [ 95%]
+evals/canary/test_canary_acceptance.py::test_canary_acceptance[10-no_egress_of_practitioner_text] PASSED [100%]
+
+======================== 20 passed, 1 warning in 5.28s =========================
+```
+
 
 

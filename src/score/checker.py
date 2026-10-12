@@ -233,8 +233,17 @@ class GateChecker:
                     "empirical", "study", "analysis", "evaluation", "practice", "digital",
                     "technology", "research", "engineering", "delivery", "trade-offs",
                     "tradeoffs", "model", "models", "assessment", "implications",
-                    "guidance", "perspective", "reforms", "information", "acceptance", "trade"
+                    "guidance", "perspective", "reforms", "information", "acceptance", "trade", "development"
                 }
+                COMPANY_NAMES = {"amazon", "google", "microsoft", "meta", "apple", "ibm", "oracle"}
+                AGENT_BARE_TERMS = {"agent", "agents", "agentic"}
+                CODE_SOFTWARE_DEV_TERMS = {
+                    "code", "coding", "software", "developer", "developers", "engineering",
+                    "programmer", "programming", "repository", "repositories", "ide", "commit",
+                    "copilot", "kiro", "sdd", "spec-driven", "assistant", "assistants"
+                }
+                SOFTWARE_CONTEXT_TERMS = CODE_SOFTWARE_DEV_TERMS | {"cloud", "bedrock", "ai", "llm", "triage", "clinical"}
+
                 salient_q = {w for w in q_words if w not in generic_set}
                 if not salient_q:
                     salient_q = set(q_words)
@@ -253,15 +262,17 @@ class GateChecker:
                                 w for w in normalize_text(src_text).split()
                                 if w not in STOPWORDS and len(w) >= 3
                             }
-                            # Must share at least one salient term or head term (not merely generic research words)
-                            salient_match = bool(salient_q.intersection(src_terms))
-                            if not salient_match:
-                                for qt in salient_q:
-                                    for st in src_terms:
-                                        if len(qt) >= 4 and len(st) >= 4:
-                                            if qt in st or st in qt:
-                                                salient_match = True
-                                                break
+                            # Must share at least one qualified salient term (company name must have software context; agent must have code context)
+                            salient_match = False
+                            for qt in salient_q:
+                                for st in src_terms:
+                                    matched_term = False
+                                    if qt == st:
+                                        matched_term = True
+                                    elif len(qt) >= 4 and len(st) >= 4:
+                                        if qt in st or st in qt:
+                                            matched_term = True
+                                        else:
                                             prefix_len = 0
                                             for a, b in zip(qt, st):
                                                 if a == b:
@@ -269,10 +280,18 @@ class GateChecker:
                                                 else:
                                                     break
                                             if prefix_len >= 4 or (prefix_len >= 3 and qt.startswith("cod") and st.startswith("cod")):
-                                                salient_match = True
-                                                break
-                                    if salient_match:
+                                                matched_term = True
+
+                                    if matched_term:
+                                        # Strict company and agent qualifications
+                                        if qt in COMPANY_NAMES and not bool(src_terms & SOFTWARE_CONTEXT_TERMS):
+                                            continue
+                                        if qt in AGENT_BARE_TERMS and not bool(src_terms & CODE_SOFTWARE_DEV_TERMS):
+                                            continue
+                                        salient_match = True
                                         break
+                                if salient_match:
+                                    break
 
                             has_match = salient_match
 
