@@ -182,6 +182,26 @@ class MultiLaneResearchRunner:
         self.scorer = QualityScorer(scoring_cfg_path=self.scoring_path)
         self.publisher = Publisher(db_path=self.db_path, denylist_path=self.denylist_path)
 
+    def _safe_insert_run(self, run: Run) -> None:
+        if os.getenv("HOSTED_DEMO") != "1":
+            self.repo.insert_run(run)
+
+    def _safe_insert_source(self, source: Source) -> None:
+        if os.getenv("HOSTED_DEMO") != "1":
+            self.repo.insert_source(source)
+
+    def _safe_insert_claim(self, claim: Claim) -> None:
+        if os.getenv("HOSTED_DEMO") != "1":
+            self.repo.insert_claim(claim)
+
+    def _safe_insert_search_log(self, slog: SearchLog) -> None:
+        if os.getenv("HOSTED_DEMO") != "1":
+            self.repo.insert_search_log(slog)
+
+    def _safe_insert_output(self, doc: OutputDoc) -> None:
+        if os.getenv("HOSTED_DEMO") != "1":
+            self.repo.insert_output(doc)
+
     def run_workflow(
         self,
         topic: str,
@@ -204,7 +224,10 @@ class MultiLaneResearchRunner:
         query_limit = 2 if is_quick else 4
         max_per_query = 4 if is_quick else 6
         lane_urls = dict(custom_lane_urls or {})
-        if custom_prac_urls:
+        if os.getenv("HOSTED_DEMO") == "1":
+            custom_prac_urls = []
+            lane_urls["practitioner"] = []
+        elif custom_prac_urls:
             existing_prac = list(lane_urls.get("practitioner", []))
             lane_urls["practitioner"] = existing_prac + list(custom_prac_urls)
 
@@ -244,7 +267,7 @@ class MultiLaneResearchRunner:
             model_ids={"map": map_provider, "reduce": reduce_provider},
             code_version="v2.0-multilane",
         )
-        self.repo.insert_run(run_record)
+        self._safe_insert_run(run_record)
 
         # ----------------------------------------------------------------------
         # STAGE 2: THREE-LANE HARVESTING (Lanes A, B, C)
@@ -328,7 +351,7 @@ class MultiLaneResearchRunner:
             "error_details": err_details,
             "model_ids": {"map": map_provider, "reduce": reduce_provider},
         }
-        self.repo.insert_run(run_record)
+        self._safe_insert_run(run_record)
 
         # 2. Build single-source-of-truth output_sentences in ledger
         synth_engine = LedgerSynthesisEngine(
@@ -380,8 +403,9 @@ class MultiLaneResearchRunner:
             }
             score_results["band"] = "BLOCKED"
             doc.status = "blocked"
-            with self.repo._conn() as conn:
-                conn.execute("UPDATE outputs SET status = ? WHERE id = ?;", ("blocked", doc.id))
+            if os.getenv("HOSTED_DEMO") != "1":
+                with self.repo._conn() as conn:
+                    conn.execute("UPDATE outputs SET status = ? WHERE id = ?;", ("blocked", doc.id))
         elif is_fallback:
             publish_success = False
             gate_res_passed = gate_results.get("passed", True)
@@ -399,9 +423,20 @@ class MultiLaneResearchRunner:
             }
             score_results["band"] = fallback_status
             score_results["total_score"] = min(float(score_results.get("total_score", 50.0)), 65.0)
-            self.repo.insert_output(doc)
-            with self.repo._conn() as conn:
-                conn.execute("UPDATE outputs SET status = ? WHERE id = ?;", (doc.status, doc.id))
+            self._safe_insert_output(doc)
+            if os.getenv("HOSTED_DEMO") != "1":
+                with self.repo._conn() as conn:
+                    conn.execute("UPDATE outputs SET status = ? WHERE id = ?;", (doc.status, doc.id))
+        elif os.getenv("HOSTED_DEMO") == "1":
+            publish_success = False
+            pub_res = {
+                "published": False,
+                "status": "DRAFT",
+                "allowed": False,
+                "reason": "Publishing is disabled in hosted demo mode: stateless execution only.",
+                "score_results": score_results,
+                "gate_results": gate_results,
+            }
         else:
             publish_success, pub_res = self.publisher.publish_output(
                 output_id=doc.id,
@@ -433,10 +468,13 @@ class MultiLaneResearchRunner:
 
     def _resolve_or_create_question(self, topic: str) -> Question:
         """Find matching question in ledger or register a new one."""
-        existing = self.repo.list_questions()
-        for q in existing:
-            if q.text.strip().lower() == topic.strip().lower():
-                return q
+        try:
+            existing = self.repo.list_questions()
+            for q in existing:
+                if q.text.strip().lower() == topic.strip().lower():
+                    return q
+        except Exception:
+            pass
 
         # Infer slug and scope
         words = re.findall(r"[a-zA-Z0-9]+", topic.lower())
@@ -453,6 +491,17 @@ class MultiLaneResearchRunner:
             scope = "productivity"
         elif any(w in lower for w in ("platform", "devex", "architecture")):
             scope = "architecture"
+
+        if os.getenv("HOSTED_DEMO") == "1":
+            return Question(
+                id=slug,
+                text=topic,
+                scope=scope,
+                time_window_months=36,
+                status="active",
+                version=1,
+                created_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            )
 
         return self.ledger_service.create_question(
             question_id=slug,
@@ -595,7 +644,7 @@ class MultiLaneResearchRunner:
             if yr is not None and str(yr).isdigit():
                 yr_val = int(yr)
                 if yr_val < min_year:
-                    self.repo.insert_search_log(
+                    self._safe_insert_search_log(
                         SearchLog(
                             id=f"slog_rej_yr_{uuid.uuid4().hex[:10]}",
                             run_id=run_id,
@@ -652,7 +701,7 @@ class MultiLaneResearchRunner:
                 is_relevant = (overlap_fraction >= min_weighted_overlap and relevance >= 0.20)
 
             if not is_relevant:
-                self.repo.insert_search_log(
+                self._safe_insert_search_log(
                     SearchLog(
                         id=f"slog_rej_top_{uuid.uuid4().hex[:10]}",
                         run_id=run_id,
@@ -706,7 +755,7 @@ class MultiLaneResearchRunner:
                 commercial_stake="none",
                 status="active",
             )
-            self.repo.insert_source(source)
+            self._safe_insert_source(source)
 
             # Record search log
             slog = SearchLog(
@@ -719,7 +768,7 @@ class MultiLaneResearchRunner:
                 result_count=len(selected),
                 executed_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
             )
-            self.repo.insert_search_log(slog)
+            self._safe_insert_search_log(slog)
 
         if len(selected) == 0:
             slog = SearchLog(
@@ -732,7 +781,7 @@ class MultiLaneResearchRunner:
                 result_count=0,
                 executed_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
             )
-            self.repo.insert_search_log(slog)
+            self._safe_insert_search_log(slog)
 
         return selected
 
@@ -782,7 +831,7 @@ class MultiLaneResearchRunner:
                     commercial_stake=stake,
                     status="active",
                 )
-                self.repo.insert_source(source)
+                self._safe_insert_source(source)
 
                 extracted = extract_claims_from_paper(
                     paper={"id": src_id, "title": t, "abstract": a, "url": u_clean},
@@ -808,7 +857,7 @@ class MultiLaneResearchRunner:
                         )
                     ]
                 for c in extracted:
-                    self.repo.insert_claim(c)
+                    self._safe_insert_claim(c)
                     claims.append(c)
 
         return claims
@@ -822,6 +871,10 @@ class MultiLaneResearchRunner:
         practitioner_abstraction_confirmed: bool = False,
     ) -> Tuple[List[Claim], bool]:
         """Harvest local-only practitioner delivery observations from practitioner.db."""
+        if os.getenv("HOSTED_DEMO") == "1":
+            logger.info("Hosted demo mode active: Lane C (Practitioner) harvesting strictly disabled.")
+            return [], False
+
         prac_collector = PractitionerCollector(db_path=self.practitioner_db_path)
         has_unconfirmed_practitioner_notes = False
 
@@ -873,7 +926,7 @@ class MultiLaneResearchRunner:
             result_count=len(exported_claims),
             executed_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
         )
-        self.repo.insert_search_log(slog)
+        self._safe_insert_search_log(slog)
 
         return exported_claims, has_unconfirmed_practitioner_notes
 
@@ -904,11 +957,11 @@ class MultiLaneResearchRunner:
                     pub_date=c.claim_date or "2024",
                     status="active",
                 )
-                self.repo.insert_source(src)
+                self._safe_insert_source(src)
             grade, reasons = self.grader.grade_claim(c, src)
             c.grade = grade
             c.grade_reasons_json = reasons
-            self.repo.insert_claim(c)
+            self._safe_insert_claim(c)
             graded.append(c)
 
         # Return all active claims for question

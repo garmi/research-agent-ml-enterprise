@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import datetime
 import logging
+import os
 import re
 import uuid
 from typing import Any, Dict, List, Optional, Set, Tuple
@@ -104,7 +105,17 @@ class SynthesisEngine:
         """Generate a structured, evidence-grounded Field Note."""
         question = self.repo.get_question(question_id)
         if not question:
-            raise ValueError(f"Question {question_id} not found in ledger")
+            if os.getenv("HOSTED_DEMO") == "1":
+                question = Question(
+                    id=question_id,
+                    text=question_id,
+                    scope="enterprise",
+                    time_window_months=36,
+                    status="active",
+                    version=1,
+                )
+            else:
+                raise ValueError(f"Question {question_id} not found in ledger")
 
         # 1. Evaluate Gap Matrix
         gap_entry = self.gap_builder.evaluate_question_lanes(question_id, run_id=run_id)
@@ -458,10 +469,10 @@ class SynthesisEngine:
             score_json=score_res,
             gates_json=gate_res.to_dict(),
         )
-        self.repo.insert_output(doc)
-
-        for s in sentences:
-            self.repo.insert_output_sentence(s)
+        if os.getenv("HOSTED_DEMO") != "1":
+            self.repo.insert_output(doc)
+            for s in sentences:
+                self.repo.insert_output_sentence(s)
 
         summary = {
             "output_id": output_id,

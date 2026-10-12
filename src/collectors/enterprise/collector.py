@@ -62,7 +62,7 @@ class EnterpriseCollector:
         """Search enterprise sources, record search_log, and ingest claims."""
         ingested_claims: List[Claim] = []
 
-        if run_id and not self.repo.get_run(run_id):
+        if run_id and os.getenv("HOSTED_DEMO") != "1" and not self.repo.get_run(run_id):
             from src.ledger.models import Run
             self.repo.insert_run(
                 Run(
@@ -92,7 +92,8 @@ class EnterpriseCollector:
                 extraction_depth="structured_data" if src_cfg["source_type"] == "filing" else "abstract_only",
                 status="active",
             )
-            self.repo.insert_source(source)
+            if os.getenv("HOSTED_DEMO") != "1":
+                self.repo.insert_source(source)
 
             # Query data (either mock/fixture override or actual feed parsing)
             items = []
@@ -110,7 +111,8 @@ class EnterpriseCollector:
                 result_count=len(items),
                 executed_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
             )
-            self.repo.insert_search_log(log_entry)
+            if os.getenv("HOSTED_DEMO") != "1":
+                self.repo.insert_search_log(log_entry)
 
             # Extract and grade claims if items found
             for item in items:
@@ -138,7 +140,8 @@ class EnterpriseCollector:
                     grade, reasons = self.grader.grade_claim(claim, source)
                     claim.grade = grade
                     claim.grade_reasons_json = reasons
-                    self.repo.insert_claim(claim)
+                    if os.getenv("HOSTED_DEMO") != "1":
+                        self.repo.insert_claim(claim)
                     ingested_claims.append(claim)
 
         return ingested_claims

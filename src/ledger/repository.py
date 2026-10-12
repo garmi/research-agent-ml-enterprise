@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 from typing import Any, Dict, List, Optional
 
@@ -25,11 +26,16 @@ class LedgerRepository:
     def __init__(self, db_path: Optional[str] = None):
         self.db_path = db_path
 
+    def _check_write_permission(self) -> None:
+        if os.getenv("HOSTED_DEMO") == "1":
+            raise PermissionError("Ledger writes are disabled in hosted demo mode: no private data is stored.")
+
     def _conn(self) -> sqlite3.Connection:
         return get_connection(self.db_path)
 
     # --- Questions ---
     def insert_question(self, q: Question) -> None:
+        self._check_write_permission()
         with self._conn() as conn:
             conn.execute(
                 """INSERT OR REPLACE INTO questions 
@@ -56,6 +62,7 @@ class LedgerRepository:
 
     # --- Sources ---
     def insert_source(self, s: Source) -> None:
+        self._check_write_permission()
         with self._conn() as conn:
             conn.execute(
                 """INSERT OR REPLACE INTO sources
@@ -88,6 +95,7 @@ class LedgerRepository:
 
     # --- Claims ---
     def insert_claim(self, c: Claim) -> None:
+        self._check_write_permission()
         with self._conn() as conn:
             conn.execute(
                 """INSERT OR REPLACE INTO claims
@@ -143,6 +151,7 @@ class LedgerRepository:
 
     # --- Search Log ---
     def insert_search_log(self, log: SearchLog) -> None:
+        self._check_write_permission()
         with self._conn() as conn:
             details_str = json.dumps(log.details_json) if log.details_json else None
             columns = [c[1] for c in conn.execute("PRAGMA table_info(search_log);").fetchall()]
@@ -187,6 +196,7 @@ class LedgerRepository:
 
     # --- Runs ---
     def insert_run(self, run: Run) -> None:
+        self._check_write_permission()
         with self._conn() as conn:
             conn.execute(
                 """INSERT OR REPLACE INTO runs
@@ -219,6 +229,7 @@ class LedgerRepository:
 
     # --- Reviews (Append-only audit) ---
     def insert_review(self, r: Review) -> None:
+        self._check_write_permission()
         with self._conn() as conn:
             conn.execute(
                 """INSERT INTO reviews
@@ -235,6 +246,7 @@ class LedgerRepository:
 
     # --- Outputs and Sentences ---
     def insert_output(self, out: OutputDoc) -> None:
+        self._check_write_permission()
         with self._conn() as conn:
             conn.execute(
                 """INSERT OR REPLACE INTO outputs
@@ -249,6 +261,7 @@ class LedgerRepository:
             )
 
     def insert_output_sentence(self, s: OutputSentence) -> None:
+        self._check_write_permission()
         with self._conn() as conn:
             conn.execute(
                 """INSERT OR REPLACE INTO output_sentences

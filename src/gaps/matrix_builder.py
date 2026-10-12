@@ -148,7 +148,7 @@ class GapMatrixBuilder:
             outcome = 4
             rationale = "Outcome 4: Unmeasured — Rigorous evidence is currently lacking across both academic and enterprise lanes."
 
-        if run_id and not self.repo.get_run(run_id):
+        if run_id and os.getenv("HOSTED_DEMO") != "1" and not self.repo.get_run(run_id):
             self.repo.insert_run(
                 Run(
                     id=run_id,
@@ -169,18 +169,19 @@ class GapMatrixBuilder:
             status="active",
         )
 
-        with self.repo._conn() as conn:
-            conn.execute(
-                """INSERT OR REPLACE INTO gap_matrix
-                   (id, run_id, question_id, academic_state, enterprise_state, field_state,
-                    outcome, rationale, status, created_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);""",
-                (
-                    entry.id, entry.run_id, entry.question_id, entry.academic_state,
-                    entry.enterprise_state, entry.field_state, entry.outcome,
-                    entry.rationale, entry.status, entry.created_at,
-                ),
-            )
+        if os.getenv("HOSTED_DEMO") != "1":
+            with self.repo._conn() as conn:
+                conn.execute(
+                    """INSERT OR REPLACE INTO gap_matrix
+                       (id, run_id, question_id, academic_state, enterprise_state, field_state,
+                        outcome, rationale, status, created_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);""",
+                    (
+                        entry.id, entry.run_id, entry.question_id, entry.academic_state,
+                        entry.enterprise_state, entry.field_state, entry.outcome,
+                        entry.rationale, entry.status, entry.created_at,
+                    ),
+                )
 
         return entry
 

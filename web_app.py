@@ -869,6 +869,9 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+if os.getenv("HOSTED_DEMO") == "1":
+    st.info("🔒 **Demo: no private data is stored** • Hosted demonstration instance. API key overrides, practitioner observations, and persistent ledger writes are disabled.")
+
 # ==============================================================================
 # STRATEGIC QUESTION FORMULATION AGENT
 # ==============================================================================
@@ -1103,29 +1106,36 @@ with lane_input_col3:
         """,
         unsafe_allow_html=True,
     )
-    custom_prac_input = st.text_area(
-        "Custom Practitioner URLs / Notes (One per line):",
-        value=st.session_state.get("custom_prac_urls", ""),
-        key="custom_prac_urls_input",
-        placeholder="https://github.com/org/repo/issues/102\nIncident note: Platform migration latency regression...\nDelivery note: Canary rollout verified 0-downtime",
-        height=90,
-        help="Paste local incident links or field observation notes. Stored locally in practitioner.db; Gate 6 abstraction verified.",
-    )
-    st.session_state["custom_prac_urls"] = custom_prac_input
+    if os.getenv("HOSTED_DEMO") == "1":
+        st.warning("🔒 Practitioner lane is disabled in hosted demo mode. Demo: no private data is stored.")
+        custom_prac_input = ""
+        st.session_state["custom_prac_urls"] = ""
+        prac_abs_confirmed = False
+        allow_remote_prac_synth = False
+    else:
+        custom_prac_input = st.text_area(
+            "Custom Practitioner URLs / Notes (One per line):",
+            value=st.session_state.get("custom_prac_urls", ""),
+            key="custom_prac_urls_input",
+            placeholder="https://github.com/org/repo/issues/102\nIncident note: Platform migration latency regression...\nDelivery note: Canary rollout verified 0-downtime",
+            height=90,
+            help="Paste local incident links or field observation notes. Stored locally in practitioner.db; Gate 6 abstraction verified.",
+        )
+        st.session_state["custom_prac_urls"] = custom_prac_input
 
-    prac_col1, prac_col2 = st.columns(2)
-    with prac_col1:
-        prac_abs_confirmed = st.checkbox(
-            "Gate 6: Confirm Practitioner Abstraction (Human Operator Sign-Off)",
-            value=False,
-            help="Mandatory operator sign-off confirming all client and proprietary identifiers have been abstracted.",
-        )
-    with prac_col2:
-        allow_remote_prac_synth = st.checkbox(
-            "Allow remote synthesis of practitioner data",
-            value=False,
-            help="If unchecked, practitioner data is synthesized strictly locally via Ollama or the offline deterministic engine. Never leaves your environment.",
-        )
+        prac_col1, prac_col2 = st.columns(2)
+        with prac_col1:
+            prac_abs_confirmed = st.checkbox(
+                "Gate 6: Confirm Practitioner Abstraction (Human Operator Sign-Off)",
+                value=False,
+                help="Mandatory operator sign-off confirming all client and proprietary identifiers have been abstracted.",
+            )
+        with prac_col2:
+            allow_remote_prac_synth = st.checkbox(
+                "Allow remote synthesis of practitioner data",
+                value=False,
+                help="If unchecked, practitioner data is synthesized strictly locally via Ollama or the offline deterministic engine. Never leaves your environment.",
+            )
 
 # Advanced Governance & Model Selection
 with st.expander("⚙️ Advanced Settings & Deterministic Governance Hub", expanded=False):
@@ -1842,7 +1852,10 @@ if results:
         st.markdown("---")
         render_venue_tiering(ledger_service)
         st.markdown("---")
-        render_practitioner_entry_view(ledger_service)
+        if os.getenv("HOSTED_DEMO") == "1":
+            st.warning("🔒 Practitioner lane is disabled in hosted demo mode. Demo: no private data is stored.")
+        else:
+            render_practitioner_entry_view(ledger_service)
 
     # EXPORT CENTER TOOLBAR
     st.markdown(

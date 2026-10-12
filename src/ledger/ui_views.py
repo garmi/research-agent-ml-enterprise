@@ -443,6 +443,10 @@ def render_publish_gate_view(service: LedgerService) -> None:
 def render_practitioner_entry_view(service: LedgerService) -> None:
     """Render View 7: Field Notes entry (Practitioner Lane)."""
     st.header("🛠️ View 7: Practitioner Delivery Field Notes Entry")
+    if os.getenv("HOSTED_DEMO") == "1":
+        st.warning("🔒 Practitioner lane is disabled in hosted demo mode. Demo: no private data is stored.")
+        return
+
     st.markdown(
         "Records operational multi-vendor enterprise delivery observations. "
         "**Strictly stored in isolated `ledger/practitioner.db` (gitignored).** "

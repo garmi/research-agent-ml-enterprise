@@ -161,3 +161,80 @@ def test_hosted_demo_mode_disables_api_key_override(monkeypatch):
     assert "HOSTED_DEMO" in src
     assert "API key override disabled on shared instance." in src
 
+
+def test_hosted_demo_mode_shows_private_data_notice(monkeypatch):
+    """Verify that hosted demo mode renders a visible 'Demo: no private data is stored' notice."""
+    with open("web_app.py", "r", encoding="utf-8") as f:
+        src = f.read()
+    assert "Demo: no private data is stored" in src
+
+
+def test_hosted_demo_mode_disables_practitioner_lane(monkeypatch):
+    """Verify that HOSTED_DEMO=1 disables the practitioner lane (entry and Lane C) and ledger writes."""
+    monkeypatch.setenv("HOSTED_DEMO", "1")
+
+    # 1. UI source code inspection
+    with open("web_app.py", "r", encoding="utf-8") as f:
+        src = f.read()
+    assert "Practitioner lane is disabled in hosted demo mode" in src or "Lane C disabled in hosted demo mode" in src
+
+    # 2. Runner behavior inspection
+    import tempfile
+    from pathlib import Path
+    from src.analysis.multilane_runner import MultiLaneResearchRunner
+    from src.ledger.migrations import apply_migrations
+    from src.ledger.db import get_connection
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = str(Path(tmpdir) / "ledger.db")
+        prac_db = str(Path(tmpdir) / "practitioner.db")
+        q_yaml = str(Path(tmpdir) / "register.yaml")
+        # Schema applied prior to hosted demo mode runtime
+        apply_migrations(db_path=db_path)
+        apply_migrations(db_path=prac_db)
+
+        # In hosted demo mode, runner should not harvest practitioner claims
+        runner = MultiLaneResearchRunner(
+            db_path=db_path,
+            practitioner_db_path=prac_db,
+            questions_yaml_path=q_yaml,
+        )
+        res = runner.run_workflow(
+            topic="Test query in hosted demo mode",
+            depth="Fast",
+            tone="Executive",
+            map_provider="stub",
+            reduce_provider="stub",
+            custom_prac_urls=["Confidential client incident report"],
+            academic_papers_override=[],
+        )
+        assert res["lane_breakdown"]["practitioner_claims_count"] == 0
+        assert len(res.get("practitioner_observations", [])) == 0
+
+        # Verify all writes to the ledger are disabled (zero rows written)
+        with get_connection(db_path) as conn:
+            assert conn.execute("SELECT count(*) FROM runs;").fetchone()[0] == 0
+            assert conn.execute("SELECT count(*) FROM outputs;").fetchone()[0] == 0
+            assert conn.execute("SELECT count(*) FROM claims;").fetchone()[0] == 0
+            assert conn.execute("SELECT count(*) FROM sources;").fetchone()[0] == 0
+            assert conn.execute("SELECT count(*) FROM search_log;").fetchone()[0] == 0
+
+
+def test_hosted_demo_mode_disables_ledger_writes(monkeypatch):
+    """Verify that HOSTED_DEMO=1 disables all persistent writes to the ledger database."""
+    import tempfile
+    from pathlib import Path
+    from src.ledger.models import Question
+    from src.ledger.repository import LedgerRepository
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = str(Path(tmpdir) / "test_ledger.db")
+        repo = LedgerRepository(db_path=db_path)
+
+        monkeypatch.setenv("HOSTED_DEMO", "1")
+        q = Question(id="q_demo", text="Demo Question")
+
+        with pytest.raises(PermissionError, match="Ledger writes are disabled in hosted demo mode"):
+            repo.insert_question(q)
+
+
