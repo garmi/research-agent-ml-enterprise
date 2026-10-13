@@ -18,7 +18,7 @@ from src.ledger.migrations import apply_migrations
 from src.ledger.db import get_connection
 
 Q1_TEXT = "What empirical evidence exists regarding Amazon Kiro adoption, productivity gains, and delivery trade-offs in engineering teams?"
-REPORT_PATH = Path("INTEGRITY_REPORT.md")
+REPORT_PATH = Path("docs/legacy/INTEGRITY_REPORT.md") if Path("docs/legacy/INTEGRITY_REPORT.md").exists() else Path("INTEGRITY_REPORT.md")
 
 
 def test_enterprise_lane_production_returns_honest_zero():
