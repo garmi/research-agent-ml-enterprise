@@ -1,0 +1,108 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ==============================================================================
+# Exit Script for Slice S0: Charter and Ground Rules
+# ==============================================================================
+
+echo "======================================================================"
+echo "Slice S0 Verification & Inventory Audit"
+echo "======================================================================"
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$REPO_ROOT"
+
+echo ""
+echo "--- 1. Call Chain: Run Button to run_workflow (hard-coded snapshot as of S0) ---"
+echo "  [UI Entry Point]         web_app.py:1022: run_submitted = st.button('🚀 Run Research', type='primary', ...)"
+echo "  [UI Trigger Branch]      web_app.py:1028: if run_submitted:"
+echo "  [UI Workflow Invocation] web_app.py:733: def run_research_flow(topic, ...)"
+echo "  [Runner Invocation]      web_app.py:762: result = multilane_runner.run_workflow(question=q_obj, ...)"
+echo "  [Engine Entry Point]     src/analysis/multilane_runner.py:214: def run_workflow(self, question, ...)"
+echo "  [Lane B Call]            src/analysis/multilane_runner.py:299: enterprise_claims = self._harvest_enterprise_lane(...)"
+echo "  [Enterprise Collector]   src/analysis/multilane_runner.py:884: claims = ent_collector.search_and_ingest(...)"
+echo "  [Fetcher Resolution]     src/collectors/enterprise/collector.py:70: get_implemented_fetcher_ids() -> [aws-dev-blog, ms-engineering-blog, google-cloud-blog]"
+echo "  [Fetcher Branch]         src/collectors/enterprise/collector.py:215: elif src_id in implemented_ids and is_live_allowed: (ALLOW_LIVE_ENTERPRISE=1)"
+echo "  [RSS Fetch Execution]    src/collectors/enterprise/feed_fetcher.py:34: EnterpriseFeedFetcher.fetch_feed(...)"
+
+echo ""
+echo "--- 2. Repository Data Files Inventory (hard-coded snapshot as of S0) ---"
+echo "  - SQLite Primary Ledger:   ledger/ledger.db (WAL mode, schema v005, sources, claims, reviews, runs)"
+echo "  - SQLite Practitioner DB:  ledger/practitioner.db (Isolated Lane C local storage)"
+echo "  - Questions Register:      questions/register.yaml (Registered questions & domains)"
+echo "  - Venue Tiers Config:      grade/venue_tiers.yaml (Academic tier mappings)"
+echo "  - Grading Rules:           grade/rules.yaml (Deterministic claim grading constraints)"
+echo "  - Gate Scoring Weights:    score/scoring.yaml (Weights, thresholds, penalties)"
+echo "  - Synthesis Verb Bounds:   synth/strength_verbs.yaml (Verb tiers & strength ceilings)"
+echo "  - Enterprise Sources:      collectors/enterprise/sources_registry.yaml (Curated feed definitions)"
+echo "  - Executive Reports:       outputs/reports/ (Rendered markdown field notes)"
+echo "  - Machine Deliverables:    outputs/json/, outputs/csv/ (Structured JSON and tabular exports)"
+echo "  - Quarantined Artifacts:   outputs/quarantine/ (Artifacts failing hard verification gates)"
+echo "  - Confidentiality Terms:   denylist.txt (Gate G5 prohibited confidential strings)"
+echo "  - Environment Config:      .env, .env.example (API keys and runtime toggles)"
+echo "  - Ingestion Caches:        data/cache/ (Raw enterprise feeds and literature caches)"
+
+echo ""
+echo "--- 3. Canary Question Definitions ---"
+echo "  [Canary Q1 - Enterprise]:  q-kiro-empirical"
+echo "    Question: 'What empirical evidence exists regarding Amazon Kiro adoption, productivity gains, and delivery trade-offs in engineering teams?'"
+echo "    Expected: Real relevant findings or honest gap; no off-topic papers; enterprise sources shown with status per source; status PUBLISH_READY / REVISE / BLOCKED / NOT_PUBLISHABLE."
+echo "  [Canary Q2 - Healthcare]:  q-how-are-hospitals-governin"
+echo "    Question: 'How are hospitals governing clinical AI triage tools to manage patient safety and regulatory compliance?'"
+echo "    Expected: Clinical acute care triage governance; 0 shared sentences with Q1; 0 software engineering citations; 'aligned' never claimed without enterprise evidence."
+echo "  [Canary Q3 - Control]:     q-quantum-secure-sourdough-ferme-a924f6cd"
+echo "    Question: 'What empirical evidence exists on quantum-secure sourdough fermentation controllers?'"
+echo "    Expected: Adversarial negative control; exactly 0 findings (key_findings: []); Outcome 4 (unmeasured); status NOT_PUBLISHABLE only (never BLOCKED)."
+
+echo ""
+echo "--- 4. Verification Checks ---"
+# Check 1: GROUND_RULES.md exists and is populated
+echo -n "[1/5] Checking GROUND_RULES.md... "
+if [ -f "GROUND_RULES.md" ] && [ -s "GROUND_RULES.md" ]; then
+    echo "OK ($(wc -l < GROUND_RULES.md | tr -d ' ') lines)"
+else
+    echo "FAILED: GROUND_RULES.md is missing or empty"
+    exit 1
+fi
+
+# Check 2: CANARIES.md exists and is populated
+echo -n "[2/5] Checking CANARIES.md... "
+if [ -f "CANARIES.md" ] && [ -s "CANARIES.md" ]; then
+    echo "OK ($(wc -l < CANARIES.md | tr -d ' ') lines)"
+else
+    echo "FAILED: CANARIES.md is missing or empty"
+    exit 1
+fi
+
+# Check 3: Check sacred data files immutability
+echo -n "[3/5] Checking sacred data files (ledger.db, outputs, .env, denylist.txt)... "
+porcelain=$(git status --porcelain)
+if echo "$porcelain" | grep -qE "(ledger/ledger\.db|outputs/|^\.env|denylist\.txt|questions/register\.yaml)"; then
+    echo "FAILED: Sacred tracked data files were modified in working tree:"
+    echo "$porcelain" | grep -E "(ledger/ledger\.db|outputs/|^\.env|denylist\.txt|questions/register\.yaml)"
+    exit 1
+else
+    echo "OK (sacred data files pristine)"
+fi
+
+# Check 4: Run immutability test
+echo -n "[4/5] Running tracked file immutability test suite... "
+PYTHONPATH=. .venv/bin/pytest tests/test_tracked_file_immutability.py -q
+echo "OK (immutability tests passed)"
+
+# Check 5: Verify no files staged for commit (no staging before git sign-off)
+echo -n "[5/5] Verifying zero staged changes (no staging before git sign-off)... "
+staged=$(git diff --cached --name-only)
+if [ -n "$staged" ]; then
+    echo "FAILED: Found staged files before explicit sign-off:"
+    echo "$staged"
+    exit 1
+else
+    echo "OK (staging area clean)"
+fi
+
+echo ""
+echo "======================================================================"
+echo "Slice S0 Exit Verification: ALL CHECKS PASSED (EXIT 0)"
+echo "======================================================================"
+exit 0
