@@ -41,6 +41,7 @@ venv.bak/
 # Output and data
 outputs/
 data/
+backups/
 *.csv
 *.json
 !evals/canary/cassettes/*.json
@@ -52,6 +53,7 @@ data/
 .env.*.local
 
 # Research Engine v2 - Durability and Confidentiality
+*.db
 ledger/*.db
 ledger/practitioner.db
 practitioner.db
@@ -59,5 +61,4 @@ denylist.txt
 ledger/backups/
 *.db-shm
 *.db-wal
-prompt_v2.txt
 
