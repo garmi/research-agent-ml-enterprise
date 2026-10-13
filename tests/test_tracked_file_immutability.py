@@ -7,28 +7,37 @@ and never write directly to tracked repository paths.
 
 from __future__ import annotations
 
+from typing import Callable, Dict, Optional
 import pytest
-from conftest import _get_tracked_status, get_session_start_status
 
 
-def test_no_tracked_file_mutations_across_entire_repo():
+def test_no_tracked_file_mutations_across_entire_repo(
+    tracked_files_session_snapshot: Dict[str, Optional[str]],
+    current_tracked_files_snapshot: Callable[[], Dict[str, Optional[str]]],
+):
     """Fail if ANY tracked file across the repository was modified during test run.
 
-    Verifies against session-start state that zero tracked files in the repository
-    (code, config, schemas, templates, data files) were mutated by tests.
-    Contains no hard-coded allowlist.
+    Compares the current content-based sha256 hash of every tracked file against
+    the session-start snapshot, catching modifications, deletions, or corruptions.
+    Zero imports from conftest; relies strictly on pytest fixture injection.
     """
-    session_start_status = get_session_start_status()
-    current_tracked = _get_tracked_status()
+    start_snapshot = tracked_files_session_snapshot
+    current_snapshot = current_tracked_files_snapshot()
 
     mutations = []
-    for path, status in current_tracked.items():
-        if path not in session_start_status or session_start_status[path] != status:
-            mutations.append(f"{status} {path}")
+    for path, start_hash in start_snapshot.items():
+        curr_hash = current_snapshot.get(path)
+        if curr_hash != start_hash:
+            if curr_hash is None:
+                mutations.append(f"DELETED {path}")
+            elif start_hash is None:
+                mutations.append(f"RESTORED {path}")
+            else:
+                mutations.append(f"MODIFIED {path}")
 
-    for path, status in session_start_status.items():
-        if path not in current_tracked:
-            mutations.append(f"REVERTED/REMOVED {path}")
+    for path in current_snapshot:
+        if path not in start_snapshot:
+            mutations.append(f"NEW_TRACKED {path}")
 
     assert not mutations, (
         f"Tracked repository files were modified during test execution: {mutations}\n"

@@ -1,61 +1,103 @@
-"""Pytest configuration and session-finish immutability guard (Slice S0).
+"""Pytest configuration and suite-wide tracked file immutability guard (Slice S0).
 
 Guarantees that test executions never mutate, pollute, or delete any tracked files in git.
-Captures tracked-file state at session start and asserts that zero tracked files were
-modified across the entire repository by session end.
+Captures content-based sha256 hashes of all files in `git ls-files` at session start
+and asserts that zero tracked files were modified across the entire repository by session end.
+Exposes fixtures for immutability tests without requiring imports from conftest.
 """
 
 from __future__ import annotations
 
+import hashlib
 import subprocess
 import sys
+from pathlib import Path
+from typing import Callable, Dict, Optional
 import pytest
 
-_SESSION_START_TRACKED_STATUS: dict[str, str] = {}
+
+def _compute_file_sha256(filepath: str | Path) -> Optional[str]:
+    """Return SHA-256 hex digest for a file on disk, or None if file does not exist."""
+    p = Path(filepath)
+    if not p.is_file():
+        return None
+    h = hashlib.sha256()
+    try:
+        with open(p, "rb") as f:
+            while chunk := f.read(65536):
+                h.update(chunk)
+        return h.hexdigest()
+    except OSError:
+        return None
 
 
-def _get_tracked_status() -> dict[str, str]:
+def _compute_head_sha256(filepath: str) -> Optional[str]:
+    """Return SHA-256 hex digest for a file at HEAD in git, or None if not committed."""
+    res = subprocess.run(["git", "show", f"HEAD:{filepath}"], capture_output=True)
+    if res.returncode != 0:
+        return None
+    return hashlib.sha256(res.stdout).hexdigest()
+
+
+def _get_tracked_files_snapshot() -> Dict[str, Optional[str]]:
+    """Return dict of relative_path -> sha256 digest for every file in `git ls-files` on disk."""
     res = subprocess.run(
-        ["git", "status", "--porcelain"],
+        ["git", "ls-files"],
         capture_output=True,
         text=True,
+        check=True,
     )
-    tracked = {}
-    for raw_line in res.stdout.splitlines():
-        if not raw_line.strip() or raw_line.startswith("??"):
-            continue
-        parts = raw_line.strip().split(maxsplit=1)
-        if len(parts) == 2:
-            status, path = parts
-            tracked[path] = status
-    return tracked
+    snapshot: Dict[str, Optional[str]] = {}
+    for line in res.stdout.splitlines():
+        path = line.strip()
+        if path:
+            snapshot[path] = _compute_file_sha256(path)
+    return snapshot
 
 
-def get_session_start_status() -> dict[str, str]:
-    """Return a copy of the tracked files status captured at session start."""
-    return dict(_SESSION_START_TRACKED_STATUS)
+def _get_baseline_tracked_snapshot() -> Dict[str, Optional[str]]:
+    """Return dict of relative_path -> sha256 digest for every file in `git ls-files` at HEAD baseline."""
+    res = subprocess.run(
+        ["git", "ls-files"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    snapshot: Dict[str, Optional[str]] = {}
+    for line in res.stdout.splitlines():
+        path = line.strip()
+        if path:
+            snapshot[path] = _compute_head_sha256(path)
+    return snapshot
+
+
+_SESSION_START_SNAPSHOT: Dict[str, Optional[str]] = {}
 
 
 def pytest_sessionstart(session: pytest.Session) -> None:
-    """Snapshot the git status of all tracked files before tests run."""
-    _SESSION_START_TRACKED_STATUS.clear()
-    _SESSION_START_TRACKED_STATUS.update(_get_tracked_status())
+    """Snapshot content-based sha256 hashes of all tracked files before tests run."""
+    global _SESSION_START_SNAPSHOT
+    _SESSION_START_SNAPSHOT = _get_tracked_files_snapshot()
 
 
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
-    """Assert that zero tracked files across the repository were modified during the run."""
-    current_tracked = _get_tracked_status()
+    """Assert that zero tracked files across the repository changed content during the run."""
+    current_snapshot = _get_tracked_files_snapshot()
 
     mutations = []
-    # Check for newly modified or staged tracked files
-    for path, status in current_tracked.items():
-        if path not in _SESSION_START_TRACKED_STATUS or _SESSION_START_TRACKED_STATUS[path] != status:
-            mutations.append(f"{status} {path}")
+    for path, start_hash in _SESSION_START_SNAPSHOT.items():
+        curr_hash = current_snapshot.get(path)
+        if curr_hash != start_hash:
+            if curr_hash is None:
+                mutations.append(f"DELETED {path}")
+            elif start_hash is None:
+                mutations.append(f"RESTORED {path}")
+            else:
+                mutations.append(f"MODIFIED {path}")
 
-    # Check for tracked files that were reverted or deleted
-    for path, status in _SESSION_START_TRACKED_STATUS.items():
-        if path not in current_tracked:
-            mutations.append(f"REVERTED/REMOVED {path}")
+    for path in current_snapshot:
+        if path not in _SESSION_START_SNAPSHOT:
+            mutations.append(f"NEW_TRACKED {path}")
 
     if mutations:
         session.exitstatus = 1
@@ -64,3 +106,15 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
             + "\n".join(f"  - {m}" for m in mutations)
             + "\nTests must use isolated temporary paths (tmp_path / tempfile) and avoid mutating tracked files.\n"
         )
+
+
+@pytest.fixture(scope="session")
+def tracked_files_session_snapshot() -> Dict[str, Optional[str]]:
+    """Session-scoped fixture holding the baseline snapshot of tracked files."""
+    return _get_baseline_tracked_snapshot()
+
+
+@pytest.fixture
+def current_tracked_files_snapshot() -> Callable[[], Dict[str, Optional[str]]]:
+    """Fixture returning a callable that takes the current snapshot of tracked files."""
+    return _get_tracked_files_snapshot

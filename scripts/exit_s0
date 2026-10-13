@@ -85,10 +85,11 @@ else
     echo "OK (sacred data files pristine)"
 fi
 
-# Check 4: Run immutability test
-echo -n "[4/5] Running tracked file immutability test suite... "
+# Check 4: Run full suite collection check & immutability test
+echo -n "[4/5] Verifying suite collection & tracked file immutability... "
+PYTHONPATH=. .venv/bin/pytest --collect-only -q >/dev/null
 PYTHONPATH=. .venv/bin/pytest tests/test_tracked_file_immutability.py -q
-echo "OK (immutability tests passed)"
+echo "OK (suite collection error-free & immutability tests passed)"
 
 # Check 5: Verify no files staged for commit (no staging before git sign-off)
 echo -n "[5/5] Verifying zero staged changes (no staging before git sign-off)... "
