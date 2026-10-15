@@ -1,9 +1,10 @@
-"""Three-step intake view for Research Engine (Slice S1 Task 5).
+"""Three-step intake view for Research Engine (Slice S1 Round 3).
 
 Renders:
-  Step 1: Ask (user enters question / problem text under Strategic Technology Question)
+  Banner: "Frame your question"
+  Step 1: Ask (user enters question, button "Show framings")
   Step 2: Choose a framing (fixed lenses: Empirical effect, Adoption and practice, Risks and controls, Costs and trade-offs)
-  Step 3: Run (Run button disabled until approved, disabled if text edited post-approval)
+  Step 3: Run (disabled reason directly above Run button in neutral info box, Run button enabled once approved)
 """
 
 from __future__ import annotations
@@ -20,24 +21,61 @@ from src.engine.approvals import (
     get_latest_gate1_approval,
     save_gate1_approval,
 )
+from src.ui.theme import (
+    COLOR_BG_CARD,
+    COLOR_BG_SURFACE,
+    COLOR_BORDER,
+    COLOR_BORDER_STRONG,
+    COLOR_DISABLED_BTN_BG,
+    COLOR_DISABLED_BTN_TEXT,
+    COLOR_PRIMARY,
+    COLOR_TEXT_MUTED,
+    COLOR_TEXT_PRIMARY,
+    COLOR_TEXT_SECONDARY,
+    FONT_FAMILY,
+    FONT_SIZE_BASE,
+    FONT_SIZE_LG,
+    FONT_SIZE_SM,
+    FONT_SIZE_XL,
+    FONT_SIZE_XS,
+    SPACING_MD,
+    SPACING_SM,
+    SPACING_XS,
+)
+from src.ui.components import disabled_reason, info_box
 
 
 def render_intake_view() -> Dict[str, Any]:
-    """Render the 3-step numbered intake UI in Streamlit."""
+    """Render the polished 3-step numbered intake UI in Streamlit."""
+    # Inject styling for disabled button state and clean layout
     st.markdown(
-        """
-        <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 1.15rem 1.4rem; margin-bottom: 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
-                <div style="font-weight: 700; font-size: 1.05rem; color: #0F172A; display: flex; align-items: center; gap: 0.5rem;">
-                    <span>🤖 Strategic Question Formulation Agent</span>
-                </div>
-                <span style="font-size: 0.74rem; background: #EEF2FF; color: #4338CA; padding: 0.2rem 0.65rem; border-radius: 9999px; font-weight: 700; letter-spacing: 0.03em;">
-                    Gate 1 Intake & Framing
-                </span>
+        f"""
+        <style>
+        button:disabled, button[disabled], button:disabled:hover, button:disabled:active {{
+            background: #E2E8F0 !important;
+            background-color: #E2E8F0 !important;
+            background-image: none !important;
+            color: #475569 !important;
+            border: 1px solid #CBD5E1 !important;
+            border-radius: 8px !important;
+            cursor: not-allowed !important;
+            opacity: 1 !important;
+            box-shadow: none !important;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # Header Banner: Calm, plain English, zero jargon
+    st.markdown(
+        f"""
+        <div style="background: {COLOR_BG_CARD}; border: 1px solid {COLOR_BORDER}; border-radius: 12px; padding: 16px; margin-bottom: 1.25rem; font-family: {FONT_FAMILY}; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+            <div style="font-weight: 700; font-size: {FONT_SIZE_LG}; color: {COLOR_TEXT_PRIMARY}; margin-bottom: 0.25rem;">
+                Frame your question
             </div>
-            <div style="font-size: 0.86rem; color: #64748B; margin-bottom: 0.2rem; line-height: 1.45;">
-                State your enterprise dilemma. Follow the three steps below to ground your inquiry before synthesis.
-                Execution requires explicit Gate 1 problem framing approval.
+            <div style="font-size: {FONT_SIZE_SM}; color: {COLOR_TEXT_SECONDARY}; line-height: 1.45;">
+                Type your question, pick the angle you want researched, approve it, then run.
             </div>
         </div>
         """,
@@ -58,11 +96,11 @@ def render_intake_view() -> Dict[str, Any]:
             placeholder="e.g. What empirical evidence exists regarding Amazon Kiro adoption, productivity gains, and delivery trade-offs in engineering teams?",
             key="input_user_question",
             height=85,
-            help="Type any enterprise engineering, AI platform, or DevSecOps inquiry for multi-source peer-reviewed literature synthesis.",
+            help="Type your question for multi-source peer-reviewed literature synthesis.",
         )
     with col_formulate:
         st.markdown("<div style='height: 1.85rem;'></div>", unsafe_allow_html=True)
-        st.button("Formulate Question", key="btn_formulate_question", type="secondary", use_container_width=True)
+        st.button("Show framings", key="btn_formulate_question", type="secondary", use_container_width=True)
 
     clean_text = (question_text or "").strip()
     question_id = resolve_question_id(clean_text) if clean_text else ""
@@ -90,17 +128,17 @@ def render_intake_view() -> Dict[str, Any]:
         # Display lens card with fixed template fields
         st.markdown(
             f"""
-            <div style="background: #F8FAFC; border: 1px solid #CBD5E1; border-radius: 8px; padding: 0.85rem 1rem; margin: 0.5rem 0;">
-                <div style="font-weight: 700; color: #1E3A8A; font-size: 0.9rem; margin-bottom: 0.35rem;">
+            <div style="background: {COLOR_BG_SURFACE}; border: 1px solid {COLOR_BORDER_STRONG}; border-radius: 8px; padding: 16px; margin: 0.5rem 0; font-family: {FONT_FAMILY};">
+                <div style="font-weight: 700; color: {COLOR_PRIMARY}; font-size: {FONT_SIZE_SM}; margin-bottom: 0.35rem;">
                     Lens: {selected_framing.title}
                 </div>
-                <div style="font-size: 0.82rem; color: #334155; margin-bottom: 0.35rem;">
+                <div style="font-size: {FONT_SIZE_SM}; color: {COLOR_TEXT_PRIMARY}; margin-bottom: 0.35rem;">
                     <strong>Focus:</strong> {selected_framing.focus}
                 </div>
-                <div style="font-size: 0.82rem; color: #334155; margin-bottom: 0.35rem;">
+                <div style="font-size: {FONT_SIZE_SM}; color: {COLOR_TEXT_PRIMARY}; margin-bottom: 0.35rem;">
                     <strong>Counts as Evidence:</strong> {selected_framing.counts_as_evidence}
                 </div>
-                <div style="font-size: 0.82rem; color: #64748B;">
+                <div style="font-size: {FONT_SIZE_SM}; color: {COLOR_TEXT_MUTED};">
                     <strong>Out of Scope:</strong> {selected_framing.out_of_scope}
                 </div>
             </div>
@@ -118,9 +156,9 @@ def render_intake_view() -> Dict[str, Any]:
             )
             st.session_state["_last_approved_id"] = question_id
             st.session_state["_last_approved_sha256"] = compute_question_sha256(clean_text)
-            st.success(f"✓ Approved Gate 1 problem framing for '{question_id}'! Step 3 is unlocked.")
+            st.success("Framing approved. You can now run the research.")
     else:
-        st.info("ℹ️ Enter your question in Step 1 to inspect candidate framings.")
+        st.markdown(info_box("Type a question in Step 1 to inspect candidate angles."), unsafe_allow_html=True)
 
     # --------------------------------------------------------------------------
     # Step 3: Run
@@ -128,21 +166,21 @@ def render_intake_view() -> Dict[str, Any]:
     st.markdown("### 3. Run")
 
     run_disabled = True
-    disabled_reason = ""
+    disabled_msg = ""
 
     if not clean_text:
-        disabled_reason = "Please enter a research topic in Step 1."
+        disabled_msg = "Type a question in Step 1."
     else:
         latest_approval = get_latest_gate1_approval(question_id)
         last_approved_sha256 = st.session_state.get("_last_approved_sha256")
         current_sha256 = compute_question_sha256(clean_text)
 
         if last_approved_sha256 and current_sha256 != last_approved_sha256:
-            disabled_reason = "You changed the question after approving a framing. Approve a framing again to continue."
+            disabled_msg = "You changed the question after approving. Approve a framing again."
         elif latest_approval is None:
-            disabled_reason = "You must choose and approve a problem framing in Step 2 before running."
+            disabled_msg = "Approve a framing in Step 2 to unlock Run."
         elif current_sha256 != latest_approval.question_sha256:
-            disabled_reason = "You changed the question after approving a framing. Approve a framing again to continue."
+            disabled_msg = "You changed the question after approving. Approve a framing again."
         else:
             run_disabled = False
 
@@ -171,8 +209,9 @@ def render_intake_view() -> Dict[str, Any]:
             help="Calibrates the framing, metric focus, and audience persona for executive deliverables.",
         )
 
-    if disabled_reason:
-        st.warning(f"⚠️ {disabled_reason}")
+    # Disabled reason sits directly above the Run button in one neutral info box
+    if disabled_msg:
+        st.markdown(disabled_reason(disabled_msg), unsafe_allow_html=True)
 
     run_submitted = st.button(
         "🚀 Run Research",
