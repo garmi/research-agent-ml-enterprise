@@ -49,6 +49,11 @@ from src.ledger.ui_views import (
     render_practitioner_entry_view,
     render_safe_table,
 )
+from src.engine.entry import start_run
+from src.engine.ids import resolve_question_id
+from src.ui.safe_page import safe_page, format_error_payload, render_safe_error
+from src.ui.intake_view import render_intake_view
+
 
 logger = logging.getLogger("ExecutiveResearchStudio")
 logging.basicConfig(level=logging.INFO)
@@ -759,8 +764,10 @@ def run_production_pipeline(
         )
         progress_box.progress(progress_val)
 
-    results = multilane_runner.run_workflow(
-        topic=topic,
+    q_id = resolve_question_id(topic)
+    results = start_run(
+        question_id=q_id,
+        question_text=topic,
         depth=depth,
         tone=tone,
         map_provider=map_provider,
@@ -882,144 +889,11 @@ is_stub_requested = (
 )
 default_formulate_provider = "stub" if is_stub_requested else ("ollama" if ollama_online and not has_gemini_key else "gemini")
 
-st.markdown(
-    """
-    <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 1.25rem 1.5rem; margin-bottom: 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
-            <div style="font-weight: 700; font-size: 1.05rem; color: #0F172A; display: flex; align-items: center; gap: 0.5rem;">
-                <span>🤖 Strategic Question Formulation Agent</span>
-            </div>
-            <span style="font-size: 0.74rem; background: #EEF2FF; color: #4338CA; padding: 0.2rem 0.65rem; border-radius: 9999px; font-weight: 700; letter-spacing: 0.03em;">
-                AI Inquiry Framing
-            </span>
-        </div>
-        <div style="font-size: 0.86rem; color: #64748B; margin-bottom: 0.85rem; line-height: 1.45;">
-            State your raw enterprise dilemma, delivery friction, or business challenge. The agent analyzes the problem and formulates a balanced, multi-lane <strong>Strategic Technology Question</strong> ready for Academic, Enterprise, and Practitioner literature.
-        </div>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
-
-qf_col_input, qf_col_btn = st.columns([3.8, 1.2])
-
-with qf_col_input:
-    user_problem_input = st.text_area(
-        "Raw Problem Description",
-        value=st.session_state.get("raw_problem_input", ""),
-        placeholder="e.g. Our engineering leaders are seeing teams adopt AI coding agents like Kiro and Copilot, but we need empirical evidence regarding security vulnerabilities, IP licensing, and measuring real developer productivity vs vanity metrics.",
-        height=85,
-        help="Type your unstructured business, technical, or delivery dilemma here.",
-        label_visibility="collapsed",
-    )
-
-with qf_col_btn:
-    st.markdown("<div style='height: 0.05rem;'></div>", unsafe_allow_html=True)
-    formulate_submitted = st.button("✨ Formulate Question", type="secondary", use_container_width=True)
-    clear_problem_btn = st.button("Clear Problem", use_container_width=True)
-    if clear_problem_btn:
-        st.session_state["raw_problem_input"] = ""
-        st.session_state["formulated_question_obj"] = None
-        st.rerun()
-
-if formulate_submitted:
-    if not user_problem_input.strip():
-        st.warning("⚠️ Please provide your problem statement or dilemma text above to formulate a research question.")
-    else:
-        st.session_state["raw_problem_input"] = user_problem_input.strip()
-        with st.spinner("🤖 Agent analyzing problem text across Academic, Enterprise, and Delivery dimensions..."):
-            formulated_obj = question_agent.formulate(
-                raw_problem=user_problem_input.strip(),
-                model_provider=default_formulate_provider,
-            )
-            st.session_state["formulated_question_obj"] = formulated_obj
-            st.session_state["current_question"] = formulated_obj.strategic_question
-            st.rerun()
-
-# Display formulation summary card if available
-formulated_obj = st.session_state.get("formulated_question_obj")
-if formulated_obj:
-    st.markdown(
-        f"""
-        <div style="background: #F8FAFC; border: 1px solid #CBD5E1; border-radius: 10px; padding: 1rem 1.25rem; margin-bottom: 1.25rem;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
-                <div style="font-weight: 700; font-size: 0.88rem; color: #1E3A8A;">
-                    💡 Formulated Strategic Research Question:
-                </div>
-                <span style="font-size: 0.74rem; background: #E0E7FF; color: #3730A3; padding: 0.15rem 0.55rem; border-radius: 4px; font-weight: 700; text-transform: uppercase;">
-                    SCOPE: {formulated_obj.scope}
-                </span>
-            </div>
-            <div style="font-size: 0.98rem; font-weight: 700; color: #0F172A; margin-bottom: 0.5rem; line-height: 1.4;">
-                "{formulated_obj.strategic_question}"
-            </div>
-            <div style="font-size: 0.82rem; color: #475569; margin-bottom: 0.6rem;">
-                <strong>Strategic Rationale:</strong> {formulated_obj.rationale}
-            </div>
-            <div style="font-size: 0.78rem; color: #64748B;">
-                <strong>Inquiry Dimensions (Sub-Questions):</strong>
-                <ul style="margin: 0.25rem 0 0 1rem; padding: 0;">
-                    <li>{formulated_obj.sub_questions[0]}</li>
-                    <li>{formulated_obj.sub_questions[1]}</li>
-                    <li>{formulated_obj.sub_questions[2]}</li>
-                </ul>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-    reg_col1, reg_col2 = st.columns([2.0, 3.0])
-    with reg_col1:
-        if st.button("📋 Register in Question Register (YAML Gate 1)", key="reg_q_btn", use_container_width=True):
-            saved_q = question_agent.register_question_in_register(formulated_obj, ledger_service)
-            st.success(f"✓ Registered '{saved_q.id}' in `questions/register.yaml` and SQLite ledger!")
-
-st.markdown("<div style='height: 0.5rem;'></div>", unsafe_allow_html=True)
-
-
-# ==============================================================================
-# RESEARCH CONSOLE CARD
-# ==============================================================================
-st.markdown('<div class="research-console-card">', unsafe_allow_html=True)
-
-query_input = st.text_input(
-    "Strategic Technology Question",
-    value=st.session_state["current_question"],
-    placeholder="e.g. Assessing DevEx and cycle time impact of platform engineering in regulated enterprises",
-    help="Type any enterprise engineering, AI platform, or DevSecOps inquiry for multi-source peer-reviewed literature synthesis.",
-    label_visibility="visible",
-)
-
-col_depth, col_tone, col_btn = st.columns([1.3, 1.3, 1.1])
-
-with col_depth:
-    depth_option = st.selectbox(
-        "Research Depth",
-        options=[
-            "⚡ Fast (~45s • 2 rounds • up to 10 sources)",
-            "🔬 Deep (~3-5m • 5 rounds • comprehensive synthesis)",
-        ],
-        index=0,
-        help="Fast provides an immediate executive brief; Deep executes multi-round citation graph queries.",
-    )
-    st.caption("⚡ Fast: Quick high-signal brief • 🔬 Deep: Comprehensive multi-round analysis")
-
-with col_tone:
-    tone_option = st.selectbox(
-        "Strategic Tone",
-        options=[
-            "Executive (ROI & Risk)",
-            "Architectural (Technical Depth)",
-            "Market & Industry (Macro Trends)",
-        ],
-        index=0,
-        help="Calibrates the framing, metric focus, and audience persona for executive deliverables.",
-    )
-    st.caption("Adjusts executive emphasis, recommendation framing, and audience persona")
-
-with col_btn:
-    st.markdown("<div style='height: 1.7rem;'></div>", unsafe_allow_html=True)
-    run_submitted = st.button("🚀 Run Research", type="primary", use_container_width=True)
+intake_state = render_intake_view()
+query_input = intake_state["question_text"]
+run_submitted = intake_state["run_submitted"]
+depth_option = intake_state["depth"]
+tone_option = intake_state["tone"]
 
 # ------------------------------------------------------------------------------
 # THREE-LANE SOURCE REPOSITORIES & MANUAL INGESTION CONSOLE
