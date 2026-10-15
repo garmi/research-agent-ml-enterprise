@@ -120,10 +120,24 @@ def test_executive_studio_ui_smoke():
                 assert run_btn.count() > 0
                 assert page.locator("text=Strategic Technology Question").count() > 0
 
-                # 5. Assert Empty Topic Validation
-                run_btn.click()
+                # 5. Assert Empty Topic Validation & Approval Flow
+                assert run_btn.is_disabled()
+                assert page.locator("text=Please enter a research topic in Step 1.").count() > 0
+
+                # Enter Q1 text
+                q1_text = "What empirical evidence exists regarding Amazon Kiro adoption, productivity gains, and delivery trade-offs in engineering teams?"
+                page.locator("textarea").first.fill(q1_text)
+                page.locator("textarea").first.press("Tab")
                 time.sleep(1)
-                assert page.locator("text=Please enter a research topic").count() > 0
+
+                # Approve framing in Step 2
+                approve_btn = page.locator('button:has-text("Approve this framing")')
+                assert approve_btn.count() > 0
+                approve_btn.click()
+                time.sleep(1)
+
+                # Assert Run button is now enabled (do NOT click Run)
+                assert run_btn.is_enabled()
 
                 browser.close()
 
