@@ -51,6 +51,14 @@ class Publisher:
         force_publish_non_band: bool = False,
     ) -> Tuple[bool, Dict[str, Any]]:
         """Evaluate Gate 6 Publish Gate and produce website JSON export."""
+        from src.engine.stub_mode import is_stub_mode
+        if is_stub_mode():
+            return False, {
+                "published": False,
+                "status": "NOT_PUBLISHABLE",
+                "reason": "TEST MODE: synthetic data. Results are not real and cannot be published.",
+            }
+
         doc = self.repo.get_output(output_id)
         if not doc:
             raise ValueError(f"Output document '{output_id}' not found in ledger")

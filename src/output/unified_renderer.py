@@ -31,7 +31,14 @@ class UnifiedRenderer:
         self.sentences = sentences
         self.papers = papers
         self.metadata = metadata or {}
-        self.base_dir = Path(base_dir)
+        from src.engine.stub_mode import is_stub_mode
+        if is_stub_mode() and str(base_dir) == "outputs":
+            import tempfile
+            self._temp_dir_obj = tempfile.TemporaryDirectory()
+            self.base_dir = Path(self._temp_dir_obj.name)
+        else:
+            self._temp_dir_obj = None
+            self.base_dir = Path(base_dir)
 
         # Output directories
         self.reports_dir = self.base_dir / "reports"

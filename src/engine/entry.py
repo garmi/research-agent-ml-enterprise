@@ -8,11 +8,15 @@ problem framing approval. Both the primary 'Run Research' action and the
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
+import shutil
+import tempfile
 from typing import Any, Callable, Dict, Optional
 
 from src.engine.approvals import get_latest_gate1_approval
 from src.engine.ids import compute_question_sha256
+from src.engine.stub_mode import is_stub_mode
 
 logger = logging.getLogger(__name__)
 
@@ -58,10 +62,6 @@ def start_run(
             "Run refused: You changed the question after approving a framing. Approve a framing again to continue."
         )
 
-    if runner is None:
-        from src.analysis import multilane_runner
-        runner = multilane_runner.run_workflow
-
     run_args = dict(kwargs)
     if "topic" not in run_args:
         run_args["topic"] = question_text
@@ -71,4 +71,52 @@ def start_run(
         question_id,
         approval.version,
     )
+
+    if is_stub_mode():
+        with tempfile.TemporaryDirectory() as tmp_stub_dir:
+            temp_db = os.path.join(tmp_stub_dir, "stub_ledger.db")
+            temp_prac_db = os.path.join(tmp_stub_dir, "stub_practitioner.db")
+            if os.path.exists("ledger/ledger.db"):
+                shutil.copy("ledger/ledger.db", temp_db)
+            if os.path.exists("ledger/practitioner.db"):
+                shutil.copy("ledger/practitioner.db", temp_prac_db)
+
+            if runner is None:
+                from src.analysis.multilane_runner import MultiLaneResearchRunner
+                stub_instance = MultiLaneResearchRunner(
+                    db_path=temp_db,
+                    practitioner_db_path=temp_prac_db,
+                )
+                actual_runner = stub_instance.run_workflow
+            elif hasattr(runner, "__self__") and getattr(runner.__self__, "db_path", None) == "ledger/ledger.db":
+                from src.analysis.multilane_runner import MultiLaneResearchRunner
+                stub_instance = MultiLaneResearchRunner(
+                    db_path=temp_db,
+                    practitioner_db_path=temp_prac_db,
+                )
+                actual_runner = stub_instance.run_workflow
+            else:
+                actual_runner = runner
+
+            result = actual_runner(**run_args)
+
+        if not isinstance(result, dict):
+            raise TypeError(
+                f"Runner in stub mode must return a dict, got {type(result).__name__}"
+            )
+
+        result["is_stub_mode"] = True
+        result["can_publish"] = False
+        result["publishable"] = False
+        result["status"] = "NOT_PUBLISHABLE"
+        result["stub_marker"] = "TEST MODE: synthetic data. Results are not real and cannot be published."
+        if "quality_scorecard" in result and isinstance(result["quality_scorecard"], dict):
+            result["quality_scorecard"]["band"] = "NOT_PUBLISHABLE"
+        return result
+
+    if runner is None:
+        from src.analysis.multilane_runner import MultiLaneResearchRunner
+        default_instance = MultiLaneResearchRunner()
+        runner = default_instance.run_workflow
+
     return runner(**run_args)

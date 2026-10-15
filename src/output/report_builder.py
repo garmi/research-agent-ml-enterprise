@@ -7,7 +7,14 @@ from typing import Any, Dict, List
 
 class ReportBuilder:
     def __init__(self, base_dir: str = "outputs"):
-        self.base_dir = Path(base_dir)
+        from src.engine.stub_mode import is_stub_mode
+        if is_stub_mode() and str(base_dir) == "outputs":
+            import tempfile
+            self._temp_dir_obj = tempfile.TemporaryDirectory()
+            self.base_dir = Path(self._temp_dir_obj.name)
+        else:
+            self._temp_dir_obj = None
+            self.base_dir = Path(base_dir)
         self.reports_dir = self.base_dir / "reports"
         self.json_dir = self.base_dir / "json"
         self.csv_dir = self.base_dir / "csv"
