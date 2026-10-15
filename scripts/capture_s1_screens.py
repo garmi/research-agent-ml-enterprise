@@ -1,4 +1,14 @@
-"""Capture 3 screenshots of the S1 intake UI states using Playwright."""
+"""Capture screenshots of the S1 intake UI states using Playwright (Slice S1 Round 3).
+
+Captures:
+1. 01_intake_empty.png (empty state)
+2. 02_intake_framings_shown.png (framings shown)
+3. 03_intake_approved_run_enabled.png (approved with Run enabled)
+4. 04_intake_edited_after_approval.png (edited after approval)
+5. 05_intake_approved_dark_mode.png (approved state in dark mode)
+"""
+
+from __future__ import annotations
 
 import os
 import signal
@@ -11,10 +21,12 @@ import urllib.request
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 
+
 def find_free_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(("", 0))
         return s.getsockname()[1]
+
 
 def is_ready(url: str) -> bool:
     try:
@@ -23,8 +35,9 @@ def is_ready(url: str) -> bool:
     except Exception:
         return False
 
+
 def main():
-    repo_root = Path.cwd()
+    repo_root = Path(__file__).resolve().parent.parent
     screens_dir = repo_root / "docs" / "screens" / "s1"
     screens_dir.mkdir(parents=True, exist_ok=True)
 
@@ -43,6 +56,7 @@ def main():
         env["HOME"] = tmp_home
         env["PYTHONPATH"] = "."
         env["HOSTED_DEMO"] = "0"
+        env["STUB_LLM"] = "1"
 
         proc = subprocess.Popen(
             [
@@ -81,15 +95,20 @@ def main():
                     headless=True,
                     args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
                 )
-                page = browser.new_page(viewport={"width": 1280, "height": 1100})
-                page.goto(f"{server_url}/?stub=1", wait_until="networkidle")
+
+                # --------------------------------------------------------------
+                # Light Mode Context
+                # --------------------------------------------------------------
+                context = browser.new_context(viewport={"width": 1280, "height": 1700})
+                page = context.new_page()
+                page.goto(f"{server_url}/", wait_until="networkidle")
                 time.sleep(2)
 
                 # State 1: Empty
                 print("Capturing State 1 (empty)...")
                 path_1 = screens_dir / "01_intake_empty.png"
                 page.screenshot(path=str(path_1), full_page=True)
-                print(f"Saved: {path_1}")
+                print(f"Saved: {path_1.name}")
 
                 # State 2: Framings shown
                 print("Entering question text...")
@@ -101,7 +120,7 @@ def main():
                 print("Capturing State 2 (framings shown)...")
                 path_2 = screens_dir / "02_intake_framings_shown.png"
                 page.screenshot(path=str(path_2), full_page=True)
-                print(f"Saved: {path_2}")
+                print(f"Saved: {path_2.name}")
 
                 # State 3: Approved with Run enabled
                 print("Clicking Approve this framing...")
@@ -112,10 +131,49 @@ def main():
                 print("Capturing State 3 (approved with Run enabled)...")
                 path_3 = screens_dir / "03_intake_approved_run_enabled.png"
                 page.screenshot(path=str(path_3), full_page=True)
-                print(f"Saved: {path_3}")
+                print(f"Saved: {path_3.name}")
 
+                # State 4: Edited after approval
+                print("Editing question text after approval...")
+                page.locator("textarea").first.fill(q1_text + " and code quality metrics")
+                page.locator("textarea").first.press("Tab")
+                time.sleep(2)
+
+                print("Capturing State 4 (edited after approval)...")
+                path_4 = screens_dir / "04_intake_edited_after_approval.png"
+                page.screenshot(path=str(path_4), full_page=True)
+                print(f"Saved: {path_4.name}")
+
+                context.close()
+
+                # --------------------------------------------------------------
+                # Dark Mode Context (Approved State: Deliberately Always Light)
+                # --------------------------------------------------------------
+                print("Setting up dark mode context...")
+                dark_context = browser.new_context(
+                    viewport={"width": 1280, "height": 1700},
+                    color_scheme="dark",
+                )
+                dark_page = dark_context.new_page()
+                dark_page.emulate_media(color_scheme="dark")
+                dark_page.goto(f"{server_url}/", wait_until="networkidle")
+                time.sleep(2)
+
+                dark_page.locator("textarea").first.fill(q1_text)
+                dark_page.locator("textarea").first.press("Tab")
+                time.sleep(2)
+                dark_approve_btn = dark_page.locator('button:has-text("Approve this framing")')
+                dark_approve_btn.click()
+                time.sleep(2)
+
+                print("Capturing State 5 (approved state in dark OS mode - always light)...")
+                path_5 = screens_dir / "05_intake_always_light_in_dark_os.png"
+                dark_page.screenshot(path=str(path_5), full_page=True)
+                print(f"Saved: {path_5.name}")
+
+                dark_context.close()
                 browser.close()
-                print("Done capturing screenshots.")
+                print("Done capturing all screenshots.")
 
         finally:
             if proc.poll() is None:
@@ -130,6 +188,7 @@ def main():
                     proc.wait(timeout=5)
                 except Exception:
                     proc.kill()
+
 
 if __name__ == "__main__":
     main()
