@@ -51,6 +51,7 @@ from src.ledger.ui_views import (
 )
 from src.engine.entry import start_run
 from src.engine.ids import resolve_question_id
+from src.engine.stub_mode import is_stub_mode
 from src.ui.safe_page import safe_page, format_error_payload, render_safe_error
 from src.ui.intake_view import render_intake_view
 
@@ -96,6 +97,14 @@ def get_available_models() -> Dict[str, str]:
     else:
         options["Google Gemini 2.5 Flash (Remote API — sends prompt out-of-boundary) [API Key Required]"] = "gemini"
     return options
+
+
+def render_stub_banner_if_active() -> bool:
+    """Render persistent red banner at top of page if stub mode is active."""
+    if is_stub_mode():
+        st.error("TEST MODE: synthetic data. Results are not real and cannot be published.")
+        return True
+    return False
 
 
 # --- PAGE SETUP ---
@@ -250,22 +259,48 @@ st.markdown(
         transform: translateY(-1px);
     }
 
-    /* Primary Launch Button */
-    button[kind="primary"] {
-        background: var(--brand-gradient) !important;
-        border: none !important;
-        border-radius: 10px !important;
-        font-weight: 700 !important;
+    /* Primary Launch Button - Enabled (Single Blue Primary Button) */
+    button[kind="primary"]:not(:disabled) {
+        background: #2563EB !important;
+        background-color: #2563EB !important;
+        background-image: none !important;
+        color: #FFFFFF !important;
+        border: 1px solid #1D4ED8 !important;
+        border-radius: 8px !important;
+        font-weight: 600 !important;
         letter-spacing: -0.01em !important;
         font-size: 0.95rem !important;
         padding: 0.65rem 1.4rem !important;
-        box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3) !important;
-        transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+        box-shadow: 0 1px 3px rgba(37, 99, 235, 0.2) !important;
+        transition: all 0.15s ease !important;
+        cursor: pointer !important;
     }
 
-    button[kind="primary"]:hover {
-        box-shadow: 0 6px 20px rgba(37, 99, 235, 0.45) !important;
+    button[kind="primary"]:not(:disabled):hover {
+        background: #1D4ED8 !important;
+        background-color: #1D4ED8 !important;
+        background-image: none !important;
+        box-shadow: 0 2px 6px rgba(29, 78, 216, 0.3) !important;
         transform: translateY(-1px) !important;
+    }
+
+    /* Disabled Button: flat grey background, grey text with readable contrast, NO gradient */
+    button:disabled,
+    button[disabled],
+    button[kind="primary"]:disabled,
+    button[kind="secondary"]:disabled,
+    button[disabled]:hover,
+    button[disabled]:active {
+        background: #E2E8F0 !important;
+        background-color: #E2E8F0 !important;
+        background-image: none !important;
+        color: #475569 !important;
+        border: 1px solid #CBD5E1 !important;
+        border-radius: 8px !important;
+        box-shadow: none !important;
+        cursor: not-allowed !important;
+        transform: none !important;
+        opacity: 1 !important;
     }
 
     .verdict-banner {
@@ -860,6 +895,8 @@ with st.sidebar:
 # ==============================================================================
 # HEADER
 # ==============================================================================
+render_stub_banner_if_active()
+
 st.markdown(
     """
     <div class="studio-header">
@@ -882,11 +919,7 @@ if os.getenv("HOSTED_DEMO") == "1":
 # ==============================================================================
 # STRATEGIC QUESTION FORMULATION AGENT
 # ==============================================================================
-is_stub_requested = (
-    st.query_params.get("stub") == "1"
-    or st.query_params.get("mock") == "1"
-    or os.getenv("STUB_LLM") == "1"
-)
+is_stub_requested = is_stub_mode()
 default_formulate_provider = "stub" if is_stub_requested else ("ollama" if ollama_online and not has_gemini_key else "gemini")
 
 intake_state = render_intake_view()
@@ -974,7 +1007,7 @@ with lane_input_col3:
                 <span style="font-size: 0.7rem; background: #D1FAE5; color: #047857; padding: 0.1rem 0.4rem; border-radius: 4px; font-weight: 700;">🔒 Local Only</span>
             </div>
             <div style="font-size: 0.74rem; color: #059669; margin-top: 0.2rem;">
-                ledger/practitioner.db • Gate 6 Privacy Isolated
+                ledger/practitioner.db • Private, stays on this computer
             </div>
         </div>
         """,
@@ -993,14 +1026,14 @@ with lane_input_col3:
             key="custom_prac_urls_input",
             placeholder="https://github.com/org/repo/issues/102\nIncident note: Platform migration latency regression...\nDelivery note: Canary rollout verified 0-downtime",
             height=90,
-            help="Paste local incident links or field observation notes. Stored locally in practitioner.db; Gate 6 abstraction verified.",
+            help="Paste local incident links or field observation notes. Stored locally in practitioner.db; privacy abstraction verified.",
         )
         st.session_state["custom_prac_urls"] = custom_prac_input
 
         prac_col1, prac_col2 = st.columns(2)
         with prac_col1:
             prac_abs_confirmed = st.checkbox(
-                "Gate 6: Confirm Practitioner Abstraction (Human Operator Sign-Off)",
+                "Confirm Practitioner Abstraction (Human Operator Sign-Off)",
                 value=False,
                 help="Mandatory operator sign-off confirming all client and proprietary identifiers have been abstracted.",
             )
@@ -1015,15 +1048,11 @@ with lane_input_col3:
 with st.expander("⚙️ Advanced Settings & Deterministic Governance Hub", expanded=False):
     adv_col1, adv_col2, adv_col3 = st.columns(3)
     with adv_col1:
-        st.checkbox("Deterministic Hallucination Gate (G1–G6)", value=True, help="Enforces strict 1-to-1 citation mapping against verified repositories.")
+        st.checkbox("Deterministic Evidence Verification Guardrails", value=True, help="Enforces strict 1-to-1 citation mapping against verified repositories.")
         st.checkbox("Strict Crossref / DOI Validation", value=True)
     with adv_col2:
         model_names = list(available_models.keys())
-        is_stub_requested = (
-            st.query_params.get("stub") == "1"
-            or st.query_params.get("mock") == "1"
-            or os.getenv("STUB_LLM") == "1"
-        )
+        is_stub_requested = is_stub_mode()
         if is_stub_requested and "Deterministic Offline Engine (Zero-API Fallback)" not in model_names:
             available_models["Deterministic Offline Engine (Zero-API Fallback)"] = "stub"
             model_names.append("Deterministic Offline Engine (Zero-API Fallback)")
@@ -1951,7 +1980,7 @@ else:
                     <strong>Local Isolation Architecture:</strong><br>
                     • <code>ledger/practitioner.db</code> (Local, gitignored)<br>
                     • Zero cloud network leakage<br>
-                    • Gate 6 human privacy abstraction required<br>
+                    • Human privacy abstraction required<br>
                     • <em>+ Custom Practitioner Notes & URLs</em>
                 </div>
                 <div style="font-size: 0.76rem; color: #059669; margin-top: 0.5rem; font-weight: 600;">
