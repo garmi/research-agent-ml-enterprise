@@ -449,7 +449,7 @@ render_intake_view()
     run_btn = at.button(key="btn_run_research")
     assert run_btn is not None
     assert run_btn.disabled is True
-    assert any("Please enter a research topic in Step 1" in w.value for w in at.warning)
+    assert any("Type a question in Step 1." in m.value for m in at.markdown)
 
     # User inputs a question
     at.text_area(key="input_user_question").input("What empirical evidence exists for test automation?").run()
@@ -471,7 +471,7 @@ render_intake_view()
     # Run button must now be disabled again with the specified after-edit message
     run_btn = at.button(key="btn_run_research")
     assert run_btn.disabled is True
-    assert any("You changed the question after approving a framing. Approve a framing again to continue." in w.value for w in at.warning)
+    assert any("You changed the question after approving. Approve a framing again." in m.value for m in at.markdown)
 
 
 # ==============================================================================

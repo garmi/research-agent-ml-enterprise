@@ -112,9 +112,9 @@ def test_executive_studio_ui_smoke():
                 assert page.locator("text=Lane B: Enterprise Literature").count() > 0
                 assert page.locator("text=Lane C: Practitioner Delivery").count() > 0
 
-                # 4. Assert Question Formulation Agent Panel & Console
-                assert page.locator("text=Strategic Question Formulation Agent").count() > 0
-                assert page.locator('button:has-text("Formulate Question")').count() > 0
+                # 4. Assert Intake Panel & Console
+                assert page.locator("text=Frame your question").count() > 0
+                assert page.locator('button:has-text("Show framings")').count() > 0
 
                 run_btn = page.locator('button:has-text("Run Research")')
                 assert run_btn.count() > 0
@@ -122,7 +122,7 @@ def test_executive_studio_ui_smoke():
 
                 # 5. Assert Empty Topic Validation & Approval Flow
                 assert run_btn.is_disabled()
-                assert page.locator("text=Please enter a research topic in Step 1.").count() > 0
+                assert page.locator("text=Type a question in Step 1.").count() > 0
 
                 # Enter Q1 text
                 q1_text = "What empirical evidence exists regarding Amazon Kiro adoption, productivity gains, and delivery trade-offs in engineering teams?"
