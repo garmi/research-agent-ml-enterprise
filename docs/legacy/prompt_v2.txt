@@ -1,0 +1,278 @@
+<USER_REQUEST>
+/goal # Research Engine v2 — Coding Agent Prompt
+
+You are extending an existing, working research engine. You have the repo and its history. **The repo is the source of truth, not this document.** Where this prompt's folder names, commands or assumptions differ from the repo, follow the repo's conventions and record the deviation in `DECISIONS.md`.
+
+Read this whole prompt before touching code. Work in phases. Each phase ends with a report and a hard STOP for human review (Section 12).
+
+---
+
+## 1. Purpose and the problem being fixed
+
+The engine takes research inputs and produces reports. Two sample outputs showed why v2 is needed:
+
+1. A Kiro brief cited a 2023 paper on general AI assistants for a Kiro-specific productivity figure ("up to 35%"). Only one of eight papers was actually about Kiro. The brief presented an evidence gap as if it were an answer.
+2. The brief grouped weak-venue and strong-venue sources together with no grading, propagated a corrupted term ("vibrate coding" for "vibe coding"), and filled content ideas by pasting the raw topic string into templates.
+3. A second sample report had headline numbers (20x, 67%, 90%) with no citations, decorative stock images captioned as figures, and invented framework acronyms.
+
+**Goal of v2:** a question-driven pipeline whose outputs are traceable, honestly graded, and reviewed by a human before anything is published. The owner is a senior delivery leader building public thought-leadership on AI governance in multi-vendor enterprise delivery. His credibility depends on every claim being checkable.
+
+**North-star behaviours:**
+- Every factual sentence traces to a graded claim in a ledger.
+- The system says what is NOT known as clearly as what is.
+- A human decides what is signal. The engine drafts evidence; it never writes the owner's opinions or first-person experience.
+- Local-first, low cost, no confidential data leaving the machine.
+
+---
+
+## 2. Hard constraints (non-negotiable)
+
+1. **Local-first.** Ollama for extraction and triage. Free public APIs for papers. A stronger remote model may be used ONLY for synthesis over public-lane claims, behind a config flag that defaults OFF, via a provider abstraction. The practitioner lane must never reach any remote model.
+2. **Confidentiality.** Practitioner data lives in a separate SQLite file (`practitioner.db`), gitignored, never exported except through the Gate 6 abstraction check. A gitignored `denylist.txt` (client, vendor, programme and person names) is scanned before any publish.
+3. **Copyright-safe outputs.** Store metadata plus a short source excerpt (max 25 words) per claim for verification. Outputs paraphrase. Any direct quote is under 15 words, at most one per source, clearly marked. No verbatim run of 8 or more words from a source outside a marked quote.
+4. **Source terms.** Respect robots.txt and each site's terms. No scraping paywalled content. Use official APIs (arXiv, Semantic Scholar, Crossref, OpenAlex, SEC EDGAR with a proper User-Agent). Cache responses; rate-limit politely; retry with backoff.
+5. **State durability (mandatory from day one).** A schema_version table, forward-only migrations, an automatic timestamped backup before every migration and before bulk writes (keep the last N), a migration test that loads a populated old-version DB and checks nothing is lost, SQLite WAL mode, and an integrity check on startup. Do not ship any schema change without its migration and test.
+6. **No rebuilds.** Do not rewrite working fetchers, the CLI, or the local frontend. Extend. Keep the existing CLI (`--topic`, `--mode quick|deep`) working; old outputs are marked `legacy-ungraded` and can never be published.
+7. **No invented branding.** Outputs must not introduce acronyms or named frameworks unless a cited source uses them. No stock imagery.
+8. **Determinism.** Seeds, model IDs, config and code version are recorded per run so a run can be reproduced.
+
+---
+
+## 3. Phase 0 — Audit (do this first, change no behaviour)
+
+Produce `AUDIT.md` covering:
+- Current architecture, entry points, config, dependencies, and which APIs the fetchers actually use (the README may be stale: recent runs used Crossref and OpenAlex).
+- The existing local frontend: how it is launched, its stack, how it talks to the engine, any API it already has, where it stores state, and what a human can currently do in it.
+- What the current outputs contain (`research_report.md/json`, `paper_index.csv`, content pack) and which pieces will be superseded.
+- Test coverage and any gaps.
+- Risks and proposed deviations from this prompt.
+
+Ask the owner a question only if the answer changes the schema or the frontend approach. Otherwise decide, log it in `DECISIONS.md`, and continue.
+
+---
+
+## 4. Target architecture
+
+```
+QUESTION REGISTER (YAML + frontend editor)
+        |
+   +----+-----------------+
+   A Academic     B Enterprise      C Practitioner
+   lane           lane              lane (local only)
+   +----+-----------------+
+        v
+   CLAIM EXTRACTION -> atomic claim records
+        v
+   EVIDENCE LEDGER (SQLite)
+        v
+   GRADING (rules, deterministic)
+        v
+   GAP MATRIX (per question: academic x enterprise x field)
+        v
+   SYNTHESIS (reads ledger only; sentence-level citations)
+        v
+   CHECKER + SCORER -> HUMAN GATES -> PUBLISH GATE -> outputs
+```
+
+Adapt folder names to the repo. Target layout for reference:
+
+```
+questions/register.yaml
+collectors/{academic,enterprise,practitioner}/
+extract/            claim extraction
+ledger/             schema.sql, migrations/, ledger.db
+grade/              rules.yaml, venue_tiers.yaml, grader
+gaps/               matrix builder
+synth/              templates/, strength_verbs.yaml, generator, checker
+score/              scoring.yaml, scorer
+publish/            field_note, strategy_doc, json export, site export
+evals/              regression cases, labelled samples
+runs/               dated outputs and diffs
+```
+
+---
+
+## 5. Data model (SQLite, `ledger.db`; practitioner data in `practitioner.db` with the same claim schema)
+
+All tables carry `created_at`. IDs are stable (UUID or content-derived). Add indexes on foreign keys.
+
+- **meta**: schema_version, created_at.
+- **questions**: id, text, scope, time_window_months, status (draft|active|retired), version.
+- **sources**: id, lane (academic|enterprise|practitioner), source_type (peer_reviewed|preprint|vendor_blog|customer_case_study|analyst_survey|regulator_standard|filing|incident_report|job_posting|practitioner_note), org, title, url, doi, venue, venue_tier (verified|reputable_preprint|unverified|vendor|n/a), pub_date, retrieved_at, content_hash, extraction_depth (abstract_only|full_text|structured_data), commercial_stake (none|vendor|sponsored|unknown), status.
+- **claims**: id, question_id, source_id, text (paraphrase, never a copy), source_excerpt (max 25 words) with location, value_json (numbers with units and basis), entity (product, company or standard the claim is about), entity_match (exact|family|topic_level|mismatch), study_type (field_experiment|controlled_study|survey_with_method|case_study|position_paper|conceptual_framework|vendor_assertion|filing_disclosure|practitioner_observation), context_json (sample, sector, scale, geography), claim_date, extraction_model, extraction_confidence, grade (strong|moderate|weak|vendor_claim|anecdote), grade_reasons_json, status (auto|approved|edited|rejected), observations_count (practitioner lane).
+- **claim_links**: claim_a, claim_b, relation (corroborates|contradicts|supersedes|duplicate_source).
+- **runs**: id, started_at, config_json, code_version, model_ids, question_ids, seed.
+- **search_log**: id, run_id, question_id, lane, query, source_api, result_count, executed_at. This lets the system prove "searched, nothing found".
+- **gap_matrix**: id, run_id, question_id, academic_state, enterprise_state, field_state, outcome (1 supported | 2 practice_without_evidence | 3 evidence_without_practice | 4 unmeasured), rationale, status.
+- **reviews** (append-only audit): id, gate, object_type, object_id, action, before_json, after_json, reason, reviewer, ts.
+- **outputs**: id, run_id, kind (field_note|strategy_doc|json_export), version, path, status (draft|in_review|published|blocked), score_json, gates_json.
+- **output_sentences**: id, output_id, ordinal, text, type (assertive|opinion|field|heading), claim_ids_json, strength_verb, checks_json.
+
+---
+
+## 6. The three lanes
+
+**A. Academic.** Keep existing fetchers. Add: abstract-only flag (`extraction_depth`), study-type tagging, venue tier lookup from `venue_tiers.yaml`, dedupe by DOI then fuzzy title, citation count stored as a signal (not a grade input), time-window filter per question. Unknown venues default to `unverified`; the human tiers them in the frontend. Do not hardcode judgments about specific publishers beyond the categories above.
+
+**B. Enterprise.** A curated `sources_registry.yaml`, not a crawl. Each entry: id, org, source_type, url or feed, access method (RSS|API|EDGAR|manual), cadence, commercial_stake, terms/robots note, status. Start with exactly five: three vendor primary sources (engineering or news feeds), SEC EDGAR filings (10-K/10-Q AI language), and one public analyst survey. Verify each source's terms before enabling it. Every claim carries who is saying it (vendor, customer, independent, regulator, analyst).
+
+**C. Practitioner.** Entry through the local frontend (Section 9, View 7). Structured fields: situation, decision, action, outcome, metric if any, sector, date, abstraction confirmed. Stored only in `practitioner.db`. Grade defaults to `anecdote`; `observations_count` records repeat sightings and never lifts the grade on its own. Nothing here is exported before Gate 6.
+
+---
+
+## 7. Claim extraction and grading
+
+**Extraction.** Local model, structured JSON output, schema-validated, one claim per atomic assertion. Record `extraction_confidence`. Reject and log malformed output; never silently repair it. Normalise terms against the source text so a term of art cannot be corrupted (the "vibrate coding" failure): extracted key terms must appear in the source excerpt or be flagged.
+
+**Entity matching.** `exact` only if the source is actually about the entity named in the claim. A general AI-assistant paper never supports a Kiro-specific sentence; it can be `topic_level` only.
+
+**Grading is rule-based and deterministic** (`grade/rules.yaml`, thresholds in config):
+- `strong`: verified peer-reviewed venue + empirical study type + entity match adequate for the claim + no unresolved contradiction, OR independently measured by 2 or more independent sources.
+- `moderate`: reputable preprint or peer-reviewed with empirical method but narrow context, OR 2 or more independent customer claims.
+- `weak`: position paper, conceptual framework, unverified venue, or abstract-only extraction with no method detail.
+- `vendor_claim`: source org has a commercial stake (vendor blog, marketing, sponsored research), unless independently corroborated.
+- `anecdote`: single case, practitioner lane, or social post.
+- **Caps:** abstract-only caps at moderate; an unresolved contradiction caps at weak; entity mismatch means the claim is usable only at topic level.
+- Independence: sources from the same organisation or author group count once.
+- Store `grade_reasons_json` listing each rule that fired so the frontend can show why.
+
+---
+
+## 8. Gap matrix and synthesis
+
+**Gap matrix.** Per question, state each lane's state (supported | partial | none found | contradicted) and assign an outcome 1 to 4. Outcomes 2, 3 and 4 are the strategic value; surface them prominently. "None found" requires a matching `search_log` entry.
+
+**Synthesis.**
+- Reads claims only (approved, or auto-graded if the Gate 3 policy allows).
+- Every assertive sentence carries claim IDs.
+- Strength-verb mapping in `strength_verbs.yaml`: strong = shows/demonstrates/finds; moderate = suggests/indicates; weak = reports/proposes/one study claims; vendor_claim = "[org] states"; anecdote = "in one case". No sentence may exceed the cap of its weakest cited claim.
+- Opinion and field-experience sentences (`type = opinion|field`) are written by the human in the frontend. The engine never generates them and never writes first-person experience.
+- Failing sentences are flagged or removed. Never silently rewrite a failure into a pass.
+- No template that interpolates the raw topic string into prose. Lint for repeated boilerplate sentences.
+
+**Output templates.**
+1. *Field Note*: Question; What the evidence supports; What it does not support; The gap (matrix outcome); My view [human]; Evidence appendix linking graded claims.
+2. *Strategy document*: Vision; Evidence-graded current state; Gaps; Bets; 12-month plan; Kill criteria per bet; Assumptions to test.
+3. *JSON export* for the website (versioned schema).
+
+---
+
+## 9. Human-in-the-loop on the existing local frontend
+
+Extend the frontend found in Phase 0. If it has no API, add a minimal local-only API bound to 127.0.0.1. No runtime CDN or network calls from the frontend, no telemetry. Every action writes an append-only row to `reviews` (who, when, before, after, reason) and is reversible.
+
+**Views (build in this order across phases):**
+1. **Claim Review Queue (Gate 3, build first).** Sorted by uncertainty (low extraction confidence, near a grade boundary, contradictions first). Side-by-side: claim, source excerpt highlighted in context, grade with reasons. Actions: approve, edit, reject, change grade (reason required), change entity match. Keyboard shortcuts. Bulk approve only for identical source + grade + study type.
+2. **Venue and Source Tiering (Gate 2).** Unknown venues and enterprise sources queue here; tier decisions persist to `venue_tiers.yaml` and the DB.
+3. **Question Register (Gate 1).** Create, edit, retire questions; set time windows.
+4. **Gap Matrix (Gate 4).** Review outcomes and rationales; sign off or override with reason.
+5. **Draft Review (Gate 5).** Per-sentence check badges (traceability, numerics, entity, language, confidentiality, copyright). Human edits and adds opinion/field sentences. Show engine-draft versus human-final diff (stored, diagnostic only).
+6. **Publish Gate (Gate 6).** Scorecard (Section 10), abstraction checklist, denylist scan results, final approve. An output cannot reach `published` unless every gate is complete and no hard gate failed.
+7. **Field Notes entry (practitioner lane).** Structured form; abstraction guidance; writes only to `practitioner.db`.
+8. **Runs and Scores.** History, trends, diffs between runs.
+
+---
+
+## 10. Scoring the final output
+
+Thresholds and weights live in `score/scoring.yaml` so the owner can tune them. The scorer runs after every draft and on demand in the frontend, and stores `score_json` and `gates_json` on the output.
+
+**Definitions.** *Assertive sentences* = sentences making factual claims (excludes headings, questions, `opinion`, `field`). A claim is *eligible* if approved or auto-graded under the active Gate 3 policy.
+
+### 10.1 Hard gates (any failure = status BLOCKED; the score is shown but marked invalid)
+
+| Gate | Rule |
+|---|---|
+| G1 Traceability | 100% of assertive sentences cite at least one eligible claim ID |
+| G2 Numeric fidelity | Every numeral (percentages, multipliers, currency, counts) in an assertive sentence appears in a cited claim's value or text. Derived numbers must be tagged DERIVED with formula and input claim IDs |
+| G3 Entity fidelity | If a sentence names a product, company or standard, every cited claim has `entity_match = exact` (or `family` where the sentence says so) for it |
+| G4 Language honesty | No sentence's strength verb exceeds the cap of its weakest cited claim |
+| G5 Confidentiality | Zero denylist hits and zero practitioner content not passed through abstraction |
+| G6 Copyright | No quote of 15+ words, no more than one quote per source, no verbatim run of 8+ words outside marked quotes |
+
+### 10.2 Quality score (0 to 100, meaningful only if all gates pass)
+
+| Component | Weight | Formula |
+|---|---|---|
+| S1 Evidence strength | 30 | Mean over assertive sentences of min(1, grade_value(sentence) / best_grade_available_for_question). grade_value: strong 1.0, moderate 0.7, weak 0.4, vendor_claim 0.3, anecdote 0.2 (use the weakest cited claim). Normalising to the best available evidence means honest reporting of a thin literature is not penalised. |
+| S2 Corroboration and diversity | 15 | 0.7 x (share of key findings supported by 2 or more independent sources) + 0.3 x (share spanning 2 or more lanes) |
+| S3 Question coverage | 15 | Share of (question, lane) cells with at least one eligible claim or an explicit "searched, nothing found" record backed by `search_log` |
+| S4 Gap disclosure | 10 | Share of in-scope questions whose gap-matrix outcome is stated in the output, averaged with recall of ledger contradictions that the output mentions |
+| S5 Freshness and scope | 10 | Share of cited claims inside the question's time window (defaults: enterprise 24 months, academic 36 months; human can mark a source foundational) |
+| S6 Human review | 10 | 0.6 x (share of cited claims reviewed at Gate 3) + 0.4 x (share of Gates 1 to 6 completed) |
+| S7 Reproducibility | 10 | Re-run extraction and grading from cached sources; score = agreement (Jaccard of approved claim set, weighted by grade agreement) |
+
+**Bands:** 85+ publish-ready (still passes Gate 6 by hand); 70 to 84 revise; below 70 do not publish. BLOCKED overrides any band.
+
+**Diagnostics (tracked, not scored, to avoid perverse incentives):** engine-draft versus human-final edit distance; share of sentences flagged and removed; claims rejected at Gate 3 by reason.
+
+### 10.3 Engine-level quality (separate from per-output score)
+
+- Extraction precision and recall against a human-labelled sample (start with 50 claims from the existing Kiro papers). Starting target: precision 0.90 or higher; report recall.
+- Grading agreement between the rules and human grades on that sample. Starting target: 0.80 or higher; every disagreement becomes a rule review.
+- Regression suite pass rate must be 100%.
+- Starting thresholds are proposals; tune them from real data and record changes in `DECISIONS.md`.
+
+### 10.4 Frontend scorecard
+
+Show gates (pass/fail with the offending sentences), the seven components with their inputs, the band, and links to the sentences and claims that lowered each component.
+
+---
+
+## 11. Regression and adversarial suite (`evals/`, runs in CI and on demand)
+
+Each case is a planted fixture with an expected result. Build these first, before the features they test.
+
+1. R1 Kiro misattribution: a 2023 general-assistant claim cited in a Kiro-specific sentence. Expect G3 fail.
+2. R2 Fabricated figure not in the ledger. Expect G2 fail.
+3. R3 Vendor claim written as fact. Expect G4 fail.
+4. R4 Reliance on an unverified-venue source. Expect grade capped at weak.
+5. R5 Denylist name in the text. Expect G5 fail.
+6. R6 Long verbatim copy from a source. Expect G6 fail.
+7. R7 Uncited assertive sentence. Expect G1 fail.
+8. R8 Stale source outside the time window. Expect S5 drop.
+9. R9 Known contradiction omitted from output. Expect S4 drop.
+10. R10 Schema migration on a populated old DB. Expect zero data loss.
+11. R11 Re-run reproducibility on cached inputs. Expect S7 at or above threshold.
+12. R12 Practitioner claim exported without abstraction. Expect blocked.
+13. R13 Corrupted term of art (the "vibrate coding" case). Expect a term-integrity flag.
+14. R14 Raw topic string interpolated into boilerplate. Expect a lint failure.
+
+---
+
+## 12. Phases, stop conditions and reporting
+
+Work on a branch per phase with small commits. Write tests before the checker and grader. Keep thresholds and weights in config files. Log choices in `DECISIONS.md`.
+
+| Phase | Scope | Acceptance (all required) |
+|---|---|---|
+| 0 | Audit | `AUDIT.md` complete; no behaviour change |
+| 1 | Ledger (with durability) + claim extraction + checker on the existing eight Kiro papers; regression cases R1 to R7, R10 | Migration test passes; R1 to R7 behave as expected; report states how many claims survive grading and what the output would score. **If results are not credible, STOP and fix before Phase 2** |
+| 2 | Question register, grading rules, venue tiers, Claim Review Queue (View 1, 2, 3), R4, R13 | A human can review a full queue in the frontend; every action is in `reviews` |
+| 3 | Enterprise lane with 5 sources, search_log, source terms checks | Each source verified for terms; claims carry stake tags; R8 |
+| 4 | Gap matrix, synthesis, scorer, Views 4, 5, 6, 8, remaining regression cases | A Field Note on one question scores with full gate and component breakdown in the frontend |
+| 5 | Practitioner lane (View 7), abstraction check, denylist scan, publish gate, JSON export | R5, R12 pass; practitioner data provably isolated |
+
+**End of every phase:** write `PHASE_n_REPORT.md` with what changed, tests run and results, scores achieved, deviations from this prompt, open questions and risks. Then STOP and wait for human review. Do not start the next phase unprompted.
+
+**Report format for any score:** gates (pass/fail), components (value and inputs), band, and the three changes that would raise the score most.
+
+---
+
+## 13. Do not
+
+- Build a new web UI, add new paper APIs, add PDF summarisation, or expand beyond the five enterprise sources before Phase 4 is accepted.
+- Let any output contain a number, product claim or quote that does not trace to the ledger.
+- Generate the owner's opinions or invent field experience.
+- Send practitioner data to any remote model or service.
+- Store full article text; store metadata and short excerpts only.
+- Guess when a decision would change the schema or the privacy model: stop and ask.
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-10-10T19:55:48+05:30.
+
+The user has mentioned some items in the form @[ITEM]. Here is extra information about the items that were mentioned by the user, in the order that they appear:
+
+/goal is a [Slash Command]:
+The user has marked this task with /goal, indicating that this task is intended to run for a long time without user input, e.g. overnight. You should be extra thorough and only stop when you are confident the goal has been completely fulfilled. The system will force you to continue execution, prompting you to audit your work until completion. Once complete, include <!-- GOAL_COMPLETE --> in your response. If the user explicitly asked to stop or cancel this goal, include <!-- GOAL_CANCELLED --> in your response to cancel the goal.
+</ADDITIONAL_METADATA>

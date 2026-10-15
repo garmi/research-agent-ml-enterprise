@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 
 HARDENING_SCRIPT = Path("scripts/cloud_run_hardening.sh")
-REPORT_PATH = Path("INTEGRITY_REPORT.md")
+REPORT_PATH = Path("docs/legacy/INTEGRITY_REPORT.md") if Path("docs/legacy/INTEGRITY_REPORT.md").exists() else Path("INTEGRITY_REPORT.md")
 
 
 def test_hardening_script_service_and_region():
