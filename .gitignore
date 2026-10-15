@@ -61,4 +61,6 @@ denylist.txt
 ledger/backups/
 *.db-shm
 *.db-wal
+ledger/approvals/
+logs/
 

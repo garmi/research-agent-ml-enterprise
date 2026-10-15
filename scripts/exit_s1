@@ -1,0 +1,138 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ==============================================================================
+# Exit Script for Slice S1: Walking skeleton (Requirement R1)
+# ==============================================================================
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$REPO_ROOT"
+
+echo "======================================================================"
+echo "Executing Slice S1 Exit Verification Script"
+echo "======================================================================"
+
+export RESEARCH_USER="exit-script"
+
+# Run the S1 transcript demonstration using isolated temp directory
+.venv/bin/python - << 'EOF'
+import json
+import re
+import sys
+import tempfile
+from pathlib import Path
+import yaml
+
+from src.engine.ids import resolve_question_id, load_question_register, compute_question_sha256
+from src.engine.framings import generate_framings
+from src.engine.approvals import save_gate1_approval, get_latest_gate1_approval
+from src.engine.entry import start_run, GateApprovalError
+
+print("--- 1. Canary Q1 Submission & Question ID Resolution ---")
+# Dynamically load Q1 from questions/register.yaml
+registered = load_question_register("questions/register.yaml")
+q1_entry = next((q for q in registered if q.get("id") == "q-kiro-empirical"), None)
+if not q1_entry:
+    print("ERROR: q-kiro-empirical not found in questions/register.yaml")
+    sys.exit(1)
+
+q1_text = q1_entry["text"]
+q1_id = resolve_question_id(q1_text)
+print(f"Canary Q1 Text (verbatim): '{q1_text}'")
+print(f"Resolved Question ID: {q1_id}")
+assert q1_id == "q-kiro-empirical", f"Expected q-kiro-empirical, got {q1_id}"
+
+print("\n--- 2. Fixed Problem Lenses (Zero User Words Embedded) ---")
+lenses = generate_framings(q1_text)
+for i, lens in enumerate(lenses, 1):
+    print(f"  [{i}] Lens: {lens.title}")
+    print(f"      Focus: {lens.focus}")
+    print(f"      Counts as evidence: {lens.counts_as_evidence}")
+    print(f"      Out of scope: {lens.out_of_scope}")
+
+with tempfile.TemporaryDirectory() as tmp_dir:
+    approvals_dir = Path(tmp_dir) / "approvals"
+
+    print("\n--- 3. start_run Execution Attempt: Unapproved Framing ---")
+    def stub_runner(**kwargs):
+        return {"run_id": "run-stub-s1-demo", "status": "completed", "topic": kwargs.get("topic")}
+
+    try:
+        start_run(
+            question_id=q1_id,
+            question_text=q1_text,
+            runner=stub_runner,
+            approvals_dir=approvals_dir,
+        )
+        print("ERROR: start_run unexpectedly succeeded without approval!")
+        sys.exit(1)
+    except GateApprovalError as exc:
+        msg = str(exc)
+        print(f"REFUSED AS EXPECTED (Gate 1 unapproved): {msg}")
+        assert not re.search(r"\b[0-9a-f]{8,64}\b", msg), "Hash leaked in error message!"
+
+    print("\n--- 4. Gate 1 Approval: Approving Lens 1 (Empirical effect) ---")
+    lens1 = lenses[0]
+    approval = save_gate1_approval(
+        question_id=q1_id,
+        question_text=q1_text,
+        framing_id=lens1.id,
+        framing_title=lens1.title,
+        framing_question=q1_text,  # verbatim question exactly as approved
+        approved_by="exit-script",
+        approvals_dir=approvals_dir,
+    )
+    v1_path = approvals_dir / q1_id / f"gate1-v{approval.version}.json"
+    print(f"Approval written to: {v1_path.name}")
+    print("Approval JSON Record Content:")
+    with open(v1_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+        print(json.dumps(data, indent=2))
+        assert len(data["question_sha256"]) == 64, "question_sha256 must be 64-hex"
+        assert data["approved_by"] == "exit-script", "approved_by must be exit-script"
+        assert data["framing_question"] == q1_text, "framing_question must be verbatim question"
+
+    print("\n--- 5. start_run Execution Attempt: Valid Approved Framing ---")
+    result = start_run(
+        question_id=q1_id,
+        question_text=q1_text,
+        depth="Fast",
+        tone="Executive",
+        runner=stub_runner,
+        approvals_dir=approvals_dir,
+    )
+    print(f"ACCEPTED AS EXPECTED: Run result = {result}")
+
+    print("\n--- 6. start_run Execution Attempt: Modified Question Text ---")
+    modified_text = q1_text + " (modified post-approval)"
+    try:
+        start_run(
+            question_id=q1_id,
+            question_text=modified_text,
+            runner=stub_runner,
+            approvals_dir=approvals_dir,
+        )
+        print("ERROR: start_run unexpectedly succeeded with modified text!")
+        sys.exit(1)
+    except GateApprovalError as exc:
+        msg = str(exc)
+        print(f"REFUSED AS EXPECTED (text hash mismatch): {msg}")
+        assert "You changed the question after approving a framing. Approve a framing again to continue." in msg
+        assert not re.search(r"\b[0-9a-f]{8,64}\b", msg), "Hash leaked in error message!"
+
+print("\n--- 7. Verification: Full Pytest Collection & S1 Tests ---")
+EOF
+
+echo -n "[1/2] Verifying full test collection (pytest --collect-only -q)... "
+PYTHONPATH=. .venv/bin/pytest --collect-only -q > /dev/null
+echo "OK (zero collection errors across full repository)"
+
+echo -n "[2/2] Running Slice S1 test suite (tests/test_s1_walking_skeleton.py)... "
+PYTHONPATH=. .venv/bin/pytest tests/test_s1_walking_skeleton.py -q
+echo "OK (all S1 walking skeleton tests passed)"
+
+echo ""
+echo "======================================================================"
+echo "Slice S1 Exit Verification: ALL CHECKS PASSED (EXIT 0)"
+echo "======================================================================"
+exit 0
