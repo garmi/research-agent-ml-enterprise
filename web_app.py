@@ -1552,7 +1552,7 @@ if results:
     # TAB 3: Evidence Ledger & Atomic Claims
     with tab3:
         st.markdown("### ⚖️ Evidence Ledger & Atomic Claims (SQLite `ledger.db`)")
-        st.markdown("Every piece of evidence is parsed into a structured, verifiable atomic claim record with verbatim source excerpts capped at $\le 25$ words and deterministic rules applied.")
+        st.markdown(r"Every piece of evidence is parsed into a structured, verifiable atomic claim record with verbatim source excerpts capped at $\le 25$ words and deterministic rules applied.")
 
         claims_list = results.get("claims", [])
         if claims_list:
