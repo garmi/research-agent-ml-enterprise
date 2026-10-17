@@ -1126,6 +1126,16 @@ class MultiLaneResearchRunner:
             synth = synthesizer.analyze(topic, papers, tone=tone_key, length="detailed")
             if map_provider == "stub" or reduce_provider == "stub":
                 generation_mode = "extractive_fallback"
+                if not synth.get("executive_summary") and not synth.get("key_findings"):
+                    synth = self._build_extractive_fallback_synthesis(
+                        topic=topic,
+                        papers=papers,
+                        question_obj=question_obj,
+                        academic_claims=academic_claims,
+                        enterprise_claims=enterprise_claims,
+                        practitioner_claims=practitioner_claims,
+                        error_details={"error_class": "OfflineEngine", "error_message": "Deterministic offline extractive engine active"},
+                    )
                 synth["generation_mode"] = "extractive_fallback"
                 synth["is_fallback"] = True
             else:
@@ -1205,16 +1215,18 @@ class MultiLaneResearchRunner:
         if not extractive_findings:
             extractive_findings = []
 
+        lead_preview = extractive_findings[0] if extractive_findings else "No empirical claims met threshold criteria."
         return {
             "topic": topic,
             "executive_summary": (
-                f"Synthesis unavailable: primary language model encountered {error_details.get('error_class', 'Error')} "
-                f"({error_details.get('error_message', 'unavailable')}). "
-                "The report presents verified extractive ledger claims only with zero inferred conclusions."
+                f"Extractive Evidence Summary ({len(academic_claims)} academic claims across {len(papers)} papers, "
+                f"{len(enterprise_claims)} enterprise claims, {len(practitioner_claims)} field observations): "
+                f"{lead_preview} "
+                f"[Mode: Verified extractive ledger claims only; primary model status: {error_details.get('error_class', 'Offline')}]"
             ),
             "objective": f"Extractive evidence inventory for {topic}",
             "research_questions": [question_obj.text],
-            "sources": sorted({p.get("source", "") for p in papers if p.get("source")}),
+            "sources": sorted({p.get("source", "") or p.get("venue", "") for p in papers if p.get("source") or p.get("venue")}),
             "time_window": "Not specified",
             "papers": papers,
             "paper_summaries": [],
@@ -1235,16 +1247,6 @@ class MultiLaneResearchRunner:
             "is_fallback": True,
             "error_details": error_details,
         }
-
-        synth["papers"] = papers
-        synth["business_context"] = {
-            "focus_areas": detect_focus_areas(topic),
-            "business_signal": derive_business_signal(topic, papers),
-            "finding_summary": summarize_findings(synth.get("paper_summaries", [])),
-        }
-        synth["content_pack"] = ContentPackBuilder(topic).build(synth)
-
-        return synth
 
     def _build_result_payload(
         self,
@@ -1283,10 +1285,104 @@ class MultiLaneResearchRunner:
         else:
             outcome_val = str(outcome_raw)
 
-        # Derive all user-facing presentation items strictly from output_sentences
-        ui_findings = [{"id": s.id, "text": s.text} for s in sentences if s.type in ("finding", "assertive")]
+        # Formatted papers table & lookup maps for full source traceability
+        papers_formatted = []
+        paper_by_id: Dict[str, Dict[str, Any]] = {}
+        for i, p in enumerate(academic_papers, start=1):
+            v, t = resolve_honest_venue_and_type(p)
+            yr = p.get("year")
+            yr_str = "Date unknown" if (yr is None or str(yr).lower() in ("none", "null", "", "date unknown")) else str(yr)
+            p_entry = {
+                "id": p.get("id"),
+                "key": f"P{i}",
+                "title": p.get("title", "Untitled"),
+                "year": yr_str,
+                "venue": v,
+                "doi": p.get("doi") or p.get("url") or p.get("link") or "Indexed",
+                "type": t,
+                "url": p.get("url") or p.get("link") or "https://scholar.google.com",
+                "relevance_score": float(p.get("relevance_score", 0.0)),
+                "is_custom": bool(p.get("is_custom", False) or "[Custom User Source]" in p.get("title", "")),
+            }
+            papers_formatted.append(p_entry)
+            if p.get("id"):
+                paper_by_id[str(p.get("id"))] = p_entry
+
+        all_q_claims = self.repo.list_claims(question_id=question_obj.id)
+        if not all_q_claims:
+            all_q_claims = list(self._ephemeral_claims)
+        claim_by_id: Dict[str, Claim] = {c.id: c for c in all_q_claims}
+
+        def _build_sources_trace(claim_ids: List[str], sentence_text: str) -> List[Dict[str, Any]]:
+            traces_out: List[Dict[str, Any]] = []
+            seen_cids = set()
+            for cid in claim_ids:
+                if cid in seen_cids:
+                    continue
+                seen_cids.add(cid)
+                c_obj = claim_by_id.get(cid)
+                if not c_obj:
+                    continue
+                src_obj = self.repo.get_source(c_obj.source_id) or self._ephemeral_sources.get(c_obj.source_id)
+                p_info = paper_by_id.get(str(c_obj.source_id))
+                src_key = p_info["key"] if p_info else str(c_obj.source_id)
+                src_title = p_info["title"] if p_info else (src_obj.title if src_obj else c_obj.entity or "Verified Source")
+                src_venue = p_info["venue"] if p_info else (src_obj.venue or src_obj.org if src_obj else "Repository")
+                src_year = p_info["year"] if p_info else (src_obj.pub_date if src_obj and src_obj.pub_date else str(c_obj.claim_date or "2024"))
+                src_url = p_info["url"] if p_info else (src_obj.url if src_obj and src_obj.url else "#")
+                src_lane = (src_obj.lane if src_obj else ("academic" if p_info else "enterprise")).upper()
+                traces_out.append({
+                    "claim_id": c_obj.id,
+                    "source_key": src_key,
+                    "lane": src_lane,
+                    "source_title": src_title,
+                    "venue": src_venue,
+                    "year": src_year,
+                    "url": src_url,
+                    "grade": (c_obj.grade or "weak").upper(),
+                    "study_type": c_obj.study_type or "empirical",
+                    "excerpt": c_obj.source_excerpt or c_obj.text,
+                })
+            # Also resolve any explicit [P#] in sentence text if claim_ids didn't already cover it
+            if not traces_out:
+                for p_match in re.findall(r"\[(P\d+)\]", sentence_text):
+                    matched_p = next((p for p in papers_formatted if p["key"] == p_match), None)
+                    if matched_p:
+                        traces_out.append({
+                            "claim_id": "citation_ref",
+                            "source_key": matched_p["key"],
+                            "lane": "ACADEMIC",
+                            "source_title": matched_p["title"],
+                            "venue": matched_p["venue"],
+                            "year": matched_p["year"],
+                            "url": matched_p["url"],
+                            "grade": "VERIFIED",
+                            "study_type": matched_p["type"],
+                            "excerpt": matched_p["title"],
+                        })
+            return traces_out
+
+        # Derive all user-facing presentation items strictly from output_sentences with full traceability
+        ui_findings = []
+        for s in sentences:
+            if s.type in ("finding", "assertive"):
+                cids = s.claim_ids_json or []
+                ui_findings.append({
+                    "id": s.id,
+                    "ordinal": s.ordinal,
+                    "text": s.text,
+                    "claim_ids": cids,
+                    "sources_trace": _build_sources_trace(cids, s.text),
+                })
+
         ui_signals = [
-            {"tag": f"KEY SIGNAL {idx+1}", "text": s.text, "citation": f"[P{idx+1}]"}
+            {
+                "tag": f"KEY SIGNAL {idx+1}",
+                "text": s.text,
+                "citation": f"[P{idx+1}]",
+                "claim_ids": s.claim_ids_json or [],
+                "sources_trace": _build_sources_trace(s.claim_ids_json or [], s.text),
+            }
             for idx, s in enumerate([s for s in sentences if s.type == "signal"])
         ]
         ui_risks = [s.text for s in sentences if s.type == "risk"]
@@ -1302,25 +1398,6 @@ class MultiLaneResearchRunner:
                 "impact": "Empirical governance target verified",
             })
         ui_negative = [s.text for s in sentences if s.type == "negative_finding"]
-
-        # Formatted papers table
-        papers_formatted = []
-        for i, p in enumerate(academic_papers, start=1):
-            v, t = resolve_honest_venue_and_type(p)
-            yr = p.get("year")
-            yr_str = "Date unknown" if (yr is None or str(yr).lower() in ("none", "null", "", "date unknown")) else str(yr)
-            papers_formatted.append({
-                "id": p.get("id"),
-                "key": f"P{i}",
-                "title": p.get("title", "Untitled"),
-                "year": yr_str,
-                "venue": v,
-                "doi": p.get("doi") or p.get("url") or p.get("link") or "Indexed",
-                "type": t,
-                "url": p.get("url") or p.get("link") or "https://scholar.google.com",
-                "relevance_score": float(p.get("relevance_score", 0.0)),
-                "is_custom": bool(p.get("is_custom", False) or "[Custom User Source]" in p.get("title", "")),
-            })
 
         # Formatted enterprise sources (scoped strictly to claims for this question/run)
         ent_sources_formatted = []
@@ -1355,25 +1432,27 @@ class MultiLaneResearchRunner:
                     "is_custom": "[Custom User Observation]" in ctx.get("situation", "") or "[Custom User Observation]" in obs.text,
                 })
 
-        # Formatted atomic claims
+        # Formatted atomic claims with full source metadata
         claims_formatted = []
-        all_q_claims = self.repo.list_claims(question_id=question_obj.id)
-        if not all_q_claims:
-            all_q_claims = list(self._ephemeral_claims)
         for c in all_q_claims:
             src = self.repo.get_source(c.source_id) or self._ephemeral_sources.get(c.source_id)
+            p_info = paper_by_id.get(str(c.source_id))
             claims_formatted.append({
                 "id": c.id,
-                "lane": (src.lane if src else "academic").upper(),
+                "lane": (src.lane if src else ("academic" if p_info else "academic")).upper(),
                 "assertion": c.text,
                 "excerpt": c.source_excerpt,
                 "grade": c.grade.upper(),
                 "entity": c.entity,
                 "entity_match": c.entity_match,
                 "study_type": c.study_type,
-                "source_title": src.title if src else "Unknown",
+                "source_key": p_info["key"] if p_info else str(c.source_id),
+                "source_title": p_info["title"] if p_info else (src.title if src else "Unknown"),
+                "source_url": p_info["url"] if p_info else (src.url if src and src.url else "#"),
+                "venue": p_info["venue"] if p_info else (src.venue or src.org if src else "Academic Repo"),
+                "year": p_info["year"] if p_info else (src.pub_date if src and src.pub_date else str(c.claim_date or "2024")),
                 "rules": ", ".join(c.grade_reasons_json or ["Default rules"]),
-                "is_custom": bool(src and "[Custom User Source]" in src.title),
+                "is_custom": bool((src and "[Custom User Source]" in src.title) or (p_info and p_info.get("is_custom"))),
             })
 
         # Format roadmap

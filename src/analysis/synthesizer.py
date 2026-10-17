@@ -178,13 +178,21 @@ class SynthesisEngine:
 
     # ---------- helpers ----------
     @staticmethod
-    def _compact(summary: Dict[str, Any], limit: int = 260) -> Dict[str, Any]:
-        """Keep reduce prompts small enough for a 4k-context local model."""
+    def _compact(summary: Dict[str, Any], limit: int = 600) -> Dict[str, Any]:
+        """Keep reduce prompts compact without cutting sentences mid-clause."""
         keys = ["problem_statement", "key_findings", "business_relevance",
                 "gap_identified", "adoption_barrier", "limitations"]
-        out: Dict[str, Any] = {"paper_id": summary["paper_id"], "title": str(summary.get("title", ""))[:100]}
+        out: Dict[str, Any] = {"paper_id": summary["paper_id"], "title": str(summary.get("title", ""))[:180]}
         for key in keys:
-            out[key] = str(summary.get(key, ""))[:limit]
+            val = str(summary.get(key, "")).strip()
+            if len(val) > limit:
+                cut = val[:limit]
+                last_period = cut.rfind(".")
+                if last_period > limit // 2:
+                    val = cut[: last_period + 1]
+                else:
+                    val = cut.rsplit(" ", 1)[0] + "."
+            out[key] = val
         return out
 
     @staticmethod

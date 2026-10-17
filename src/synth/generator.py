@@ -205,14 +205,21 @@ class SynthesisEngine:
                 )
                 ordinal += 1
         elif supported_claims:
-            for c in supported_claims[:3]:
+            paper_id_to_tag = {
+                p.get("id"): f"P{idx}"
+                for idx, p in enumerate(papers or [], 1)
+                if p.get("id")
+            }
+            for c in supported_claims[:8]:
                 verb = self._select_verb_for_grade(c.grade)
                 c_text = c.text.strip().rstrip(".")
                 for prefix in ("the study reports that ", "the study finds that ", "the authors find that ", "empirical analysis shows that ", "research indicates that "):
                     if c_text.lower().startswith(prefix):
                         c_text = c_text[len(prefix):]
                         break
-                text = f"Empirical literature {verb} that {c_text[0].lower() + c_text[1:] if c_text else ''}."
+                p_tag = paper_id_to_tag.get(c.source_id)
+                prefix_tag = f"[{p_tag}] " if p_tag else ""
+                text = f"{prefix_tag}Empirical literature {verb} that {c_text[0].lower() + c_text[1:] if c_text else ''}."
                 sentences.append(
                     OutputSentence(
                         id=f"{output_id}_{ordinal}",

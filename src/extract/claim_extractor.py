@@ -98,6 +98,31 @@ def infer_study_type(text: str) -> StudyType:
     return "position_paper"
 
 
+_ABBREV_PATTERN = re.compile(
+    r"\b(e\.g|i\.e|et\s+al|vs|cf|dr|prof|mr|mrs|ms|fig|figs|eq|eqs|sec|secs|no|nos|vol|vols|pp|al|inc|ltd|co|approx|est|dept|univ|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)\.",
+    re.IGNORECASE,
+)
+
+
+def _split_sentences_preserving_abbreviations(text: str) -> List[str]:
+    """Split abstract text into complete sentences without breaking on abbreviations or initials."""
+    placeholder = "<DOT_ABBREV>"
+    # Protect common abbreviations (e.g., et al., vs., Fig., i.e.)
+    protected = _ABBREV_PATTERN.sub(lambda m: m.group(0)[:-1] + placeholder, text)
+    # Protect single-letter initials like "J. Smith"
+    protected = re.sub(r"\b([A-Z])\.(?=\s+[A-Z])", r"\1" + placeholder, protected)
+    # Protect decimal numbers like 3.14
+    protected = re.sub(r"(\d)\.(\d)", r"\1" + placeholder + r"\2", protected)
+
+    raw_parts = re.split(r"(?<=[.!?])\s+", protected)
+    sentences = []
+    for part in raw_parts:
+        restored = part.replace(placeholder, ".").strip()
+        if len(restored) > 20:
+            sentences.append(restored)
+    return sentences
+
+
 def extract_claims_from_paper(
     paper: Dict[str, Any],
     question_id: Optional[str] = None,
@@ -118,7 +143,7 @@ def extract_claims_from_paper(
     entity_match = determine_entity_match(target_entity, title, abstract)
     study_type = infer_study_type(f"{title} {abstract}")
 
-    sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", abstract) if len(s.strip()) > 20]
+    sentences = _split_sentences_preserving_abbreviations(abstract)
     extracted_claims: List[Claim] = []
 
     for idx, sentence in enumerate(sentences):

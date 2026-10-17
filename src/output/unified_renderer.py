@@ -119,8 +119,8 @@ class UnifiedRenderer:
             "## 3. Strategic Signals",
         ])
         if self.signals:
-            for idx, sig in enumerate(self.signals, 1):
-                lines.append(f"- Signal {idx}: {sig.text}")
+            for sig in self.signals:
+                lines.append(f"- {sig.text}")
         else:
             lines.append("- No strategic signals in evidence ledger.")
         lines.append("")
