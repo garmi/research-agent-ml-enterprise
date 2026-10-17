@@ -1189,6 +1189,10 @@ if results:
         unsafe_allow_html=True,
     )
 
+    gap_info = results.get("gap_matrix") or {}
+    status = (results.get("publish_res", {}).get("status") or results.get("quality_scorecard", {}).get("band") or "NOT_PUBLISHABLE").upper()
+    gates_passed = results.get("gates_audit", {}).get("passed", False)
+
     if results.get("is_fallback"):
         blocking_msg = results.get(
             "blocking_banner",
@@ -1206,9 +1210,6 @@ if results:
                     language="text",
                 )
     else:
-        gap_info = results.get("gap_matrix", {})
-        status = (results.get("publish_res", {}).get("status") or results.get("quality_scorecard", {}).get("band") or "NOT_PUBLISHABLE").upper()
-        gates_passed = results.get("gates_audit", {}).get("passed", False)
         if not gates_passed or status == "BLOCKED":
             reasons = results.get("gates_audit", {}).get("reasons", []) or ["Gate audit blocked publication."]
             reasons_html = "".join(f"<li>{r}</li>" for r in reasons)
@@ -1392,7 +1393,7 @@ if results:
                     💡 Strategic Business Signal
                 </div>
                 <div style="font-size: 0.94rem; color: #1E293B;">
-                    <strong>Signal Summary:</strong> {results['business_signal']}
+                    <strong>Signal Summary:</strong> {results.get('business_signal', 'Empirical research across active repositories.')}
                 </div>
             </div>
             """,
@@ -1720,7 +1721,7 @@ if results:
     # TAB 6: Implementation Roadmap & Executive Pack
     with tab6:
         st.markdown("### 🗺️ Enterprise Implementation Roadmap")
-        for step in results["roadmap"]:
+        for step in results.get("roadmap", []):
             st.markdown(
                 f"""
                 <div style="display: flex; gap: 1rem; align-items: flex-start; background: white; border: 1px solid #E2E8F0; border-radius: 10px; padding: 1rem 1.25rem; margin-bottom: 0.75rem;">
@@ -1739,7 +1740,7 @@ if results:
         st.markdown("---")
         st.markdown("### 📱 Executive Content Ideas & LinkedIn Pack")
         st.markdown("Publication-ready executive summaries, soundbites, and strategic talking points.")
-        for idx, idea in enumerate(results["content_ideas"]):
+        for idx, idea in enumerate(results.get("content_ideas", [])):
             st.markdown(
                 f"""
                 <div style="background: white; border: 1px solid #E2E8F0; border-radius: 10px; padding: 1.15rem; margin-bottom: 0.75rem;">

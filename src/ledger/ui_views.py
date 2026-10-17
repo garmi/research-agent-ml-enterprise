@@ -7,8 +7,9 @@ All user actions write immutable audit logs to the SQLite reviews table.
 
 from __future__ import annotations
 
-import streamlit as st
+import os
 from typing import Any, Dict, List, Optional
+import streamlit as st
 
 def render_safe_table(records: List[Dict[str, Any]], use_container_width: bool = True) -> None:
     """Render a table safely using st.dataframe, falling back to markdown if pyarrow fails."""
