@@ -62,8 +62,8 @@ class LedgerService:
     # =========================================================================
     # GATE 1: Question Register
     # =========================================================================
-    def sync_questions_from_yaml(self) -> List[Question]:
-        """Load questions from YAML register into SQLite database."""
+    def load_questions_from_yaml(self) -> List[Question]:
+        """Parse questions from YAML register in memory without modifying the database."""
         if not os.path.exists(self.questions_yaml_path):
             return []
 
@@ -71,12 +71,16 @@ class LedgerService:
             data = yaml.safe_load(f) or {}
 
         questions_data = data.get("questions", [])
-        synced: List[Question] = []
-        for q_dict in questions_data:
-            q = Question(**q_dict)
+        return [Question(**q_dict) for q_dict in questions_data]
+
+    def sync_questions_from_yaml(self) -> List[Question]:
+        """Load questions from YAML register into SQLite database (or return in-memory in hosted demo mode)."""
+        questions = self.load_questions_from_yaml()
+        if os.getenv("HOSTED_DEMO") == "1":
+            return questions
+        for q in questions:
             self.repo.insert_question(q)
-            synced.append(q)
-        return synced
+        return questions
 
     def sync_questions_to_yaml(self) -> None:
         """Dump active questions from SQLite to YAML register."""

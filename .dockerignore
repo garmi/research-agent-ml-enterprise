@@ -9,6 +9,13 @@ tests
 evals
 .env
 outputs
+*.db
+*.db-shm
+*.db-wal
+ledger/*.db
+ledger/backups
+ledger/approvals
+denylist.txt
 compare_report.md
 *.md
 !README.md

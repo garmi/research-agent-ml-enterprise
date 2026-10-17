@@ -53,17 +53,29 @@ class GapMatrixBuilder:
         self,
         question_id: str,
         run_id: Optional[str] = None,
+        claims_override: Optional[List[Claim]] = None,
+        sources_override: Optional[Dict[str, Any]] = None,
+        search_logs_override: Optional[List[Any]] = None,
     ) -> GapMatrixEntry:
         """Evaluate evidence across lanes and determine the strategic gap outcome."""
         all_claims = self.repo.list_claims(question_id=question_id)
+        if not all_claims and claims_override:
+            all_claims = [c for c in claims_override if c.question_id == question_id or not c.question_id]
         search_logs = self.repo.list_search_logs(question_id=question_id)
+        if not search_logs and search_logs_override:
+            search_logs = [s for s in search_logs_override if s.question_id == question_id or not s.question_id]
 
         academic_claims: List[Claim] = []
         enterprise_claims: List[Claim] = []
         field_claims: List[Claim] = []
 
+        def _get_src(source_id: str):
+            if sources_override and source_id in sources_override:
+                return sources_override[source_id]
+            return self.repo.get_source(source_id)
+
         for c in all_claims:
-            src = self.repo.get_source(c.source_id)
+            src = _get_src(c.source_id)
             if not src:
                 continue
             if src.lane == "academic":
@@ -123,7 +135,7 @@ class GapMatrixBuilder:
         if enterprise_claims:
             is_vendor_source = []
             for c in enterprise_claims:
-                src = self.repo.get_source(c.source_id)
+                src = _get_src(c.source_id)
                 stake = getattr(src, "commercial_stake", "") if src else ""
                 v_tier = getattr(src, "venue_tier", "") if src else ""
                 is_vendor_source.append(

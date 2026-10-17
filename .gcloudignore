@@ -10,7 +10,13 @@ env/**
 __pycache__/**
 .pytest_cache/**
 outputs/**
-ledger/**
+ledger/*.db
+ledger/*.db-shm
+ledger/*.db-wal
+ledger/backups/**
+ledger/approvals/**
+!ledger/migrations/
+!ledger/migrations/**
 evals/**
 tests/**
 compare_report.md

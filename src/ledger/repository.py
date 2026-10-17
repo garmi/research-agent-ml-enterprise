@@ -31,7 +31,15 @@ class LedgerRepository:
             raise PermissionError("Ledger writes are disabled in hosted demo mode: no private data is stored.")
 
     def _conn(self) -> sqlite3.Connection:
-        return get_connection(self.db_path)
+        conn = get_connection(self.db_path)
+        cur = conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='questions';")
+        if not cur.fetchone():
+            conn.close()
+            from src.ledger.db import DEFAULT_LEDGER_PATH
+            from src.ledger.migrations import apply_migrations
+            apply_migrations(db_path=self.db_path or DEFAULT_LEDGER_PATH)
+            conn = get_connection(self.db_path)
+        return conn
 
     # --- Questions ---
     def insert_question(self, q: Question) -> None:

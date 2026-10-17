@@ -1999,6 +1999,8 @@ else:
     st.caption("Select a registered research question below or type your inquiry in the console above to run the 3-lane pipeline:")
 
     reg_questions = ledger_service.repo.list_questions()
+    if not reg_questions:
+        reg_questions = ledger_service.load_questions_from_yaml()
     if reg_questions:
         for q in reg_questions:
             q_col1, q_col2 = st.columns([4.2, 0.8])

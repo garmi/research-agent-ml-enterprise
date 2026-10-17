@@ -101,6 +101,10 @@ class SynthesisEngine:
         run_id: Optional[str] = None,
         executive_synthesis: Optional[Dict[str, Any]] = None,
         papers: Optional[List[Dict[str, Any]]] = None,
+        claims_override: Optional[List[Claim]] = None,
+        sources_override: Optional[Dict[str, Source]] = None,
+        search_logs_override: Optional[List[Any]] = None,
+        gap_entry_override: Optional[Any] = None,
     ) -> Tuple[OutputDoc, List[OutputSentence], Dict[str, Any]]:
         """Generate a structured, evidence-grounded Field Note."""
         question = self.repo.get_question(question_id)
@@ -118,14 +122,25 @@ class SynthesisEngine:
                 raise ValueError(f"Question {question_id} not found in ledger")
 
         # 1. Evaluate Gap Matrix
-        gap_entry = self.gap_builder.evaluate_question_lanes(question_id, run_id=run_id)
+        gap_entry = gap_entry_override or self.gap_builder.evaluate_question_lanes(
+            question_id,
+            run_id=run_id,
+            claims_override=claims_override,
+            sources_override=sources_override,
+            search_logs_override=search_logs_override,
+        )
 
         # 2. Retrieve eligible claims (approved or auto, not rejected)
         all_claims = self.repo.list_claims(question_id=question_id)
+        if not all_claims and claims_override:
+            all_claims = [c for c in claims_override if c.question_id == question_id or not c.question_id]
         eligible_claims = [c for c in all_claims if c.status != "rejected"]
         claims_by_id = {c.id: c for c in eligible_claims}
 
-        sources = {c.source_id: self.repo.get_source(c.source_id) for c in eligible_claims}
+        sources = {
+            c.source_id: ((sources_override or {}).get(c.source_id) or self.repo.get_source(c.source_id))
+            for c in eligible_claims
+        }
         sources = {sid: src for sid, src in sources.items() if src is not None}
 
         # 3. Partition claims
@@ -315,6 +330,8 @@ class SynthesisEngine:
         ordinal += 1
 
         slogs = self.repo.list_search_logs(question_id=question_id)
+        if not slogs and search_logs_override:
+            slogs = [s for s in search_logs_override if s.question_id == question_id or not s.question_id]
         searched_zero = [s for s in slogs if getattr(s, "status", "searched_ok") == "searched_ok" and s.result_count == 0]
         unsearched = [s for s in slogs if getattr(s, "status", "searched_ok") in ("not_implemented", "not_searched", "skipped_by_scope")]
 

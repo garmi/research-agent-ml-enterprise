@@ -38,7 +38,9 @@ def render_question_register(service: LedgerService) -> None:
     )
 
     questions = service.repo.list_questions()
-    
+    if not questions:
+        questions = service.sync_questions_from_yaml()
+
     col1, col2, col3 = st.columns(3)
     active_count = sum(1 for q in questions if q.status == "active")
     retired_count = sum(1 for q in questions if q.status == "retired")
@@ -62,9 +64,7 @@ def render_question_register(service: LedgerService) -> None:
         ]
         render_safe_table(q_data, use_container_width=True)
     else:
-        st.info("No questions in register. Syncing default questions from YAML...")
-        service.sync_questions_from_yaml()
-        st.rerun()
+        st.info("No questions in register.")
 
     # Form to add a new question
     with st.expander("➕ Register New Research Question", expanded=False):

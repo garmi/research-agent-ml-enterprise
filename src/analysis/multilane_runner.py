@@ -190,20 +190,26 @@ class MultiLaneResearchRunner:
         self.checker = GateChecker(verbs_path=self.verbs_path)
         self.scorer = QualityScorer(scoring_cfg_path=self.scoring_path)
         self.publisher = Publisher(db_path=self.db_path, denylist_path=self.denylist_path)
+        self._ephemeral_sources: Dict[str, Source] = {}
+        self._ephemeral_claims: List[Claim] = []
+        self._ephemeral_search_logs: List[SearchLog] = []
 
     def _safe_insert_run(self, run: Run) -> None:
         if os.getenv("HOSTED_DEMO") != "1":
             self.repo.insert_run(run)
 
     def _safe_insert_source(self, source: Source) -> None:
+        self._ephemeral_sources[source.id] = source
         if os.getenv("HOSTED_DEMO") != "1":
             self.repo.insert_source(source)
 
     def _safe_insert_claim(self, claim: Claim) -> None:
+        self._ephemeral_claims.append(claim)
         if os.getenv("HOSTED_DEMO") != "1":
             self.repo.insert_claim(claim)
 
     def _safe_insert_search_log(self, slog: SearchLog) -> None:
+        self._ephemeral_search_logs.append(slog)
         if os.getenv("HOSTED_DEMO") != "1":
             self.repo.insert_search_log(slog)
 
@@ -228,6 +234,9 @@ class MultiLaneResearchRunner:
     ) -> Dict[str, Any]:
         """Execute the full 8-stage multi-lane workflow."""
         start_time = time.time()
+        self._ephemeral_sources = {}
+        self._ephemeral_claims = []
+        self._ephemeral_search_logs = []
         is_quick = "Fast" in depth
         max_academic_papers = 5 if is_quick else 10
         query_limit = 2 if is_quick else 4
@@ -329,7 +338,13 @@ class MultiLaneResearchRunner:
         # STAGE 5: STRATEGIC GAP MATRIX (Gate 4)
         # ----------------------------------------------------------------------
         report(5, "Strategic Gap Matrix: Evaluating Academic x Enterprise x Field evidence matrix...", 0.68)
-        gap_entry = self.gap_builder.evaluate_question_lanes(question_obj.id, run_id=run_id)
+        gap_entry = self.gap_builder.evaluate_question_lanes(
+            question_obj.id,
+            run_id=run_id,
+            claims_override=self._ephemeral_claims,
+            sources_override=self._ephemeral_sources,
+            search_logs_override=self._ephemeral_search_logs,
+        )
 
         # ----------------------------------------------------------------------
         # STAGE 6: LEDGER-ONLY SYNTHESIS & SINGLE SOURCE OF TRUTH
@@ -373,6 +388,10 @@ class MultiLaneResearchRunner:
             run_id=run_id,
             executive_synthesis=executive_synthesis,
             papers=academic_papers,
+            claims_override=self._ephemeral_claims,
+            sources_override=self._ephemeral_sources,
+            search_logs_override=self._ephemeral_search_logs,
+            gap_entry_override=gap_entry,
         )
 
         # 3. Render all report files strictly from output_sentences
@@ -887,6 +906,25 @@ class MultiLaneResearchRunner:
             run_id=run_id,
             feed_data_override=enterprise_feed_override,
         )
+        for src_cfg in ent_collector.registry_sources:
+            src_id = src_cfg.get("id")
+            if src_id and src_id not in self._ephemeral_sources:
+                self._ephemeral_sources[src_id] = Source(
+                    id=src_id,
+                    lane="enterprise",
+                    source_type=src_cfg["source_type"],
+                    org=src_cfg["org"],
+                    title=f"{src_cfg['org']} - {src_cfg['id']}",
+                    url=src_cfg.get("url"),
+                    venue=src_cfg["org"],
+                    venue_tier="vendor" if src_cfg.get("commercial_stake") == "vendor" else "verified",
+                    commercial_stake=src_cfg.get("commercial_stake", "unknown"),
+                    extraction_depth="structured_data" if src_cfg["source_type"] == "filing" else "abstract_only",
+                    status="active",
+                )
+        for c in claims:
+            if all(existing.id != c.id for existing in self._ephemeral_claims):
+                self._ephemeral_claims.append(c)
 
         # Ingest custom user URLs for Enterprise Lane
         if custom_urls:
@@ -1031,7 +1069,7 @@ class MultiLaneResearchRunner:
         """Persist academic claims in ledger.db and apply deterministic grading."""
         graded: List[Claim] = []
         for c in academic_claims:
-            src = self.repo.get_source(c.source_id)
+            src = self.repo.get_source(c.source_id) or self._ephemeral_sources.get(c.source_id)
             if not src:
                 src = Source(
                     id=c.source_id,
@@ -1050,7 +1088,8 @@ class MultiLaneResearchRunner:
             graded.append(c)
 
         # Return all active claims for question
-        return self.repo.list_claims(question_id=question_id)
+        db_claims = self.repo.list_claims(question_id=question_id)
+        return db_claims if db_claims else list(self._ephemeral_claims)
 
     def _generate_executive_deliverables(
         self,
@@ -1287,7 +1326,7 @@ class MultiLaneResearchRunner:
         ent_sources_formatted = []
         ent_source_ids = {c.source_id for c in enterprise_claims}
         for sid in ent_source_ids:
-            s = self.repo.get_source(sid)
+            s = self.repo.get_source(sid) or self._ephemeral_sources.get(sid)
             if s and s.lane == "enterprise":
                 ent_sources_formatted.append({
                     "id": s.id,
@@ -1301,24 +1340,28 @@ class MultiLaneResearchRunner:
                 })
 
         # Formatted practitioner observations (scoped strictly to this question)
-        prac_collector = PractitionerCollector(db_path=self.practitioner_db_path)
         prac_obs_formatted = []
-        for obs in prac_collector.list_observations(question_id=question_obj.id):
-            ctx = obs.context_json or {}
-            prac_obs_formatted.append({
-                "id": obs.id,
-                "situation": ctx.get("situation", obs.text),
-                "decision": ctx.get("decision", "Governance gate enforcement"),
-                "action": ctx.get("action", obs.source_excerpt),
-                "outcome": ctx.get("outcome", "Verified delivery outcome"),
-                "date": obs.claim_date,
-                "is_custom": "[Custom User Observation]" in ctx.get("situation", "") or "[Custom User Observation]" in obs.text,
-            })
+        if os.getenv("HOSTED_DEMO") != "1":
+            prac_collector = PractitionerCollector(db_path=self.practitioner_db_path)
+            for obs in prac_collector.list_observations(question_id=question_obj.id):
+                ctx = obs.context_json or {}
+                prac_obs_formatted.append({
+                    "id": obs.id,
+                    "situation": ctx.get("situation", obs.text),
+                    "decision": ctx.get("decision", "Governance gate enforcement"),
+                    "action": ctx.get("action", obs.source_excerpt),
+                    "outcome": ctx.get("outcome", "Verified delivery outcome"),
+                    "date": obs.claim_date,
+                    "is_custom": "[Custom User Observation]" in ctx.get("situation", "") or "[Custom User Observation]" in obs.text,
+                })
 
         # Formatted atomic claims
         claims_formatted = []
-        for c in self.repo.list_claims(question_id=question_obj.id):
-            src = self.repo.get_source(c.source_id)
+        all_q_claims = self.repo.list_claims(question_id=question_obj.id)
+        if not all_q_claims:
+            all_q_claims = list(self._ephemeral_claims)
+        for c in all_q_claims:
+            src = self.repo.get_source(c.source_id) or self._ephemeral_sources.get(c.source_id)
             claims_formatted.append({
                 "id": c.id,
                 "lane": (src.lane if src else "academic").upper(),
