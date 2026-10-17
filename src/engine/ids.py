@@ -9,6 +9,7 @@ Rules:
 
 from __future__ import annotations
 
+import datetime
 import hashlib
 import os
 import re
@@ -92,3 +93,22 @@ def resolve_question_id(text_or_id: str, register_path: Optional[str | Path] = N
             return q["id"]
 
     return generate_question_id(stripped)
+
+
+def generate_run_id(question_id: str, timestamp: Optional[datetime.datetime] = None) -> str:
+    """Generate deterministic or timestamped run ID bound to question_id.
+
+    Format: run-<question_id>-<YYYYMMDD-HHMMSS>
+    """
+    ts = timestamp or datetime.datetime.now(datetime.timezone.utc)
+    ts_str = ts.strftime("%Y%m%d-%H%M%S")
+    return f"run-{question_id}-{ts_str}"
+
+
+def generate_output_id(run_id: str, version: int = 1) -> str:
+    """Generate output document ID for a draft version derived from a run.
+
+    Format: out-<run_id>-v<version>
+    """
+    return f"out-{run_id}-v{version}"
+

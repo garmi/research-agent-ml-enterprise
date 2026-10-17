@@ -14,7 +14,7 @@ never rewritten, never embedded in lens text).
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 
 @dataclass(frozen=True)
@@ -77,3 +77,12 @@ def generate_framings(question_text: str = "") -> List[FramingLens]:
     The user question is handled separately and displayed verbatim.
     """
     return list(FIXED_LENSES)
+
+
+def get_lens_by_id(lens_id: str) -> Optional[FramingLens]:
+    """Return the FramingLens matching the given lens_id, or None if not found."""
+    for lens in FIXED_LENSES:
+        if lens.id == lens_id:
+            return lens
+    return None
+

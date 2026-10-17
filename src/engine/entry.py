@@ -7,6 +7,7 @@ problem framing approval. Both the primary 'Run Research' action and the
 
 from __future__ import annotations
 
+import inspect
 import logging
 import os
 from pathlib import Path
@@ -15,15 +16,29 @@ import tempfile
 from typing import Any, Callable, Dict, Optional
 
 from src.engine.approvals import get_latest_gate1_approval
+from src.engine.framings import get_lens_by_id
 from src.engine.ids import compute_question_sha256
 from src.engine.stub_mode import is_stub_mode
 
 logger = logging.getLogger(__name__)
 
 
+def _filter_runner_args(runner_fn: Callable[..., Any], args: Dict[str, Any]) -> Dict[str, Any]:
+    """Filter args so legacy runners lacking **kwargs do not receive unknown arguments."""
+    try:
+        sig = inspect.signature(runner_fn)
+        for param in sig.parameters.values():
+            if param.kind == inspect.Parameter.VAR_KEYWORD:
+                return args
+        return {k: v for k, v in args.items() if k in sig.parameters}
+    except Exception:
+        return args
+
+
 class GateApprovalError(Exception):
     """Raised when execution is refused due to a missing or invalidated Gate 1 approval."""
     pass
+
 
 
 def start_run(
@@ -65,6 +80,10 @@ def start_run(
     run_args = dict(kwargs)
     if "topic" not in run_args:
         run_args["topic"] = question_text
+    run_args.setdefault("framing_id", approval.framing_id)
+    lens = get_lens_by_id(approval.framing_id)
+    if lens:
+        run_args.setdefault("framing_lens", lens.to_dict())
 
     logger.info(
         "Gate 1 validated successfully for '%s' (v%d). Delegating to runner.",
@@ -98,7 +117,8 @@ def start_run(
             else:
                 actual_runner = runner
 
-            result = actual_runner(**run_args)
+            filtered_args = _filter_runner_args(actual_runner, run_args)
+            result = actual_runner(**filtered_args)
 
         if not isinstance(result, dict):
             raise TypeError(
@@ -119,4 +139,6 @@ def start_run(
         default_instance = MultiLaneResearchRunner()
         runner = default_instance.run_workflow
 
-    return runner(**run_args)
+    filtered_args = _filter_runner_args(runner, run_args)
+    return runner(**filtered_args)
+
