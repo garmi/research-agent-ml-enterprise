@@ -55,6 +55,17 @@ def render_s2_proposal_card_text(pkg: Dict[str, Any]) -> str:
     return f"Refined Question:\n{refined}\n\nSub-Questions:\n{sub_qs}\n\nPremises:\n{premises}\n\nScope:\n{scope}"
 
 
+def approved_question_text(package: Optional[Dict[str, Any]], results: Optional[Dict[str, Any]]) -> str:
+    """The question a re-draft must run: the approved refined question, never the raw input box text.
+
+    `current_question` holds whatever is typed in Step 1, so using it after approval makes Gate 1
+    look up the wrong question id and refuse the re-draft.
+    """
+    if package and package.get("refined_question"):
+        return str(package["refined_question"])
+    return str((results or {}).get("strategic_question") or "")
+
+
 def render_intake_view() -> Dict[str, Any]:
     """Render the polished 3-step numbered intake UI in Streamlit for Slice S2."""
     # Inject styling for disabled button state and clean layout

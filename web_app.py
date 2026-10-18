@@ -53,7 +53,7 @@ from src.engine.entry import start_run
 from src.engine.ids import resolve_question_id
 from src.engine.stub_mode import is_stub_mode
 from src.ui.safe_page import safe_page, format_error_payload, render_safe_error
-from src.ui.intake_view import render_intake_view
+from src.ui.intake_view import approved_question_text, render_intake_view
 
 
 logger = logging.getLogger("ExecutiveResearchStudio")
@@ -1657,7 +1657,7 @@ if results:
                     progress_box = st.empty()
                     try:
                         refreshed = run_production_pipeline(
-                            topic=st.session_state["current_question"],
+                            topic=approved_question_text(st.session_state.get("s2_active_package"), results),
                             depth=depth_option,
                             tone=tone_option,
                             map_provider=selected_provider,
@@ -1780,7 +1780,7 @@ if results:
             progress_box = st.empty()
             try:
                 refreshed = run_production_pipeline(
-                    topic=st.session_state["current_question"],
+                    topic=approved_question_text(st.session_state.get("s2_active_package"), results),
                     depth=depth_option,
                     tone=tone_option,
                     map_provider=selected_provider,
