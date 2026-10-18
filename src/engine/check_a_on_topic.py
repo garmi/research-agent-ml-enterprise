@@ -21,7 +21,8 @@ from src.engine.checks import ABSTAIN, CheckVerdict
 logger = logging.getLogger(__name__)
 
 CHECK_A_ID = "check_a_on_topic"
-PROMPT_FILE_PATH = "prompts/check_a_on_topic_v2.md"
+# v1 stays live until the Check A bake-off picks a model: qwen2.5:3b returns malformed output on v2.
+PROMPT_FILE_PATH = "prompts/check_a_on_topic_v1.md"
 BATCH_SIZE = 12
 TEXT_CHARS = 320
 
@@ -57,7 +58,7 @@ class CheckAResult:
 def get_prompt_hash(prompt_path: Optional[str | Path] = None) -> str:
     path = Path(prompt_path or PROMPT_FILE_PATH)
     if not path.exists():
-        return hashlib.sha256(b"check_a_on_topic_v2_default").hexdigest()
+        return hashlib.sha256(path.name.encode("utf-8")).hexdigest()
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
@@ -169,7 +170,7 @@ def _extract_json(raw: str) -> Dict[str, Any]:
     return json.loads(raw[start:end + 1])
 
 
-def _judge_with_model(llm: Any, context: str, items: List[SourceItem], template: str) -> Dict[str, Dict[str, str]]:
+def _judge_with_model(llm: Any, question: str, context: str, items: List[SourceItem], template: str) -> Dict[str, Dict[str, str]]:
     """Return {source_id: {"verdict", "reason"}}. Any failure leaves sources unjudged (abstain)."""
     judged: Dict[str, Dict[str, str]] = {}
     if llm is None:
@@ -182,13 +183,17 @@ def _judge_with_model(llm: Any, context: str, items: List[SourceItem], template:
             title = it.title.replace("|", "/")
             snippet = re.sub(r"\s+", " ", it.text)[:TEXT_CHARS]
             lines.append(f"[{k}] lane: {it.lane} | title: {title} | text: {snippet}")
-        prompt = template.replace("{context}", context).replace("{items}", "\n".join(lines))
+        # v1 prompts take {question}; v2 prompts take {context} (question + package + equivalent terms).
+        prompt = template.replace("{context}", context).replace("{question}", question).replace("{items}", "\n".join(lines))
         try:
             data = _extract_json(llm.generate(prompt, temperature=0.0, json_mode=True))
         except Exception as exc:  # unavailable or unparseable model abstains
             logger.info("Check A model abstained on batch %d: %s", start // BATCH_SIZE, exc)
             continue
-        for entry in data.get("verdicts", []) if isinstance(data, dict) else []:
+        entries = data.get("verdicts", []) if isinstance(data, dict) else []
+        for entry in entries if isinstance(entries, list) else []:
+            if not isinstance(entry, dict):
+                continue  # malformed entry: that source stays unjudged (abstain)
             item = keys.get(str(entry.get("id", "")).strip())
             verdict = str(entry.get("verdict", "")).strip().lower()
             if item and verdict in ("on_topic", "off_topic"):
@@ -216,7 +221,7 @@ def run_check_a(
     terms = salient_terms(question)
     alternates = _term_alternates(terms, synonyms)
 
-    judged = _judge_with_model(llm, build_question_context(question, package, alternates), items, template)
+    judged = _judge_with_model(llm, question, build_question_context(question, package, alternates), items, template)
     verdicts: List[CheckVerdict] = []
     on_topic: Set[str] = set()
     for item in items:
