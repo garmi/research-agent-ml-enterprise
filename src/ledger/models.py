@@ -101,6 +101,8 @@ class Run(BaseModel):
     question_ids: Optional[List[str]] = None
     seed: Optional[int] = 42
     created_at: str = Field(default_factory=now_utc_iso)
+    status: Optional[str] = "RUNNING"
+    status_reason: Optional[str] = None
 
 
 SearchLogStatus = Literal["searched_ok", "searched_error", "not_implemented", "not_searched", "skipped_by_scope"]

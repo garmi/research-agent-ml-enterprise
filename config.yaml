@@ -63,6 +63,12 @@ research:
     - arxiv
     - semantic_scholar
 
+# Handoff checks (DEC-016, docs/solution_design.md)
+checks:
+  check_a:
+    min_on_topic_sources: 1
+    floor_min_terms: 1
+
 # Provider per stage: "gemini" (free Google AI Studio) or "ollama" (free local model).
 llm:
   map_provider: "ollama"

@@ -91,6 +91,13 @@ def start_run(
         run_args["reasoned_package"] = reasoned_pkg
     elif "topic" not in run_args:
         run_args["topic"] = question_text
+    run_args["approved_question"] = run_args["topic"]
+    run_args["approval_ref"] = {
+        "question_id": question_id,
+        "version": approval.version,
+        "question_sha256": approval.question_sha256,
+        "package_sha256": getattr(approval, "package_sha256", "") or "",
+    }
     run_args.setdefault("framing_id", approval.framing_id)
     lens = get_lens_by_id(approval.framing_id)
     if lens:

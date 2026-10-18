@@ -1221,6 +1221,24 @@ if results:
         unsafe_allow_html=True,
     )
 
+    # Check A: on-topic evidence (DEC-016)
+    check_a_info = results.get("check_a") or {}
+    if results.get("stopped_at") == "check_a":
+        st.error(f"**Run stopped: not enough on-topic evidence.** {results.get('stop_reason', '')}")
+    elif check_a_info:
+        st.caption(f"Check A passed: {check_a_info.get('reason', '')}")
+    if check_a_info.get("sources"):
+        with st.expander("Check A: which sources were judged on-topic", expanded=results.get("stopped_at") == "check_a"):
+            st.table([
+                {
+                    "Source": src.get("title", ""),
+                    "Lane": str(src.get("lane", "")).capitalize(),
+                    "Verdict": "On-topic" if src.get("verdict") == "on_topic" else "Off-topic",
+                    "Why": src.get("reason", ""),
+                }
+                for src in check_a_info["sources"]
+            ])
+
     # Status / Fallback Banner
     if results.get("is_fallback"):
         blocking_msg = results.get(

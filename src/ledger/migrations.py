@@ -170,6 +170,26 @@ CREATE TABLE IF NOT EXISTS runs (
     model_ids TEXT,
     question_ids TEXT,
     seed INTEGER,
+    created_at TEXT NOT NULL,
+    status TEXT DEFAULT 'RUNNING',
+    status_reason TEXT
+);
+
+CREATE TABLE IF NOT EXISTS check_verdicts (
+    id TEXT PRIMARY KEY,
+    check_id TEXT NOT NULL,
+    run_id TEXT REFERENCES runs(id),
+    object_type TEXT NOT NULL,
+    object_id TEXT NOT NULL,
+    model_verdict TEXT,
+    rule_verdict TEXT,
+    rule_decisive INTEGER NOT NULL DEFAULT 0,
+    final TEXT NOT NULL,
+    reason_plain TEXT NOT NULL,
+    attempt INTEGER NOT NULL DEFAULT 0 CHECK(attempt IN (0, 1)),
+    model_id TEXT,
+    prompt_hash TEXT,
+    details_json TEXT,
     created_at TEXT NOT NULL
 );
 
@@ -250,6 +270,7 @@ CREATE INDEX IF NOT EXISTS idx_reviews_object ON reviews(object_type, object_id)
 CREATE INDEX IF NOT EXISTS idx_output_sentences_output ON output_sentences(output_id);
 CREATE INDEX IF NOT EXISTS idx_output_sentences_type ON output_sentences(type);
 CREATE INDEX IF NOT EXISTS idx_gap_matrix_question ON gap_matrix(question_id);
+CREATE INDEX IF NOT EXISTS idx_check_verdicts_run ON check_verdicts(run_id, check_id);
 """
 
 
@@ -304,10 +325,10 @@ def apply_migrations(
                 now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
                 conn.execute(
                     "INSERT INTO meta (schema_version, created_at) VALUES (?, ?);",
-                    (5, now_iso),
+                    (6, now_iso),
                 )
                 conn.commit()
-                return 5
+                return 6
             finally:
                 conn.close()
         conn.close()
