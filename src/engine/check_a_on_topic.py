@@ -220,10 +220,13 @@ def run_check_a(
 
     n_on, n_all = len(on_topic), len(items)
     passed = n_on >= min_on_topic_sources
+    need = f"at least {min_on_topic_sources} on-topic source{'' if min_on_topic_sources == 1 else 's'} {'is' if min_on_topic_sources == 1 else 'are'} needed"
     if passed:
-        reason = f"{n_on} of {n_all} sources are on-topic for the approved question (need {min_on_topic_sources})."
+        reason = f"{n_on} of {n_all} sources are on-topic for the approved question ({need})."
+    elif n_all == 0:
+        reason = f"The search found no sources that match the approved question; {need}."
     else:
-        reason = f"Only {n_on} of {n_all} sources are on-topic for the approved question; at least {min_on_topic_sources} are needed."
+        reason = f"Only {n_on} of {n_all} sources are on-topic for the approved question; {need}."
     verdicts.append(CheckVerdict(
         check_id=CHECK_A_ID, run_id=run_id, object_type="run", object_id=run_id,
         model_verdict=None, rule_verdict="pass" if passed else "fail", rule_decisive=True,
