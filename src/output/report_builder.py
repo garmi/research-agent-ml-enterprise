@@ -6,7 +6,10 @@ from typing import Any, Dict, List
 
 
 class ReportBuilder:
-    def __init__(self, base_dir: str = "outputs"):
+    def __init__(self, base_dir: Optional[str] = None):
+        import os
+        if base_dir is None or base_dir == "outputs":
+            base_dir = os.getenv("OUTPUT_DIR", "outputs")
         from src.engine.stub_mode import is_stub_mode
         if is_stub_mode() and str(base_dir) == "outputs":
             import tempfile

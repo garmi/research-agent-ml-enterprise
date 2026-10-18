@@ -33,10 +33,14 @@ class Publisher:
         denylist_path: str = "denylist.txt",
         verbs_path: str = "synth/strength_verbs.yaml",
         scoring_path: str = "score/scoring.yaml",
-        export_dir: str = "outputs/json",
+        export_dir: Optional[str] = None,
     ):
         self.db_path = db_path
         self.denylist_path = denylist_path
+        import os
+        if export_dir is None or export_dir == "outputs/json":
+            out_base = os.getenv("OUTPUT_DIR", "outputs")
+            export_dir = str(Path(out_base) / "json")
         self.export_dir = export_dir
         self.repo = LedgerRepository(db_path=self.db_path)
         self.checker = GateChecker(verbs_path=verbs_path, denylist_path=denylist_path)
@@ -164,7 +168,7 @@ class Publisher:
         is_band_ready = score_res.get("band") == "PUBLISH_READY"
         if not is_band_ready and not force_publish_non_band:
             band_status = score_res.get("band", "NOT_PUBLISHABLE")
-            doc.status = band_status.lower()
+            doc.status = "draft"
             with self.repo._conn() as conn:
                 conn.execute("UPDATE outputs SET status = ? WHERE id = ?;", (doc.status, doc.id))
             return False, {

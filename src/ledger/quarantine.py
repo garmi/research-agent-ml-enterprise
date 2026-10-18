@@ -47,9 +47,11 @@ def quarantine_pre_a1_records(
     db_path: str = "ledger/ledger.db",
     cutoff_iso: str = A1_COMMIT_CUTOFF_ISO,
     quarantine_files: bool = True,
-    outputs_dir: str = "outputs",
+    outputs_dir: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Quarantine all runs, claims, and outputs created before commit A1 cutoff."""
+    if outputs_dir is None or outputs_dir == "outputs":
+        outputs_dir = os.getenv("OUTPUT_DIR", "outputs")
     summary: Dict[str, Any] = {
         "cutoff_iso": cutoff_iso,
         "outputs_quarantined": 0,

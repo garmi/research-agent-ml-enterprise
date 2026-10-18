@@ -768,6 +768,7 @@ def run_production_pipeline(
     custom_lane_urls: Optional[Dict[str, List[str]]] = None,
     allow_remote_practitioner_synthesis: bool = False,
     practitioner_abstraction_confirmed: bool = False,
+    reasoned_package: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Execute the formal 8-stage research engine workflow across Academic, Enterprise, and Practitioner lanes."""
     stage_titles = {
@@ -812,6 +813,7 @@ def run_production_pipeline(
         custom_lane_urls=custom_lane_urls,
         allow_remote_practitioner_synthesis=allow_remote_practitioner_synthesis,
         practitioner_abstraction_confirmed=practitioner_abstraction_confirmed,
+        reasoned_package=reasoned_package,
     )
     progress_box.empty()
     return results
@@ -849,7 +851,12 @@ with st.sidebar:
     p1_status = "✅ Completed" if has_results else "🔵 Active"
     p2_status = f"✅ {len(results.get('papers', []))} Papers • {len(results.get('enterprise_sources', []))} Ent" if has_results else "⏳ Pending"
     p3_status = f"✅ {len(results.get('claims', []))} Graded Claims" if has_results else "⏳ Pending"
-    p4_status = f"✅ {(results.get('publish_res', {}).get('status') or results.get('status') or 'AUDITED').upper()}" if has_results else "⏳ Pending"
+    if has_results:
+        final_stat = (results.get('publish_res', {}).get('status') or results.get('status') or 'AUDITED').upper()
+        stat_icon = "⛔" if "BLOCK" in final_stat else "✅"
+        p4_status = f"{stat_icon} {final_stat}"
+    else:
+        p4_status = "⏳ Pending"
 
     st.markdown(
         f"""
@@ -875,7 +882,7 @@ with st.sidebar:
                         <span>Phase 3: Claim Ledger & Gap</span>
                         <span style="color: {'#059669' if has_results else '#64748B'}; font-size: 0.72rem;">{p3_status}</span>
                     </div>
-                    <div style="font-size: 0.72rem; color: #64748B;">Output: SQLite Claims & Outcome 1–4 Matrix</div>
+                    <div style="font-size: 0.72rem; color: #64748B;">Output: Ledger Claims & Outcome 1–4 Matrix</div>
                 </div>
                 <div style="padding: 0.4rem 0;">
                     <div style="display: flex; justify-content: space-between; font-weight: 700;">
@@ -1151,6 +1158,7 @@ if run_submitted:
                 custom_lane_urls=lane_urls,
                 allow_remote_practitioner_synthesis=allow_remote_prac_synth,
                 practitioner_abstraction_confirmed=prac_abs_confirmed,
+                reasoned_package=intake_state.get("reasoned_package"),
             )
             eta_banner.empty()
             st.session_state["research_results"] = results
@@ -1635,6 +1643,7 @@ if results:
                             reduce_provider=selected_provider,
                             progress_box=progress_box,
                             papers_override=remaining,
+                            reasoned_package=st.session_state.get("s2_active_package"),
                         )
                         st.session_state["research_results"] = refreshed
                         st.success("✓ Feedback Loop complete — synthesis updated!")
@@ -1650,7 +1659,7 @@ if results:
     with phase_tab3:
         st.markdown("### ⚖️ Phase 3 Output: Atomic Claim Ledger & Strategic Gap Matrix")
         st.markdown(
-            "Every extracted claim is stored in SQLite (`ledger.db`) with its full untruncated assertion, "
+            "Every extracted claim is stored in the evidence ledger with its full untruncated assertion, "
             "verbatim source excerpt (≤ 25 words), deterministic evidence grade, and source paper link."
         )
 
@@ -1915,7 +1924,7 @@ else:
                     <span class="lane-badge-c">🔒 LOCAL</span>
                 </div>
                 <div style="font-size: 0.8rem; color: #1E293B;">
-                    Integrates local field observations from <code>ledger/practitioner.db</code> with mandatory privacy abstraction.
+                    Integrates local field observations from practitioner records with mandatory privacy abstraction.
                 </div>
             </div>
             """,

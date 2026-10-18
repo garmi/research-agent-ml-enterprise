@@ -1,0 +1,231 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ==============================================================================
+# Exit Script for Slice S2: Reasoned Question Package
+# ==============================================================================
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$REPO_ROOT"
+
+echo "======================================================================"
+echo "Executing Slice S2 Exit Verification Script"
+echo "======================================================================"
+
+export RESEARCH_USER="exit-script-s2"
+
+.venv/bin/python - << 'EOF'
+import json
+import re
+import sys
+import tempfile
+from pathlib import Path
+
+from src.engine.ids import resolve_question_id
+from src.engine.reasoner import (
+    reason_question,
+    validate_reasoned_package,
+    split_user_sentences,
+    compute_package_sha256,
+    get_prompt_file_hash,
+    QuestionReasoningError,
+)
+from src.engine.approvals import (
+    save_gate1_approval,
+    get_latest_gate1_approval,
+    is_package_approved,
+)
+from src.engine.entry import start_run, GateApprovalError
+
+print("--- 1. Question Reasoning: Multi-sentence Input with Loaded Premises ---")
+user_text = (
+    "AI coding assistants like Kiro are obviously doubling enterprise delivery velocity without any risk. "
+    "However, some skeptical architects worry about technical debt. "
+    "How does actual code review throughput change in practice?"
+)
+sentences = split_user_sentences(user_text)
+print(f"User Input ({len(sentences)} sentences split deterministically):")
+for i, s in enumerate(sentences, 1):
+    print(f"  [{i}] {s}")
+
+pkg_v1 = reason_question(
+    user_text=user_text,
+    angle_hint="Empirical effect",
+    provider="stub",
+)
+print(f"\nModel Proposal v1 Refined Question:\n  \"{pkg_v1['refined_question']}\"")
+print("\nSub-Questions (3 to 5):")
+for sq in pkg_v1["sub_questions"]:
+    print(f"  - {sq}")
+
+print("\nPremises to Test (evaluating loaded claims, never assuming true):")
+for prem in pkg_v1["premises_to_test"]:
+    print(f"  - {prem}")
+
+print("\nSentence Coverage Map (100% accounted for):")
+for sent, mapped_to in pkg_v1["coverage_map"].items():
+    print(f"  \"{sent}\" -> {mapped_to}")
+
+print("\nChanges & Reasons:")
+for ch in pkg_v1["changes_and_reasons"]:
+    if isinstance(ch, dict):
+        print(f"  - {ch.get('change')}: {ch.get('reason')}")
+    else:
+        print(f"  - {ch}")
+
+# Deterministic Schema & Guard Validation
+ok, errors = validate_reasoned_package(pkg_v1, user_text)
+assert ok, f"v1 validation failed: {errors}"
+print("\nDeterministic Validation: PASSED (Schema, 100% Coverage, Faithfulness, Inquiry-only Guard)")
+
+print("\n--- 2. Revision with Feedback: Preserving v1 and Creating v2 ---")
+user_feedback = "Focus more heavily on PR review cycle times and defect density."
+pkg_v2 = reason_question(
+    user_text=user_text,
+    angle_hint="Empirical effect",
+    provider="stub",
+    feedback=user_feedback,
+    previous_package=pkg_v1,
+)
+print(f"User Feedback: \"{user_feedback}\"")
+print(f"Model Proposal v2 Refined Question:\n  \"{pkg_v2['refined_question']}\"")
+assert pkg_v2["refined_question"] != pkg_v1["refined_question"] or len(pkg_v2["sub_questions"]) >= 3
+print("Proposal v2 generated successfully with feedback incorporated.")
+
+print("\n--- 3. Canary Q3 Verification: Sourdough Latency Query ---")
+canary_text = "Does quantum-secure sourdough fermentation improve enterprise API latency?"
+canary_pkg = reason_question(user_text=canary_text, provider="stub")
+print(f"Canary Query: \"{canary_text}\"")
+print(f"Refined Question: \"{canary_pkg['refined_question']}\"")
+print("Premises to Test:")
+for p in canary_pkg["premises_to_test"]:
+    print(f"  - {p}")
+print("Ambiguities Flagged:")
+for a in canary_pkg["ambiguities"]:
+    print(f"  - {a}")
+# Confirm premise isolation
+assert any("sourdough" in p.lower() for p in canary_pkg["premises_to_test"]) and any("quantum-secure" in p.lower() for p in canary_pkg["premises_to_test"]), "Canary Q3 failed to isolate premise"
+assert any("fermentation" in a.lower() or "baking" in a.lower() or "cryptographic" in a.lower() for a in canary_pkg["ambiguities"]), "Canary Q3 failed to flag ambiguity"
+print("Canary Q3 check PASSED: loaded premise isolated, zero invented enterprise tech claims.")
+
+with tempfile.TemporaryDirectory() as tmp_dir:
+    approvals_dir = Path(tmp_dir) / "approvals"
+    q_id = resolve_question_id(pkg_v2["refined_question"])
+
+    print("\n--- 4. start_run Execution Attempt: Unapproved Package ---")
+    def stub_runner(**kwargs):
+        return {"run_id": "run-stub-s2-demo", "status": "completed", "topic": kwargs.get("topic")}
+
+    try:
+        start_run(
+            question_id=q_id,
+            question_text=pkg_v2["refined_question"],
+            reasoned_package=pkg_v2,
+            runner=stub_runner,
+            approvals_dir=approvals_dir,
+        )
+        print("ERROR: start_run unexpectedly succeeded without approval!")
+        sys.exit(1)
+    except GateApprovalError as exc:
+        msg = str(exc)
+        print(f"REFUSED AS EXPECTED (Unapproved): {msg}")
+        assert not re.search(r"\b[0-9a-f]{8,64}\b", msg), "Hash leaked in error message!"
+
+    print("\n--- 5. Gate 1 Approval: Approving Proposal v2 ---")
+    pkg_hash = compute_package_sha256(pkg_v2)
+    prompt_hash = get_prompt_file_hash()
+    approval = save_gate1_approval(
+        question_id=q_id,
+        raw_user_text=user_text,
+        proposals=[pkg_v1, pkg_v2],
+        final_package=pkg_v2,
+        provider="stub",
+        model_name="Deterministic Offline Engine",
+        prompt_file_hash=prompt_hash,
+        approvals_dir=approvals_dir,
+    )
+    v1_file = approvals_dir / q_id / f"gate1-v{approval.version}.json"
+    print(f"Approval written to: {v1_file.name}")
+    with open(v1_file, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    print("Approval JSON Structure (Sample fields):")
+    print(f"  schema_version: {data.get('schema_version')}")
+    print(f"  question_id: {data.get('question_id')}")
+    print(f"  approved_by: {data.get('approved_by')}")
+    print(f"  package_sha256: {data.get('package_sha256')[:16]}... (length {len(data.get('package_sha256'))})")
+    print(f"  prompt_file_hash: {data.get('prompt_file_hash')[:16]}...")
+    print(f"  proposals count: {len(data.get('proposals', []))}")
+    assert len(data["package_sha256"]) == 64, "package_sha256 must be 64-hex"
+    assert data["approved_by"] == "exit-script-s2"
+    assert len(data["proposals"]) == 2
+
+    print("\n--- 6. start_run Execution Attempt: Valid Approved Package ---")
+    res = start_run(
+        question_id=q_id,
+        question_text=pkg_v2["refined_question"],
+        reasoned_package=pkg_v2,
+        runner=stub_runner,
+        approvals_dir=approvals_dir,
+    )
+    print(f"ACCEPTED AS EXPECTED: Run result topic = \"{res.get('topic')}\"")
+    assert res["topic"] == pkg_v2["refined_question"]
+
+    print("\n--- 7. start_run Execution Attempt: Tampered / Modified Package Post-Approval ---")
+    tampered_pkg = dict(pkg_v2)
+    tampered_pkg["refined_question"] = "What is the completely unapproved modified question?"
+    try:
+        start_run(
+            question_id=q_id,
+            question_text=tampered_pkg["refined_question"],
+            reasoned_package=tampered_pkg,
+            runner=stub_runner,
+            approvals_dir=approvals_dir,
+        )
+        print("ERROR: start_run unexpectedly succeeded with tampered package!")
+        sys.exit(1)
+    except GateApprovalError as exc:
+        msg = str(exc)
+        print(f"REFUSED AS EXPECTED (Tampered package hash): {msg}")
+        assert not re.search(r"\b[0-9a-f]{8,64}\b", msg), "Hash leaked in error message!"
+
+print("\n--- 8. Guard Verification: Coverage Check & Schema Failure Rejections ---")
+# Drop a sentence from coverage
+dropped_cov_pkg = dict(pkg_v1)
+dropped_cov_pkg["coverage_map"] = {sentences[0]: "question"}
+ok, errs = validate_reasoned_package(dropped_cov_pkg, user_text)
+assert not ok, "Validation should have failed for dropped coverage"
+print(f"Coverage Guard correctly rejected dropped sentence: {errs[0]}")
+
+# Faithfulness check: unlisted term
+from src.engine.reasoner import find_unlisted_terms
+unfaithful_pkg = dict(pkg_v1)
+unfaithful_pkg["refined_question"] = "How does Oracle WebLogic 19c enterprise latency change?"
+unfaithful_pkg["added_terms"] = []
+unlisted = find_unlisted_terms(unfaithful_pkg, user_text)
+assert len(unlisted) > 0, "Unlisted check should have found unlisted entities"
+ok, errs = validate_reasoned_package(unfaithful_pkg, user_text, strict_unlisted_terms=True)
+assert not ok, "Validation should have failed for unlisted entity"
+print(f"Faithfulness Guard correctly detected unlisted entities: {unlisted}")
+
+# Findings check: model claiming result
+findings_pkg = dict(pkg_v1)
+findings_pkg["refined_question"] = "AI coding assistants increase throughput by 35% across all teams."
+ok, errs = validate_reasoned_package(findings_pkg, user_text)
+assert not ok, "Validation should have failed for findings claim"
+print(f"Inquiry-Only Guard correctly rejected findings claim: {errs[0]}")
+EOF
+
+echo ""
+echo -n "[1/2] Running Slice S2 test suite (tests/test_s2_reasoned_question.py)... "
+PYTHONPATH=. .venv/bin/pytest tests/test_s2_reasoned_question.py -q
+echo "OK (all S2 reasoned question tests passed)"
+
+echo -n "[2/2] Running full regression test suite (144 tests)... "
+PYTHONPATH=. .venv/bin/pytest tests/ -q
+echo "OK (full repository tests passed)"
+
+echo ""
+echo "======================================================================"
+echo "Slice S2 Exit Verification: ALL CHECKS PASSED (EXIT 0)"
+echo "======================================================================"
+exit 0

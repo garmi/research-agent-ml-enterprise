@@ -5,6 +5,18 @@ import time
 from typing import Optional
 
 import requests
+import urllib.request
+
+
+def is_ollama_reachable(timeout: float = 0.5) -> bool:
+    """Fast check whether local Ollama server is responding."""
+    try:
+        url = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/") + "/api/tags"
+        req = urllib.request.Request(url, headers={"User-Agent": "ExecutiveResearchStudio/1.0"})
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return resp.status == 200
+    except Exception:
+        return False
 
 
 class OllamaClient:

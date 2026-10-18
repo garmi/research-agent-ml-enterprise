@@ -61,24 +61,35 @@ def start_run(
     approval = get_latest_gate1_approval(question_id, approvals_dir=approvals_dir)
     if approval is None:
         raise GateApprovalError(
-            f"Run refused: Problem framing is not approved for question '{question_id}'. "
+            "Run refused: Problem framing is not approved. "
             "Please review and approve a framing before initiating research."
         )
 
-    current_sha256 = compute_question_sha256(question_text)
-    if current_sha256 != approval.question_sha256:
-        logger.warning(
-            "Gate 1 hash mismatch for '%s': approved=%s, current=%s",
-            question_id,
-            approval.question_sha256,
-            current_sha256,
-        )
-        raise GateApprovalError(
-            "Run refused: You changed the question after approving a framing. Approve a framing again to continue."
-        )
+    reasoned_pkg = kwargs.get("reasoned_package")
+    if reasoned_pkg:
+        from src.engine.approvals import is_package_approved
+        if not is_package_approved(question_id, reasoned_pkg, approvals_dir=approvals_dir):
+            raise GateApprovalError(
+                "Run refused: You changed the proposal after approving. Approve again to continue."
+            )
+    else:
+        current_sha256 = compute_question_sha256(question_text)
+        if current_sha256 != approval.question_sha256:
+            logger.warning(
+                "Gate 1 hash mismatch for '%s': approved=%s, current=%s",
+                question_id,
+                approval.question_sha256,
+                current_sha256,
+            )
+            raise GateApprovalError(
+                "Run refused: You changed the question after approving a framing. Approve a framing again to continue."
+            )
 
     run_args = dict(kwargs)
-    if "topic" not in run_args:
+    if reasoned_pkg:
+        run_args["topic"] = reasoned_pkg.get("refined_question", question_text)
+        run_args["reasoned_package"] = reasoned_pkg
+    elif "topic" not in run_args:
         run_args["topic"] = question_text
     run_args.setdefault("framing_id", approval.framing_id)
     lens = get_lens_by_id(approval.framing_id)
