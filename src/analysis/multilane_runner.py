@@ -1749,24 +1749,10 @@ class MultiLaneResearchRunner:
                     "grade": (c_obj.grade or "weak").upper(),
                     "study_type": c_obj.study_type or "empirical",
                     "excerpt": c_obj.source_excerpt or c_obj.text,
+                    "hedge_terms": list(c_obj.hedge_terms_json or []),
                 })
-            # Also resolve any explicit [P#] in sentence text if claim_ids didn't already cover it
-            if not traces_out:
-                for p_match in re.findall(r"\[(P\d+)\]", sentence_text):
-                    matched_p = next((p for p in papers_formatted if p["key"] == p_match), None)
-                    if matched_p:
-                        traces_out.append({
-                            "claim_id": "citation_ref",
-                            "source_key": matched_p["key"],
-                            "lane": "ACADEMIC",
-                            "source_title": matched_p["title"],
-                            "venue": matched_p["venue"],
-                            "year": matched_p["year"],
-                            "url": matched_p["url"],
-                            "grade": "VERIFIED",
-                            "study_type": matched_p["type"],
-                            "excerpt": matched_p["title"],
-                        })
+            # A sentence whose tags resolve to no ledger claim gets no trace: it is shown as unbound,
+            # never as a paper title passed off as a verbatim excerpt.
             return traces_out
 
         # Derive all user-facing presentation items strictly from output_sentences with full traceability
@@ -1774,12 +1760,14 @@ class MultiLaneResearchRunner:
         for s in sentences:
             if s.type in ("finding", "assertive"):
                 cids = s.claim_ids_json or []
+                trace = _build_sources_trace(cids, s.text)
                 ui_findings.append({
                     "id": s.id,
                     "ordinal": s.ordinal,
                     "text": s.text,
                     "claim_ids": cids,
-                    "sources_trace": _build_sources_trace(cids, s.text),
+                    "binding": "bound" if trace else "unbound",
+                    "sources_trace": trace,
                 })
 
         ui_signals = [
