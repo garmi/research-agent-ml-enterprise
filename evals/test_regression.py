@@ -586,7 +586,8 @@ def test_r16_d2_silent_fallback_prevented_and_sanitized():
             reduce_provider="stub",
             academic_papers_override=[],
         )
-        assert res.get("generation_mode") == "extractive_fallback"
+        # With zero evidence Check A stops before any generation (DEC-016); otherwise fallback is labelled.
+        assert res.get("generation_mode") == "extractive_fallback" or res.get("stopped_at") == "check_a"
         assert res["publish_res"]["allowed"] is False
         assert res["publish_res"]["status"] in ("NOT_PUBLISHABLE", "BLOCKED")
 
