@@ -23,6 +23,7 @@ import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from src.ledger.db import default_practitioner_path
 from src.ledger.migrations import apply_migrations
 from src.ledger.models import Claim, Question, Review, Source
 from src.ledger.repository import LedgerRepository
@@ -33,10 +34,10 @@ logger = logging.getLogger(__name__)
 class PractitionerCollector:
     def __init__(
         self,
-        db_path: str = "ledger/practitioner.db",
+        db_path: Optional[str] = None,
         migrations_dir: str = "ledger/migrations",
     ):
-        self.db_path = db_path
+        self.db_path = db_path or default_practitioner_path()
         self.migrations_dir = migrations_dir
         # Ensure parent directory exists
         Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)

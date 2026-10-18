@@ -35,9 +35,9 @@ class LedgerRepository:
         cur = conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='questions';")
         if not cur.fetchone():
             conn.close()
-            from src.ledger.db import DEFAULT_LEDGER_PATH
+            from src.ledger.db import default_ledger_path
             from src.ledger.migrations import apply_migrations
-            apply_migrations(db_path=self.db_path or DEFAULT_LEDGER_PATH)
+            apply_migrations(db_path=self.db_path or default_ledger_path())
             conn = get_connection(self.db_path)
         return conn
 

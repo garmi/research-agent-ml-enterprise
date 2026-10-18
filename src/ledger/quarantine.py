@@ -23,6 +23,9 @@ import sqlite3
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from src.config import default_outputs_dir
+from src.ledger.db import default_ledger_path
+
 logger = logging.getLogger(__name__)
 
 # Commit 81e2fd6 timestamp (fix(A1): remove hardcoded report content strings and templates)
@@ -44,14 +47,15 @@ KNOWN_PRE_A1_FILES = [
 
 
 def quarantine_pre_a1_records(
-    db_path: str = "ledger/ledger.db",
+    db_path: Optional[str] = None,
     cutoff_iso: str = A1_COMMIT_CUTOFF_ISO,
     quarantine_files: bool = True,
     outputs_dir: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Quarantine all runs, claims, and outputs created before commit A1 cutoff."""
     if outputs_dir is None or outputs_dir == "outputs":
-        outputs_dir = os.getenv("OUTPUT_DIR", "outputs")
+        outputs_dir = default_outputs_dir()
+    db_path = db_path or default_ledger_path()
     summary: Dict[str, Any] = {
         "cutoff_iso": cutoff_iso,
         "outputs_quarantined": 0,

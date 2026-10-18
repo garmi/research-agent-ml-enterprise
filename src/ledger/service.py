@@ -20,7 +20,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 import yaml
 
 from src.grade.grader import Grader
-from src.ledger.db import get_connection
+from src.ledger.db import default_ledger_path, get_connection
 from src.ledger.migrations import apply_migrations
 from src.ledger.models import Claim, Question, Review, Source, VenueTier
 from src.ledger.repository import LedgerRepository
@@ -41,12 +41,12 @@ def dump_model(obj: Any) -> Dict[str, Any]:
 class LedgerService:
     def __init__(
         self,
-        db_path: str = "ledger/ledger.db",
+        db_path: Optional[str] = None,
         questions_yaml_path: str = "questions/register.yaml",
         venue_tiers_yaml_path: str = "grade/venue_tiers.yaml",
         rules_yaml_path: str = "grade/rules.yaml",
     ):
-        self.db_path = db_path
+        self.db_path = db_path or default_ledger_path()
         self.questions_yaml_path = questions_yaml_path
         self.venue_tiers_yaml_path = venue_tiers_yaml_path
         self.rules_yaml_path = rules_yaml_path
