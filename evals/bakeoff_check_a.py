@@ -56,7 +56,11 @@ def main() -> None:
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
 
+    from dotenv import load_dotenv
+
     from src.llm.factory import build_llm
+
+    load_dotenv()  # same as web_app: picks up GEMINI_API_KEY from the nearest .env
 
     cfg = yaml.safe_load(open("config.yaml", encoding="utf-8")) or {}
     if args.model:
