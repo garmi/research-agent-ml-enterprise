@@ -16,6 +16,7 @@ from src.engine.checks import CheckVerdict
 CHECK_B_ID = "check_b_wellformed"
 MAX_EXCERPT_WORDS = 25
 VALID_GRADES = {"strong", "moderate", "weak", "vendor_claim", "anecdote"}
+LOCATION_TAG = re.compile(r"\s*\(Location:[^)]*\)\s*$")
 
 
 @dataclass
@@ -39,7 +40,8 @@ def claim_problem(claim: Any, source: Optional[Any]) -> Optional[str]:
         return "Set aside: its source is not in the ledger."
     if not str(claim.text or "").strip():
         return "Set aside: the claim text is empty."
-    excerpt = str(claim.source_excerpt or "").strip()
+    # The extractor appends "(Location: Abstract)" after the capped quote; the tag is not quoted text.
+    excerpt = LOCATION_TAG.sub("", str(claim.source_excerpt or "")).strip()
     if not excerpt:
         return "Set aside: there is no source excerpt."
     if len(excerpt.split()) > MAX_EXCERPT_WORDS:
