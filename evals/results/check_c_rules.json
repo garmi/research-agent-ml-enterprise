@@ -1,0 +1,280 @@
+{
+ "provider": "rules",
+ "model": "rules",
+ "prompt": null,
+ "seconds": 0,
+ "n": 29,
+ "abstained": 0,
+ "dropped": {
+  "precision": 0.923,
+  "recall": 0.857,
+  "accuracy": 0.897,
+  "false_alarms": 1,
+  "missed": 2
+ },
+ "hold_precision": 0.85,
+ "decision": "hold",
+ "rows": [
+  {
+   "id": "h01",
+   "label": "kept",
+   "pred": "kept",
+   "raw": "kept",
+   "reason": "kept",
+   "sentence": "The paper discusses how AI may affect developer productivity in software teams.",
+   "note": ""
+  },
+  {
+   "id": "h02",
+   "label": "dropped",
+   "pred": "dropped",
+   "raw": "dropped",
+   "reason": "dropped",
+   "sentence": "The paper shows that AI affects developer productivity in software teams.",
+   "note": ""
+  },
+  {
+   "id": "h03",
+   "label": "kept",
+   "pred": "kept",
+   "raw": "kept",
+   "reason": "kept",
+   "sentence": "Results suggest AI tools could deliver roughly 25-35% efficiency gains in development.",
+   "note": "hedge reworded"
+  },
+  {
+   "id": "h04",
+   "label": "dropped",
+   "pred": "dropped",
+   "raw": "dropped",
+   "reason": "dropped",
+   "sentence": "Results prove AI tools deliver 25-35% efficiency gains in development.",
+   "note": ""
+  },
+  {
+   "id": "h05",
+   "label": "kept",
+   "pred": "kept",
+   "raw": "kept",
+   "reason": "kept",
+   "sentence": "AI can improve teamwork, especially in agile and distributed teams.",
+   "note": ""
+  },
+  {
+   "id": "h06",
+   "label": "dropped",
+   "pred": "dropped",
+   "raw": "dropped",
+   "reason": "dropped",
+   "sentence": "AI improves teamwork in agile and distributed teams.",
+   "note": ""
+  },
+  {
+   "id": "h07",
+   "label": "kept",
+   "pred": "kept",
+   "raw": "kept",
+   "reason": "kept",
+   "sentence": "AI could enhance developer productivity, but lasting gains depend on planned integration.",
+   "note": ""
+  },
+  {
+   "id": "h08",
+   "label": "dropped",
+   "pred": "dropped",
+   "raw": "dropped",
+   "reason": "dropped",
+   "sentence": "AI significantly enhances developer productivity.",
+   "note": ""
+  },
+  {
+   "id": "h09",
+   "label": "dropped",
+   "pred": "kept",
+   "raw": "kept",
+   "reason": "kept",
+   "sentence": "AI could enhance productivity, and the gains are guaranteed to last.",
+   "note": "keeps a hedge word but overstates"
+  },
+  {
+   "id": "h10",
+   "label": "kept",
+   "pred": "kept",
+   "raw": "kept",
+   "reason": "kept",
+   "sentence": "Controlled studies find speedups of 21-56% in some settings but slowdowns of up to 19% in others.",
+   "note": ""
+  },
+  {
+   "id": "h11",
+   "label": "dropped",
+   "pred": "dropped",
+   "raw": "dropped",
+   "reason": "dropped",
+   "sentence": "Controlled studies find AI coding agents speed developers up by 21-56%.",
+   "note": ""
+  },
+  {
+   "id": "h12",
+   "label": "kept",
+   "pred": "kept",
+   "raw": "kept",
+   "reason": "kept",
+   "sentence": "Productivity gains from AI coding agents remain inconsistent.",
+   "note": ""
+  },
+  {
+   "id": "h13",
+   "label": "dropped",
+   "pred": "dropped",
+   "raw": "dropped",
+   "reason": "dropped",
+   "sentence": "AI coding agents deliver consistent productivity gains.",
+   "note": ""
+  },
+  {
+   "id": "h14",
+   "label": "kept",
+   "pred": "kept",
+   "raw": "kept",
+   "reason": "kept",
+   "sentence": "Prototype-derived architectures often cause problems in industrial clinical AI.",
+   "note": ""
+  },
+  {
+   "id": "h15",
+   "label": "dropped",
+   "pred": "dropped",
+   "raw": "dropped",
+   "reason": "dropped",
+   "sentence": "Prototype-derived architectures always fail in industrial clinical AI.",
+   "note": ""
+  },
+  {
+   "id": "h16",
+   "label": "kept",
+   "pred": "kept",
+   "raw": "kept",
+   "reason": "kept",
+   "sentence": "Generative AI tools often operate as disconnected point solutions.",
+   "note": ""
+  },
+  {
+   "id": "h17",
+   "label": "dropped",
+   "pred": "dropped",
+   "raw": "dropped",
+   "reason": "dropped",
+   "sentence": "Generative AI tools operate as disconnected point solutions.",
+   "note": ""
+  },
+  {
+   "id": "h18",
+   "label": "kept",
+   "pred": "kept",
+   "raw": "kept",
+   "reason": "kept",
+   "sentence": "Productivity gains from AI are real but conditional on how teams adopt it.",
+   "note": ""
+  },
+  {
+   "id": "h19",
+   "label": "dropped",
+   "pred": "dropped",
+   "raw": "dropped",
+   "reason": "dropped",
+   "sentence": "Productivity gains from AI are real across all teams.",
+   "note": ""
+  },
+  {
+   "id": "h20",
+   "label": "dropped",
+   "pred": "kept",
+   "raw": "kept",
+   "reason": "kept",
+   "sentence": "Gains from AI may be real, and they hold unconditionally for every team.",
+   "note": "keeps a hedge word but overstates"
+  },
+  {
+   "id": "h21",
+   "label": "kept",
+   "pred": "kept",
+   "raw": "kept",
+   "reason": "kept",
+   "sentence": "Studies show these assistants can improve task completion.",
+   "note": ""
+  },
+  {
+   "id": "h22",
+   "label": "dropped",
+   "pred": "dropped",
+   "raw": "dropped",
+   "reason": "dropped",
+   "sentence": "Studies show these assistants improve task completion for all developers.",
+   "note": ""
+  },
+  {
+   "id": "h23",
+   "label": "kept",
+   "pred": "kept",
+   "raw": "kept",
+   "reason": "kept",
+   "sentence": "Sourdough fermentation is considered a promising way to improve bread quality.",
+   "note": ""
+  },
+  {
+   "id": "h24",
+   "label": "dropped",
+   "pred": "dropped",
+   "raw": "dropped",
+   "reason": "dropped",
+   "sentence": "Sourdough fermentation improves bread quality.",
+   "note": ""
+  },
+  {
+   "id": "h25",
+   "label": "kept",
+   "pred": "kept",
+   "raw": "kept",
+   "reason": "kept",
+   "sentence": "AI has transformative potential in healthcare but brings new risks.",
+   "note": ""
+  },
+  {
+   "id": "h26",
+   "label": "dropped",
+   "pred": "dropped",
+   "raw": "dropped",
+   "reason": "dropped",
+   "sentence": "AI transforms healthcare.",
+   "note": ""
+  },
+  {
+   "id": "h27",
+   "label": "kept",
+   "pred": "dropped",
+   "raw": "dropped",
+   "reason": "dropped",
+   "sentence": "AI is not guaranteed to improve teamwork, though agile and distributed teams report benefits.",
+   "note": "preserves the limit without a listed hedge word"
+  },
+  {
+   "id": "h28",
+   "label": "kept",
+   "pred": "kept",
+   "raw": "kept",
+   "reason": "no_hedge",
+   "sentence": "Large language model assistants present new opportunities to transform software development.",
+   "note": "claim has no hedge"
+  },
+  {
+   "id": "h29",
+   "label": "kept",
+   "pred": "kept",
+   "raw": "kept",
+   "reason": "no_hedge",
+   "sentence": "Developers increasingly adopt these tools for coding, testing and debugging.",
+   "note": "claim has no hedge"
+  }
+ ]
+}

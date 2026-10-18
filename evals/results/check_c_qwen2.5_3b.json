@@ -1,0 +1,280 @@
+{
+ "provider": "ollama",
+ "model": "qwen2.5:3b-instruct",
+ "prompt": "prompts/check_c_hedges_v1.md",
+ "seconds": 49,
+ "n": 29,
+ "abstained": 0,
+ "dropped": {
+  "precision": 0.9,
+  "recall": 0.643,
+  "accuracy": 0.793,
+  "false_alarms": 1,
+  "missed": 5
+ },
+ "hold_precision": 0.85,
+ "decision": "hold",
+ "rows": [
+  {
+   "id": "h01",
+   "label": "kept",
+   "pred": "kept",
+   "raw": "kept",
+   "reason": "Both sentences maintain the original claim's caution and specificity.",
+   "sentence": "The paper discusses how AI may affect developer productivity in software teams.",
+   "note": ""
+  },
+  {
+   "id": "h02",
+   "label": "dropped",
+   "pred": "dropped",
+   "raw": "dropped",
+   "reason": "The second sentence states as fact what the first sentence hedges.",
+   "sentence": "The paper shows that AI affects developer productivity in software teams.",
+   "note": ""
+  },
+  {
+   "id": "h03",
+   "label": "kept",
+   "pred": "kept",
+   "raw": "kept",
+   "reason": "Both sentences maintain the original claim's caution and specificity.",
+   "sentence": "Results suggest AI tools could deliver roughly 25-35% efficiency gains in development.",
+   "note": "hedge reworded"
+  },
+  {
+   "id": "h04",
+   "label": "dropped",
+   "pred": "dropped",
+   "raw": "dropped",
+   "reason": "The second sentence states as fact what the first sentence hedges.",
+   "sentence": "Results prove AI tools deliver 25-35% efficiency gains in development.",
+   "note": ""
+  },
+  {
+   "id": "h05",
+   "label": "kept",
+   "pred": "kept",
+   "raw": "kept",
+   "reason": "Both sentences maintain the original claim's caution and specificity.",
+   "sentence": "AI can improve teamwork, especially in agile and distributed teams.",
+   "note": ""
+  },
+  {
+   "id": "h06",
+   "label": "dropped",
+   "pred": "kept",
+   "raw": "kept",
+   "reason": "Both sentences maintain the original claim's caution and specificity.",
+   "sentence": "AI improves teamwork in agile and distributed teams.",
+   "note": ""
+  },
+  {
+   "id": "h07",
+   "label": "kept",
+   "pred": "kept",
+   "raw": "kept",
+   "reason": "Both sentences maintain the original claim's caution and specificity.",
+   "sentence": "AI could enhance developer productivity, but lasting gains depend on planned integration.",
+   "note": ""
+  },
+  {
+   "id": "h08",
+   "label": "dropped",
+   "pred": "dropped",
+   "raw": "dropped",
+   "reason": "The second sentence states as fact what the first sentence hedges.",
+   "sentence": "AI significantly enhances developer productivity.",
+   "note": ""
+  },
+  {
+   "id": "h09",
+   "label": "dropped",
+   "pred": "kept",
+   "raw": "kept",
+   "reason": "Both sentences maintain the caution about sustainable gains under planned intake.",
+   "sentence": "AI could enhance productivity, and the gains are guaranteed to last.",
+   "note": "keeps a hedge word but overstates"
+  },
+  {
+   "id": "h10",
+   "label": "kept",
+   "pred": "kept",
+   "raw": "kept",
+   "reason": "Both sentences use 'some settings' to indicate variability.",
+   "sentence": "Controlled studies find speedups of 21-56% in some settings but slowdowns of up to 19% in others.",
+   "note": ""
+  },
+  {
+   "id": "h11",
+   "label": "dropped",
+   "pred": "kept",
+   "raw": "kept",
+   "reason": "Both sentences use 'some settings' to indicate variability.",
+   "sentence": "Controlled studies find AI coding agents speed developers up by 21-56%.",
+   "note": ""
+  },
+  {
+   "id": "h12",
+   "label": "kept",
+   "pred": "kept",
+   "raw": "kept",
+   "reason": "Both sentences use 'remain inconsistent' to indicate variability.",
+   "sentence": "Productivity gains from AI coding agents remain inconsistent.",
+   "note": ""
+  },
+  {
+   "id": "h13",
+   "label": "dropped",
+   "pred": "dropped",
+   "raw": "dropped",
+   "reason": "The sentence states a universal truth, contradicting the claim's caution.",
+   "sentence": "AI coding agents deliver consistent productivity gains.",
+   "note": ""
+  },
+  {
+   "id": "h14",
+   "label": "kept",
+   "pred": "kept",
+   "raw": "kept",
+   "reason": "Both sentences use 'often' to indicate variability.",
+   "sentence": "Prototype-derived architectures often cause problems in industrial clinical AI.",
+   "note": ""
+  },
+  {
+   "id": "h15",
+   "label": "dropped",
+   "pred": "dropped",
+   "raw": "dropped",
+   "reason": "The sentence states a universal failure, contradicting the claim's caution.",
+   "sentence": "Prototype-derived architectures always fail in industrial clinical AI.",
+   "note": ""
+  },
+  {
+   "id": "h16",
+   "label": "kept",
+   "pred": "kept",
+   "raw": "kept",
+   "reason": "Both sentences use 'often' to indicate variability.",
+   "sentence": "Generative AI tools often operate as disconnected point solutions.",
+   "note": ""
+  },
+  {
+   "id": "h17",
+   "label": "dropped",
+   "pred": "kept",
+   "raw": "kept",
+   "reason": "Both sentences maintain the conditional nature of the claim.",
+   "sentence": "Generative AI tools operate as disconnected point solutions.",
+   "note": ""
+  },
+  {
+   "id": "h18",
+   "label": "kept",
+   "pred": "dropped",
+   "raw": "dropped",
+   "reason": "The sentence states a universal condition, dropping the conditional aspect.",
+   "sentence": "Productivity gains from AI are real but conditional on how teams adopt it.",
+   "note": ""
+  },
+  {
+   "id": "h19",
+   "label": "dropped",
+   "pred": "dropped",
+   "raw": "dropped",
+   "reason": "The sentence states a universal condition, dropping the conditional aspect.",
+   "sentence": "Productivity gains from AI are real across all teams.",
+   "note": ""
+  },
+  {
+   "id": "h20",
+   "label": "dropped",
+   "pred": "kept",
+   "raw": "kept",
+   "reason": "The sentence preserves the conditional nature with a hedge.",
+   "sentence": "Gains from AI may be real, and they hold unconditionally for every team.",
+   "note": "keeps a hedge word but overstates"
+  },
+  {
+   "id": "h21",
+   "label": "kept",
+   "pred": "kept",
+   "raw": "kept",
+   "reason": "The sentence preserves the conditional nature with a hedge.",
+   "sentence": "Studies show these assistants can improve task completion.",
+   "note": ""
+  },
+  {
+   "id": "h22",
+   "label": "dropped",
+   "pred": "dropped",
+   "raw": "dropped",
+   "reason": "The sentence states a universal condition, dropping the conditional aspect.",
+   "sentence": "Studies show these assistants improve task completion for all developers.",
+   "note": ""
+  },
+  {
+   "id": "h23",
+   "label": "kept",
+   "pred": "kept",
+   "raw": "kept",
+   "reason": "The sentence preserves the conditional nature with a hedge.",
+   "sentence": "Sourdough fermentation is considered a promising way to improve bread quality.",
+   "note": ""
+  },
+  {
+   "id": "h24",
+   "label": "dropped",
+   "pred": "dropped",
+   "raw": "dropped",
+   "reason": "The sentence states a universal condition, dropping the conditional aspect.",
+   "sentence": "Sourdough fermentation improves bread quality.",
+   "note": ""
+  },
+  {
+   "id": "h25",
+   "label": "kept",
+   "pred": "kept",
+   "raw": "kept",
+   "reason": "The sentence maintains the caution about new risks while rephrasing the claim.",
+   "sentence": "AI has transformative potential in healthcare but brings new risks.",
+   "note": ""
+  },
+  {
+   "id": "h26",
+   "label": "dropped",
+   "pred": "dropped",
+   "raw": "dropped",
+   "reason": "The sentence states as a fact what the claim hedged with 'but'.",
+   "sentence": "AI transforms healthcare.",
+   "note": ""
+  },
+  {
+   "id": "h27",
+   "label": "kept",
+   "pred": "kept",
+   "raw": "kept",
+   "reason": "The sentence preserves the caution about AI not being guaranteed to improve teamwork.",
+   "sentence": "AI is not guaranteed to improve teamwork, though agile and distributed teams report benefits.",
+   "note": "preserves the limit without a listed hedge word"
+  },
+  {
+   "id": "h28",
+   "label": "kept",
+   "pred": "kept",
+   "raw": "kept",
+   "reason": "The sentence preserves the caution about AI's transformative potential being approximate.",
+   "sentence": "Large language model assistants present new opportunities to transform software development.",
+   "note": "claim has no hedge"
+  },
+  {
+   "id": "h29",
+   "label": "kept",
+   "pred": "kept",
+   "raw": "kept",
+   "reason": "The sentence preserves the caution about adoption being approximate.",
+   "sentence": "Developers increasingly adopt these tools for coding, testing and debugging.",
+   "note": "claim has no hedge"
+  }
+ ]
+}
