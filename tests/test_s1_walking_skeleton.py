@@ -436,6 +436,7 @@ def test_ui_intake_run_button_lifecycle(tmp_path: Path, monkeypatch: pytest.Monk
 
     approvals_dir = str(tmp_path / "approvals")
     monkeypatch.setenv("RESEARCH_APPROVALS_DIR", approvals_dir)
+    monkeypatch.setenv("STUB_LLM", "1")
 
     app_script = """
 import streamlit as st
@@ -455,9 +456,20 @@ render_intake_view()
     at.text_area(key="input_user_question").input("What empirical evidence exists for test automation?").run()
     run_btn = at.button(key="btn_run_research")
     assert run_btn.disabled is True
+    assert any("Click Reason about my question and approve a proposal in Step 2 to unlock Run." in m.value for m in at.markdown)
 
-    # User approves framing in Step 2
-    approve_btn = at.button(key="btn_approve_framing")
+    # User clicks Reason about my question
+    reason_btn = at.button(key="btn_reason_question")
+    assert reason_btn is not None
+    reason_btn.click().run()
+
+    # Proposal is shown, Run is still disabled until approved
+    run_btn = at.button(key="btn_run_research")
+    assert run_btn.disabled is True
+    assert any("Approve the reasoned proposal in Step 2 to unlock Run." in m.value for m in at.markdown)
+
+    # User approves reasoned package
+    approve_btn = at.button(key="btn_approve_reasoned_package")
     assert approve_btn is not None
     approve_btn.click().run()
 
@@ -465,13 +477,13 @@ render_intake_view()
     run_btn = at.button(key="btn_run_research")
     assert run_btn.disabled is False
 
-    # Step 3: User edits question text in Step 1
-    at.text_area(key="input_user_question").input("What empirical evidence exists for test automation and CI?").run()
+    # Step 3: User edits a field in the proposal after approval
+    at.text_input(key="input_s2_refined_question").input("What empirical evidence exists for test automation and CI?").run()
 
-    # Run button must now be disabled again with the specified after-edit message
+    # Run button must now be disabled again with the after-edit message
     run_btn = at.button(key="btn_run_research")
     assert run_btn.disabled is True
-    assert any("You changed the question after approving. Approve a framing again." in m.value for m in at.markdown)
+    assert any("You changed the proposal after approving. Approve again to unlock Run." in m.value for m in at.markdown)
 
 
 # ==============================================================================

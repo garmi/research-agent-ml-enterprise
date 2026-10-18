@@ -40,7 +40,8 @@ def _compute_head_sha256(filepath: str) -> Optional[str]:
 
 
 def _get_tracked_files_snapshot() -> Dict[str, Optional[str]]:
-    """Return dict of relative_path -> sha256 digest for every file in `git ls-files` on disk."""
+    """Return dict of relative_path -> sha256 digest for every file in `git ls-files` on disk,
+    plus every file under ledger/ and outputs/ (whether gitignored or not)."""
     res = subprocess.run(
         ["git", "ls-files"],
         capture_output=True,
@@ -52,6 +53,14 @@ def _get_tracked_files_snapshot() -> Dict[str, Optional[str]]:
         path = line.strip()
         if path:
             snapshot[path] = _compute_file_sha256(path)
+
+    # Scan every file under ledger/ and outputs/ (ignored or not)
+    for folder in ("ledger", "outputs"):
+        p = Path(folder)
+        if p.is_dir():
+            for f in sorted(p.rglob("*")):
+                if f.is_file():
+                    snapshot[str(f)] = _compute_file_sha256(f)
     return snapshot
 
 
@@ -138,4 +147,18 @@ def current_tracked_files_snapshot() -> Callable[[], Dict[str, Optional[str]]]:
 def snapshot_comparator() -> Callable[[Dict[str, Optional[str]], Dict[str, Optional[str]]], List[str]]:
     """Fixture returning pure comparison function for snapshots."""
     return compare_tracked_snapshots
+
+
+@pytest.fixture(autouse=True)
+def isolate_test_ledger_and_outputs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """Isolate ledger backups, approvals, and report outputs to temporary directories."""
+    test_approvals = tmp_path / "ledger" / "approvals"
+    test_backups = tmp_path / "ledger" / "backups"
+    test_outputs = tmp_path / "outputs"
+    test_approvals.mkdir(parents=True, exist_ok=True)
+    test_backups.mkdir(parents=True, exist_ok=True)
+    test_outputs.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("RESEARCH_APPROVALS_DIR", str(test_approvals))
+    monkeypatch.setenv("LEDGER_BACKUPS_DIR", str(test_backups))
+    monkeypatch.setenv("OUTPUT_DIR", str(test_outputs))
 
