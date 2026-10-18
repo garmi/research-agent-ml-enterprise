@@ -13,6 +13,7 @@ Requirements:
    returned so the evidence board can show them; runs.status and verdict rows persist.
 7. Operator exclusions (by content key) remove claims from the draft, are listed as
    excluded, are logged to reviews, and can push the run into BLOCKED.
+8. A re-draft runs the approved refined question, not the raw Step 1 input text.
 """
 
 from __future__ import annotations
@@ -228,3 +229,14 @@ def test_operator_exclusions_are_applied_logged_and_can_block(tmp_path):
     assert claim_content_key(Claim(id="x", source_id="s", text=" A  b ", source_excerpt="e")) == claim_content_key(
         Claim(id="y", source_id="s", text="a b", source_excerpt="other")
     )
+
+
+# ------------------------------------------------------------------------------
+# Test 8: A re-draft runs the approved question, not the raw input text
+# ------------------------------------------------------------------------------
+def test_redraft_uses_approved_refined_question():
+    from src.ui.intake_view import approved_question_text
+
+    pkg = {"refined_question": "What measurable productivity impact do AI coding assistants have?"}
+    assert approved_question_text(pkg, {"strategic_question": "raw typed text"}) == pkg["refined_question"]
+    assert approved_question_text(None, {"strategic_question": "Question the run used"}) == "Question the run used"
