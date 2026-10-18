@@ -16,6 +16,8 @@ Requirements:
 7. On-topic harvest proceeds past Check A and the run status is persisted.
 8. A model that is unavailable or unparseable abstains; the rules decide.
 9. The approved question and its hashes reach the runner through start_run.
+10. The model is shown the approved package (sub-questions, scope) and the configured
+    synonyms for the question's terms, and the prompt defines on-topic as the whole subject.
 """
 
 from __future__ import annotations
@@ -380,5 +382,34 @@ def test_approved_question_threads_through_start_run(tmp_path, monkeypatch):
     assert captured["approval_ref"]["question_sha256"] == approval.question_sha256
     assert captured["approval_ref"]["version"] == approval.version
 
+    assert captured["approved_package"] == package
     kept = _filter_runner_args(MultiLaneResearchRunner(db_path=str(tmp_path / "l.db")).run_workflow, captured)
-    assert "approved_question" in kept and "approval_ref" in kept
+    assert "approved_question" in kept and "approval_ref" in kept and "approved_package" in kept
+
+
+# ------------------------------------------------------------------------------
+# Test 10: The model sees the approved package and the configured synonyms
+# ------------------------------------------------------------------------------
+def test_model_prompt_carries_package_and_synonyms():
+    class Recorder(FakeCheckLLM):
+        def generate(self, prompt, **kwargs):
+            self.prompt = prompt
+            return super().generate(prompt, **kwargs)
+
+    llm = Recorder()
+    package = {
+        "refined_question": "What evidence exists on Kiro adoption in engineering teams?",
+        "sub_questions": ["How does spec-driven tooling change review effort?"],
+        "in_scope": ["enterprise engineering teams"],
+        "out_of_scope": ["consumer chat assistants"],
+    }
+    items = build_source_items(AI_PAPERS[:1], [], [])
+    run_check_a(
+        question=package["refined_question"], items=items, llm=llm, run_id="r", attempt=0,
+        package=package, synonyms={"kiro": ["spec-driven development"], "sourdough": ["levain"]},
+    )
+    assert "How does spec-driven tooling change review effort?" in llm.prompt
+    assert "enterprise engineering teams" in llm.prompt and "consumer chat assistants" in llm.prompt
+    assert "kiro: spec driven development" in llm.prompt.lower()
+    assert "levain" not in llm.prompt, "only synonyms for the question's own terms are shown"
+    assert "one part" in llm.prompt.lower()
