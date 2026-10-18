@@ -20,6 +20,7 @@ import uuid
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
+from src.extract.hedges import find_hedge_terms
 from src.extract.term_normalizer import check_term_integrity
 from src.ledger.models import Claim, EntityMatch, StudyType
 
@@ -198,6 +199,7 @@ def extract_claims_from_paper(
             grade="weak",  # Assigned by grader
             grade_reasons_json=[],
             status="auto",
+            hedge_terms_json=find_hedge_terms(sentence),
         )
         extracted_claims.append(claim)
 

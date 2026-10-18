@@ -19,8 +19,8 @@ class StubLLM:
         json_mode: bool = False,
     ) -> str:
         prompt_lower = prompt.lower()
-        if "you are check a" in prompt_lower:
-            # The stub cannot judge relevance: abstain so the rules decide.
+        if "you are check a" in prompt_lower or "you are check c" in prompt_lower:
+            # The stub cannot judge relevance or hedges: abstain so the rules decide.
             return json.dumps({"verdicts": []})
         if "compact summaries of research papers" in prompt_lower:
             return json.dumps({

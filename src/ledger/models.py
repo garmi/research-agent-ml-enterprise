@@ -83,6 +83,7 @@ class Claim(BaseModel):
     status: ClaimStatus = "auto"
     observations_count: int = 1
     created_at: str = Field(default_factory=now_utc_iso)
+    hedge_terms_json: Optional[List[str]] = None  # hedges in the source sentence (S5)
 
 
 class ClaimLink(BaseModel):

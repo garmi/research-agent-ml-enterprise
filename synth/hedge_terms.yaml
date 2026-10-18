@@ -1,0 +1,48 @@
+# Hedge terms (S5, DEC-016 Check C). A claim's hedges are the terms below found in its source
+# sentence; a drafted sentence that drops all of them overstates the claim.
+# Matched case-insensitively as whole words or phrases. Order does not matter.
+modal:
+  - may
+  - might
+  - could
+  - can
+  - would
+evidential:
+  - suggest
+  - suggests
+  - suggested
+  - indicate
+  - indicates
+  - indicated
+  - appear
+  - appears
+  - seem
+  - seems
+  - considered
+probability:
+  - likely
+  - unlikely
+  - possibly
+  - potentially
+  - potential
+  - promising
+approximation:
+  - about
+  - approximately
+  - roughly
+  - around
+  - up to
+scope:
+  - in some cases
+  - in some settings
+  - in some contexts
+  - under certain conditions
+  - sometimes
+  - often
+  - tend to
+  - tends to
+  - conditional
+  - inconsistent
+  - mixed
+  - preliminary
+  - limited evidence

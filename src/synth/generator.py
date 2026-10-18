@@ -29,6 +29,29 @@ from src.score.scorer import QualityScorer
 logger = logging.getLogger(__name__)
 
 
+def resolve_citations(
+    text: str,
+    papers: List[Dict[str, Any]],
+    eligible_claims: List[Claim],
+    claims_by_id: Dict[str, Claim],
+) -> List[str]:
+    """Claim ids a sentence cites through its own tags, in order: [P#] means every eligible claim
+    from that paper, [c_...] means that claim. No tag, or only unknown tags, means no claims."""
+    cited: List[str] = []
+    for m in re.finditer(r"\[P(\d+)\]|\[(c_[^\]]+)\]", text or ""):
+        if m.group(1):
+            idx = int(m.group(1)) - 1
+            if 0 <= idx < len(papers):
+                pid = papers[idx].get("id")
+                ids = [c.id for c in eligible_claims if c.source_id == pid]
+            else:
+                ids = []
+        else:
+            ids = [m.group(2)] if m.group(2) in claims_by_id else []
+        cited.extend(i for i in ids if i not in cited)
+    return cited
+
+
 def search_log_negative_findings(slogs: List[Any]) -> List[Tuple[str, Dict[str, Any]]]:
     """Rule-built 'searched, nothing found' / 'not searched' statements, each tied to its search_log row."""
     searched_zero = [s for s in slogs if getattr(s, "status", "searched_ok") == "searched_ok" and s.result_count == 0]
@@ -168,7 +191,10 @@ class SynthesisEngine:
         # 3. Partition claims
         supported_claims = [c for c in eligible_claims if c.grade in ("strong", "moderate")]
         thin_claims = [c for c in eligible_claims if c.grade in ("weak", "vendor_claim", "anecdote")]
-        default_claim_ids = [c.id for c in (supported_claims or eligible_claims)[:1]]
+
+        def bind(text: str) -> Tuple[List[str], Optional[Dict[str, Any]]]:
+            cids = resolve_citations(text, papers or [], eligible_claims, claims_by_id)
+            return cids, (None if cids else {"binding": "unbound"})
 
         output_id = f"out_{uuid.uuid4().hex[:12]}"
         sentences: List[OutputSentence] = []
@@ -200,21 +226,8 @@ class SynthesisEngine:
 
         if executive_synthesis and executive_synthesis.get("key_findings"):
             for f_text in executive_synthesis["key_findings"]:
-                cited_cids = []
-                p_match = re.search(r"\[P(\d+)\]", f_text)
-                c_match = re.search(r"\[(c_[^\]]+)\]", f_text)
-                if p_match and papers:
-                    p_idx = int(p_match.group(1)) - 1
-                    if 0 <= p_idx < len(papers):
-                        target_paper_id = papers[p_idx].get("id")
-                        cited_cids = [c.id for c in eligible_claims if c.source_id == target_paper_id]
-                elif c_match:
-                    target_cid = c_match.group(1)
-                    if target_cid in claims_by_id:
-                        cited_cids = [target_cid]
-                if not cited_cids and not p_match and not c_match:
-                    cited_cids = default_claim_ids
-
+                # Only the claims the sentence's own tags point to; an untagged sentence stays unbound.
+                cited_cids, checks = bind(f_text)
                 sentences.append(
                     OutputSentence(
                         id=f"{output_id}_{ordinal}",
@@ -223,6 +236,7 @@ class SynthesisEngine:
                         text=f_text.strip(),
                         type="assertive",
                         claim_ids_json=cited_cids,
+                        checks_json=checks,
                     )
                 )
                 ordinal += 1
@@ -292,7 +306,8 @@ class SynthesisEngine:
                         ordinal=ordinal,
                         text=sig.strip(),
                         type="signal",
-                        claim_ids_json=default_claim_ids,
+                        claim_ids_json=bind(sig)[0],
+                        checks_json=bind(sig)[1],
                     )
                 )
                 ordinal += 1
@@ -330,7 +345,8 @@ class SynthesisEngine:
                         ordinal=ordinal,
                         text=r.strip(),
                         type="risk",
-                        claim_ids_json=default_claim_ids,
+                        claim_ids_json=bind(r)[0],
+                        checks_json=bind(r)[1],
                     )
                 )
                 ordinal += 1
@@ -439,7 +455,8 @@ class SynthesisEngine:
                             ordinal=ordinal,
                             text=f"{phase_title}: {act}",
                             type="roadmap",
-                            claim_ids_json=default_claim_ids,
+                            claim_ids_json=bind(str(act))[0],
+                            checks_json=bind(str(act))[1],
                         )
                     )
                     ordinal += 1
