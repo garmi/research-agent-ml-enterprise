@@ -151,7 +151,11 @@ def snapshot_comparator() -> Callable[[Dict[str, Optional[str]], Dict[str, Optio
 
 @pytest.fixture(autouse=True)
 def isolate_test_ledger_and_outputs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    """Isolate ledger backups, approvals, and report outputs to temporary directories."""
+    """Isolate ledger databases, backups, approvals, and report outputs to this test's tmp_path.
+
+    The src modules read these variables at call time, so a runner, service or web_app built
+    without explicit paths writes into the sandbox rather than the checkout's ledger/ or outputs/.
+    """
     test_approvals = tmp_path / "ledger" / "approvals"
     test_backups = tmp_path / "ledger" / "backups"
     test_outputs = tmp_path / "outputs"
@@ -161,4 +165,6 @@ def isolate_test_ledger_and_outputs(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     monkeypatch.setenv("RESEARCH_APPROVALS_DIR", str(test_approvals))
     monkeypatch.setenv("LEDGER_BACKUPS_DIR", str(test_backups))
     monkeypatch.setenv("OUTPUT_DIR", str(test_outputs))
+    monkeypatch.setenv("RESEARCH_LEDGER_DB", str(tmp_path / "ledger" / "ledger.db"))
+    monkeypatch.setenv("RESEARCH_PRACTITIONER_DB", str(tmp_path / "ledger" / "practitioner.db"))
 

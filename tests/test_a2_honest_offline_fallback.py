@@ -7,11 +7,15 @@ import pytest
 from src.analysis.multilane_runner import MultiLaneResearchRunner
 
 
-def test_fallback_produces_extractive_claims_and_blocks_publication():
+def test_fallback_produces_extractive_claims_and_blocks_publication(monkeypatch):
     """Verify that when the LLM provider fails, the runner uses extractive fallback,
     records generation_mode='extractive_fallback', logs exception details, and never
     marks the output as publish_ready.
     """
+    # The unknown provider resolves to the local Ollama client. Point it at a closed port so the
+    # failure is deterministic whether or not Ollama is running on this machine.
+    monkeypatch.setenv("OLLAMA_BASE_URL", "http://127.0.0.1:9")
+
     with tempfile.TemporaryDirectory() as tmpdir:
         ledger_db = str(Path(tmpdir) / "test_ledger.db")
         prac_db = str(Path(tmpdir) / "test_prac.db")
