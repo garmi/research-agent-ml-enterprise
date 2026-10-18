@@ -32,13 +32,13 @@ def test_default_paths_follow_environment_overrides(tmp_path, monkeypatch):
     assert default_practitioner_path() == str(tmp_path / "y.db")
 
 
-def test_suite_sandbox_covers_every_runtime_location(isolated_runtime_paths, monkeypatch):
+def test_suite_sandbox_covers_every_runtime_location(tmp_path):
     from src.engine.approvals import get_approvals_dir
     from src.ledger.db import default_ledger_path, default_practitioner_path
     from src.ledger.migrations import default_backups_dir
     from src.config import default_outputs_dir
 
-    root = isolated_runtime_paths
+    root = tmp_path
     assert Path(default_ledger_path()).is_relative_to(root)
     assert Path(default_practitioner_path()).is_relative_to(root)
     assert Path(default_backups_dir()).is_relative_to(root)
@@ -46,12 +46,12 @@ def test_suite_sandbox_covers_every_runtime_location(isolated_runtime_paths, mon
     assert Path(default_outputs_dir()).is_relative_to(root)
 
 
-def test_default_constructed_services_write_only_inside_sandbox(isolated_runtime_paths):
+def test_default_constructed_services_write_only_inside_sandbox(tmp_path):
     from src.analysis.multilane_runner import MultiLaneResearchRunner
     from src.ledger.service import LedgerService
     from src.publish.publisher import Publisher
 
-    root = isolated_runtime_paths
+    root = tmp_path
 
     runner = MultiLaneResearchRunner()
     service = LedgerService()

@@ -11,8 +11,8 @@ def load_config(path: str = "config.yaml") -> Dict[str, Any]:
 
 
 def default_outputs_dir() -> str:
-    """Outputs directory: RESEARCH_OUTPUTS_DIR when set, otherwise 'outputs'."""
-    return os.getenv("RESEARCH_OUTPUTS_DIR") or "outputs"
+    """Outputs directory: OUTPUT_DIR when set, otherwise 'outputs'."""
+    return os.getenv("OUTPUT_DIR") or "outputs"
 
 
 def ensure_directories(base_dir: Optional[str] = None) -> None:

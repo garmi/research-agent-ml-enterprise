@@ -38,7 +38,7 @@ from src.fetchers.openalex_client import OpenAlexClient
 from src.fetchers.semantic_scholar_client import SemanticScholarClient
 from src.gaps.matrix_builder import GapMatrixBuilder
 from src.grade.grader import Grader
-from src.ledger.db import default_ledger_path, default_practitioner_path
+from src.ledger.db import DEFAULT_LEDGER_PATH, default_ledger_path, default_practitioner_path
 from src.ledger.migrations import apply_migrations
 from src.ledger.models import Claim, OutputDoc, OutputSentence, Question, Run, SearchLog, Source
 from src.ledger.repository import LedgerRepository
@@ -154,8 +154,10 @@ class MultiLaneResearchRunner:
         self.practitioner_db_path = practitioner_db_path or default_practitioner_path()
         Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
 
-        # Isolate questions_yaml_path for test databases to avoid modifying the tracked register.yaml
-        if self.db_path != "ledger/ledger.db" and questions_yaml_path == "questions/register.yaml":
+        # Isolate questions_yaml_path for every database other than the production ledger, so the
+        # tracked register.yaml is never rewritten (LedgerService writes it). Sandboxed defaults count
+        # as test databases; comparing against default_ledger_path() here would switch this off.
+        if self.db_path != DEFAULT_LEDGER_PATH and questions_yaml_path == "questions/register.yaml":
             temp_q_yaml = os.path.join(os.path.dirname(self.db_path), "register.yaml")
             if os.path.exists("questions/register.yaml") and not os.path.exists(temp_q_yaml):
                 shutil.copy("questions/register.yaml", temp_q_yaml)

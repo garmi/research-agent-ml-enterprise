@@ -29,8 +29,8 @@ DEFAULT_BACKUPS_DIR = "ledger/backups"
 
 
 def default_backups_dir() -> str:
-    """Backups directory: RESEARCH_BACKUPS_DIR when set, otherwise DEFAULT_BACKUPS_DIR."""
-    return os.getenv("RESEARCH_BACKUPS_DIR") or DEFAULT_BACKUPS_DIR
+    """Backups directory: LEDGER_BACKUPS_DIR when set, otherwise DEFAULT_BACKUPS_DIR."""
+    return os.getenv("LEDGER_BACKUPS_DIR") or DEFAULT_BACKUPS_DIR
 
 
 def create_backup(
@@ -44,13 +44,13 @@ def create_backup(
     Rotates older backups to keep the last `keep_last_n`.
     """
     if backups_dir is None or backups_dir == DEFAULT_BACKUPS_DIR or backups_dir == "ledger/backups":
-        backups_dir = os.getenv("LEDGER_BACKUPS_DIR", DEFAULT_BACKUPS_DIR)
+        backups_dir = default_backups_dir()
 
     source = Path(db_path)
     if not source.exists() or source.stat().st_size == 0:
         return None
 
-    target_dir = Path(backups_dir or default_backups_dir())
+    target_dir = Path(backups_dir)
     target_dir.mkdir(parents=True, exist_ok=True)
 
     timestamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d_%H%M%S")
@@ -294,7 +294,7 @@ def apply_migrations(
         The latest schema version after migrations.
     """
     if backups_dir is None or backups_dir == DEFAULT_BACKUPS_DIR or backups_dir == "ledger/backups":
-        backups_dir = os.getenv("LEDGER_BACKUPS_DIR", DEFAULT_BACKUPS_DIR)
+        backups_dir = default_backups_dir()
 
     conn = get_connection(db_path, verify_integrity=False)
     current_version = get_current_schema_version(conn)
