@@ -248,6 +248,7 @@ class MultiLaneResearchRunner:
         practitioner_abstraction_confirmed: bool = False,
         approved_question: Optional[str] = None,
         approval_ref: Optional[Dict[str, Any]] = None,
+        approved_package: Optional[Dict[str, Any]] = None,
         excluded_claim_keys: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """Execute the full 8-stage multi-lane workflow.
@@ -358,6 +359,7 @@ class MultiLaneResearchRunner:
         check_a = self._run_check_a(
             check_question, academic_papers, enterprise_claims, practitioner_claims,
             map_provider=map_provider, run_id=run_id, attempt=0, approval_ref=approval_ref,
+            approved_package=approved_package,
         )
         if not check_a.passed:
             report(2, "Check A: Too little on-topic evidence. Widening the search once...", 0.36)
@@ -383,6 +385,7 @@ class MultiLaneResearchRunner:
             check_a = self._run_check_a(
                 check_question, academic_papers, enterprise_claims, practitioner_claims,
                 map_provider=map_provider, run_id=run_id, attempt=1, approval_ref=approval_ref,
+                approved_package=approved_package,
             )
         if not check_a.passed:
             return self._stop_at_check_a(
@@ -639,6 +642,7 @@ class MultiLaneResearchRunner:
         run_id: str,
         attempt: int,
         approval_ref: Optional[Dict[str, Any]],
+        approved_package: Optional[Dict[str, Any]] = None,
     ) -> Any:
         from src.engine.check_a_on_topic import build_source_items, run_check_a
         from src.engine.checks import record_verdict
@@ -658,6 +662,7 @@ class MultiLaneResearchRunner:
             floor_min_terms=int(cfg.get("floor_min_terms", 1)),
             synonyms=research_cfg.get("head_term_synonyms"),
             approval_ref=approval_ref,
+            package=approved_package,
         )
         for v in result.verdicts:
             record_verdict(self.repo, v)

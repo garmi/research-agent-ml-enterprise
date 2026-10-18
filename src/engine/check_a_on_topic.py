@@ -21,7 +21,7 @@ from src.engine.checks import ABSTAIN, CheckVerdict
 logger = logging.getLogger(__name__)
 
 CHECK_A_ID = "check_a_on_topic"
-PROMPT_FILE_PATH = "prompts/check_a_on_topic_v1.md"
+PROMPT_FILE_PATH = "prompts/check_a_on_topic_v2.md"
 BATCH_SIZE = 12
 TEXT_CHARS = 320
 
@@ -57,7 +57,7 @@ class CheckAResult:
 def get_prompt_hash(prompt_path: Optional[str | Path] = None) -> str:
     path = Path(prompt_path or PROMPT_FILE_PATH)
     if not path.exists():
-        return hashlib.sha256(b"check_a_on_topic_v1_default").hexdigest()
+        return hashlib.sha256(b"check_a_on_topic_v2_default").hexdigest()
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
@@ -127,6 +127,28 @@ def _term_alternates(terms: Set[str], synonyms: Optional[Dict[str, List[str]]]) 
     return alternates
 
 
+def build_question_context(
+    question: str,
+    package: Optional[Dict[str, Any]],
+    alternates: Dict[str, Set[str]],
+) -> str:
+    """What the model sees about the question: the approved package and the equivalent terms
+    configured for the question's own salient terms (research.head_term_synonyms)."""
+    pkg = package or {}
+    lines = [f"Approved question:\n{question}"]
+    for label, key in (("Sub-questions", "sub_questions"), ("In scope", "in_scope"), ("Out of scope", "out_of_scope")):
+        values = [str(v).strip() for v in (pkg.get(key) or []) if str(v).strip()]
+        if values:
+            lines.append(f"{label}:\n" + "\n".join(f"- {v}" for v in values))
+    equivalents = [
+        f"- {term}: {', '.join(sorted(alts - {term}))}"
+        for term, alts in sorted(alternates.items()) if alts - {term}
+    ]
+    if equivalents:
+        lines.append("Equivalent terms (count as the subject itself):\n" + "\n".join(equivalents))
+    return "\n\n".join(lines)
+
+
 def _rule_floor(alternates: Dict[str, Set[str]], text: str, min_terms: int) -> Dict[str, Any]:
     norm = normalize_text(text)
     tokens = set(norm.split())
@@ -147,7 +169,7 @@ def _extract_json(raw: str) -> Dict[str, Any]:
     return json.loads(raw[start:end + 1])
 
 
-def _judge_with_model(llm: Any, question: str, items: List[SourceItem], template: str) -> Dict[str, Dict[str, str]]:
+def _judge_with_model(llm: Any, context: str, items: List[SourceItem], template: str) -> Dict[str, Dict[str, str]]:
     """Return {source_id: {"verdict", "reason"}}. Any failure leaves sources unjudged (abstain)."""
     judged: Dict[str, Dict[str, str]] = {}
     if llm is None:
@@ -160,7 +182,7 @@ def _judge_with_model(llm: Any, question: str, items: List[SourceItem], template
             title = it.title.replace("|", "/")
             snippet = re.sub(r"\s+", " ", it.text)[:TEXT_CHARS]
             lines.append(f"[{k}] lane: {it.lane} | title: {title} | text: {snippet}")
-        prompt = template.replace("{question}", question).replace("{items}", "\n".join(lines))
+        prompt = template.replace("{context}", context).replace("{items}", "\n".join(lines))
         try:
             data = _extract_json(llm.generate(prompt, temperature=0.0, json_mode=True))
         except Exception as exc:  # unavailable or unparseable model abstains
@@ -185,15 +207,16 @@ def run_check_a(
     floor_min_terms: int = 1,
     synonyms: Optional[Dict[str, List[str]]] = None,
     approval_ref: Optional[Dict[str, Any]] = None,
+    package: Optional[Dict[str, Any]] = None,
 ) -> CheckAResult:
     prompt_path = Path(PROMPT_FILE_PATH)
-    template = prompt_path.read_text(encoding="utf-8") if prompt_path.exists() else "{question}\n{items}"
+    template = prompt_path.read_text(encoding="utf-8") if prompt_path.exists() else "{context}\n{items}"
     prompt_hash = get_prompt_hash(prompt_path)
     model_id = str(getattr(llm, "model", None) or type(llm).__name__) if llm is not None else None
     terms = salient_terms(question)
     alternates = _term_alternates(terms, synonyms)
 
-    judged = _judge_with_model(llm, question, items, template)
+    judged = _judge_with_model(llm, build_question_context(question, package, alternates), items, template)
     verdicts: List[CheckVerdict] = []
     on_topic: Set[str] = set()
     for item in items:
