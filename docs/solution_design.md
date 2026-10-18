@@ -51,5 +51,18 @@ You review and publish
 - **Count rule (decisive):** at least `checks.check_b.min_claims` usable claims from at least `checks.check_b.min_sources` distinct sources (default 3 from 2). Otherwise the run stops as `BLOCKED` before drafting. The claims are still returned so the evidence board can show them.
 - **No model:** Check B never builds or calls a model; the same claims always give the same verdict and reason.
 
+### S5 groundwork for Check C
+- **Hedges on claims:** the extractor records the hedge terms of each claim's source sentence in `claims.hedge_terms_json` (migration 007), by rule from `synth/hedge_terms.yaml` (whole words and phrases, case-insensitive).
+- **Honest binding:** a drafted sentence cites only the claims its own `[P#]` / `[c_...]` tags point to, and every tag is resolved, not just the first. A sentence with no usable tag is left unbound (`checks_json.binding = "unbound"`) instead of being attached to the first strong claim, so the gates judge it honestly.
+- **Check C judges (not yet wired into runs):** `src/engine/check_c_hedges.py` has a rules judge (the claim has hedges, the sentence has none) and a model judge (prompt `prompts/check_c_hedges_v1.md`). `evals/bakeoff_check_c.py` scores either one against `evals/data/check_c_pairs_v1.json`.
+- **Baseline on 29 hand-labelled pairs, positive class "dropped":**
+
+  | Judge | Precision | Recall |
+  |---|---|---|
+  | rules | 0.92 | 0.86 |
+  | qwen2.5:3b | 0.90 | 0.64 |
+
+  Neither judge catches a sentence that keeps a hedge word but overstates elsewhere. The pairs set is small and partly built by deleting hedges, which favours the rules judge, so Check C stays unwired until a larger and less biased set (and the Gemini run) confirms the hold-or-warn decision.
+
 ### Open risk
 Check C is the least certain. A hedge check on a small local model may be unreliable, so the bake-off (`evals/bakeoff_check_c.py`, S5) runs before C is allowed to hold sentences. If it falls short, C ships warn-only, like D.
