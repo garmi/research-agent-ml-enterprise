@@ -18,6 +18,8 @@ import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from src.config import default_outputs_dir
+from src.ledger.db import default_ledger_path
 from src.ledger.models import Claim, OutputDoc, OutputSentence, Question, Review
 from src.ledger.repository import LedgerRepository
 from src.score.checker import GateCheckResult, GateChecker
@@ -29,18 +31,16 @@ logger = logging.getLogger(__name__)
 class Publisher:
     def __init__(
         self,
-        db_path: str = "ledger/ledger.db",
+        db_path: Optional[str] = None,
         denylist_path: str = "denylist.txt",
         verbs_path: str = "synth/strength_verbs.yaml",
         scoring_path: str = "score/scoring.yaml",
         export_dir: Optional[str] = None,
     ):
-        self.db_path = db_path
+        self.db_path = db_path or default_ledger_path()
         self.denylist_path = denylist_path
-        import os
         if export_dir is None or export_dir == "outputs/json":
-            out_base = os.getenv("OUTPUT_DIR", "outputs")
-            export_dir = str(Path(out_base) / "json")
+            export_dir = str(Path(default_outputs_dir()) / "json")
         self.export_dir = export_dir
         self.repo = LedgerRepository(db_path=self.db_path)
         self.checker = GateChecker(verbs_path=verbs_path, denylist_path=denylist_path)

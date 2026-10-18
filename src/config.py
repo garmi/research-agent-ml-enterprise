@@ -1,5 +1,6 @@
+import os
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import yaml
 
@@ -9,7 +10,13 @@ def load_config(path: str = "config.yaml") -> Dict[str, Any]:
         return yaml.safe_load(fh) or {}
 
 
-def ensure_directories(base_dir: str = "outputs") -> None:
+def default_outputs_dir() -> str:
+    """Outputs directory: RESEARCH_OUTPUTS_DIR when set, otherwise 'outputs'."""
+    return os.getenv("RESEARCH_OUTPUTS_DIR") or "outputs"
+
+
+def ensure_directories(base_dir: Optional[str] = None) -> None:
+    base_dir = base_dir or default_outputs_dir()
     dirs = [
         Path(base_dir) / "reports",
         Path(base_dir) / "json",

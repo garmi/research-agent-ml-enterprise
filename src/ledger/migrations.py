@@ -28,6 +28,11 @@ DEFAULT_MIGRATIONS_DIR = "ledger/migrations"
 DEFAULT_BACKUPS_DIR = "ledger/backups"
 
 
+def default_backups_dir() -> str:
+    """Backups directory: RESEARCH_BACKUPS_DIR when set, otherwise DEFAULT_BACKUPS_DIR."""
+    return os.getenv("RESEARCH_BACKUPS_DIR") or DEFAULT_BACKUPS_DIR
+
+
 def create_backup(
     db_path: str,
     backups_dir: Optional[str] = None,
@@ -45,7 +50,7 @@ def create_backup(
     if not source.exists() or source.stat().st_size == 0:
         return None
 
-    target_dir = Path(backups_dir)
+    target_dir = Path(backups_dir or default_backups_dir())
     target_dir.mkdir(parents=True, exist_ok=True)
 
     timestamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d_%H%M%S")

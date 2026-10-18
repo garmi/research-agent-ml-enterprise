@@ -31,7 +31,7 @@ from src.analysis.multilane_runner import MultiLaneResearchRunner
 from src.analysis.question_formulator import FormulatedQuestion, QuestionFormulationAgent
 from src.analysis.relevance import rank_papers
 from src.analysis.synthesizer import SynthesisEngine
-from src.config import ensure_directories, load_config
+from src.config import default_outputs_dir, ensure_directories, load_config
 from src.fetchers.arxiv_client import ArxivClient
 from src.fetchers.crossref_client import CrossrefClient
 from src.fetchers.openalex_client import OpenAlexClient
@@ -61,7 +61,7 @@ logging.basicConfig(level=logging.INFO)
 
 load_dotenv()
 config = load_config("config.yaml") if Path("config.yaml").exists() else {}
-ensure_directories("outputs")
+ensure_directories()
 ledger_service = LedgerService()
 question_agent = QuestionFormulationAgent(config)
 multilane_runner = MultiLaneResearchRunner()
@@ -1825,7 +1825,7 @@ if results:
     papers_df = pd.DataFrame(results.get("papers", []))
     csv_content = papers_df.to_csv(index=False)
     linkedin_pack = builder.build_linkedin_pack(topic_str, syn_raw) if syn_raw else "# LinkedIn Executive Thought Leadership Pack\n\n"
-    deck_path = Path("outputs/reports/strategic_storyline.html")
+    deck_path = Path(default_outputs_dir()) / "reports" / "strategic_storyline.html"
     deck_html = deck_path.read_text(encoding="utf-8") if deck_path.exists() else builder.build_html_storyline(topic_str, syn_raw)
 
     with export_col1:

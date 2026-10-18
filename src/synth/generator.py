@@ -20,6 +20,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 import yaml
 
 from src.gaps.matrix_builder import GapMatrixBuilder
+from src.ledger.db import default_ledger_path
 from src.ledger.models import Claim, OutputDoc, OutputSentence, Question, Run, Source
 from src.ledger.repository import LedgerRepository
 from src.score.checker import GateChecker
@@ -69,11 +70,11 @@ def lint_output_text(
 class SynthesisEngine:
     def __init__(
         self,
-        db_path: str = "ledger/ledger.db",
+        db_path: Optional[str] = None,
         verbs_path: str = "synth/strength_verbs.yaml",
         scoring_path: str = "score/scoring.yaml",
     ):
-        self.db_path = db_path
+        self.db_path = db_path or default_ledger_path()
         self.repo = LedgerRepository(db_path=self.db_path)
         self.gap_builder = GapMatrixBuilder(db_path=self.db_path)
         self.checker = GateChecker(verbs_path=verbs_path)

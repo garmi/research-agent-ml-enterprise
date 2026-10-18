@@ -38,6 +38,7 @@ from src.fetchers.openalex_client import OpenAlexClient
 from src.fetchers.semantic_scholar_client import SemanticScholarClient
 from src.gaps.matrix_builder import GapMatrixBuilder
 from src.grade.grader import Grader
+from src.ledger.db import default_ledger_path, default_practitioner_path
 from src.ledger.migrations import apply_migrations
 from src.ledger.models import Claim, OutputDoc, OutputSentence, Question, Run, SearchLog, Source
 from src.ledger.repository import LedgerRepository
@@ -138,8 +139,8 @@ class MultiLaneResearchRunner:
 
     def __init__(
         self,
-        db_path: str = "ledger/ledger.db",
-        practitioner_db_path: str = "ledger/practitioner.db",
+        db_path: Optional[str] = None,
+        practitioner_db_path: Optional[str] = None,
         questions_yaml_path: str = "questions/register.yaml",
         sources_registry_path: str = "collectors/enterprise/sources_registry.yaml",
         rules_path: str = "grade/rules.yaml",
@@ -149,8 +150,9 @@ class MultiLaneResearchRunner:
         denylist_path: str = "denylist.txt",
         config_path: str = "config.yaml",
     ):
-        self.db_path = db_path
-        self.practitioner_db_path = practitioner_db_path
+        self.db_path = db_path or default_ledger_path()
+        self.practitioner_db_path = practitioner_db_path or default_practitioner_path()
+        Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
 
         # Isolate questions_yaml_path for test databases to avoid modifying the tracked register.yaml
         if self.db_path != "ledger/ledger.db" and questions_yaml_path == "questions/register.yaml":
@@ -174,7 +176,6 @@ class MultiLaneResearchRunner:
                 self.config = yaml.safe_load(f) or {}
 
         # Ensure database tables exist
-        Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
         apply_migrations(db_path=self.db_path)
         apply_migrations(db_path=self.practitioner_db_path)
 

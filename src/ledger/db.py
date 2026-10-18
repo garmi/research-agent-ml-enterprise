@@ -21,6 +21,19 @@ DEFAULT_LEDGER_PATH = "ledger/ledger.db"
 DEFAULT_PRACTITIONER_PATH = "ledger/practitioner.db"
 
 
+def default_ledger_path() -> str:
+    """Ledger database path: RESEARCH_LEDGER_DB when set, otherwise DEFAULT_LEDGER_PATH.
+
+    Read at call time so a process (or the test sandbox) can redirect the default.
+    """
+    return os.getenv("RESEARCH_LEDGER_DB") or DEFAULT_LEDGER_PATH
+
+
+def default_practitioner_path() -> str:
+    """Practitioner database path: RESEARCH_PRACTITIONER_DB when set, otherwise DEFAULT_PRACTITIONER_PATH."""
+    return os.getenv("RESEARCH_PRACTITIONER_DB") or DEFAULT_PRACTITIONER_PATH
+
+
 def init_db_directory(db_path: str) -> None:
     """Ensure parent directory exists."""
     path = Path(db_path)
@@ -34,13 +47,13 @@ def get_connection(
     """Open and configure a SQLite connection with durability pragmas.
 
     Args:
-        db_path: Path to SQLite database file. Defaults to DEFAULT_LEDGER_PATH.
+        db_path: Path to SQLite database file. Defaults to default_ledger_path().
         verify_integrity: Whether to run PRAGMA integrity_check on connection.
 
     Returns:
         Configured sqlite3.Connection with Row factory and WAL mode.
     """
-    target_path = db_path or DEFAULT_LEDGER_PATH
+    target_path = db_path or default_ledger_path()
     init_db_directory(target_path)
 
     conn = sqlite3.connect(target_path, timeout=30.0)

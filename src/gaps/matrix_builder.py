@@ -19,6 +19,7 @@ import uuid
 from typing import Any, Dict, List, Optional, Tuple
 import yaml
 
+from src.ledger.db import default_ledger_path
 from src.ledger.models import Claim, GapMatrixEntry, Question, Run
 from src.ledger.repository import LedgerRepository
 
@@ -28,11 +29,11 @@ logger = logging.getLogger(__name__)
 class GapMatrixBuilder:
     def __init__(
         self,
-        db_path: str = "ledger/ledger.db",
+        db_path: Optional[str] = None,
         rules_path: Optional[str] = None,
         config_path: Optional[str] = None,
     ):
-        self.db_path = db_path
+        self.db_path = db_path or default_ledger_path()
         self.rules_path = rules_path
         self.config_path = config_path
         self.repo = LedgerRepository(db_path=self.db_path)
