@@ -130,6 +130,7 @@ def _runner(tmp_path: Path, llm: Any) -> MultiLaneResearchRunner:
     )
     runner._build_check_llm = lambda provider: llm  # type: ignore[assignment]
     runner._harvest_enterprise_lane = lambda **kwargs: []  # type: ignore[assignment]
+    runner.config.setdefault("checks", {})["check_b"] = {"min_claims": 1, "min_sources": 1}
     return runner
 
 
@@ -301,7 +302,7 @@ def test_on_topic_run_passes_check_a_and_persists_status(tmp_path):
     repo = LedgerRepository(db_path=runner.db_path)
     status, _ = repo.get_run_status(res["run_id"])
     assert status == res["status"]
-    run_level = [v for v in repo.list_check_verdicts(res["run_id"]) if v["object_type"] == "run"]
+    run_level = [v for v in repo.list_check_verdicts(res["run_id"], check_id=CHECK_A_ID) if v["object_type"] == "run"]
     assert [v["final"] for v in run_level] == ["pass"]
 
 
