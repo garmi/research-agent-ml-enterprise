@@ -200,7 +200,7 @@ def test_publisher_publish_output_refuses_when_stub_mode_active(monkeypatch: pyt
     monkeypatch.setenv("STUB_LLM", "1")
     monkeypatch.delenv("HOSTED_DEMO", raising=False)
 
-    pub = Publisher(db_path="ledger/ledger.db")
+    pub = Publisher()
     success, res = pub.publish_output("any_output_id")
     assert success is False
     assert res["status"] == "NOT_PUBLISHABLE"

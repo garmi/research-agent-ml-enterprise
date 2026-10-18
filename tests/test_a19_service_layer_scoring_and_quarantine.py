@@ -20,7 +20,7 @@ import pytest
 from src.ledger.models import Claim, Question, Run, Source
 from src.ledger.repository import LedgerRepository
 from src.ledger.service import LedgerService
-from src.ledger.migrations import apply_migrations
+from src.ledger.migrations import apply_migrations, create_backup
 from src.score.scorer import QualityScorer
 from src.synth.generator import SynthesisEngine
 
@@ -144,39 +144,66 @@ def test_s7_honestly_labeled_extraction_determinism():
     assert "extraction determinism" in rec_text
 
 
-def test_quarantine_inventory_reconciliation():
+def test_quarantine_inventory_reconciliation(tmp_path, monkeypatch):
+    """Quarantine moves the 11 known pre-A1 deliverables, watermarks each one, and flags legacy outputs.
+
+    Builds its own fixture data under tmp_path (cwd is moved there because the quarantine
+    paths are relative to it), so the result does not depend on what outputs/ or ledger/
+    happen to hold on this machine.
+    """
+    from src.ledger.quarantine import KNOWN_PRE_A1_FILES, quarantine_pre_a1_records
+
+    monkeypatch.chdir(tmp_path)
+
+    # 11 legacy deliverables: 7 reports and 4 JSON exports.
+    assert len(KNOWN_PRE_A1_FILES) == 11
+    for rel_path in KNOWN_PRE_A1_FILES:
+        Path(rel_path).parent.mkdir(parents=True, exist_ok=True)
+        Path(rel_path).write_text("legacy deliverable\n", encoding="utf-8")
+
+    # Ledger with three outputs that were published before the A1 cutoff.
+    ledger_dir = tmp_path / "ledger"
+    db_path = str(ledger_dir / "ledger.db")
+    backups_dir = str(ledger_dir / "backups")
+    apply_migrations(db_path=db_path, backups_dir=backups_dir)
+
+    legacy_ids = ("out_636bd066b77e", "out_df7b5084c036", "out_458ae9566b28")
+    conn = sqlite3.connect(db_path)
+    for oid in legacy_ids:
+        conn.execute(
+            "INSERT INTO outputs (id, kind, status, created_at) VALUES (?, 'field_note', 'published', ?);",
+            (oid, "2026-10-01T00:00:00+00:00"),
+        )
+    conn.commit()
+    conn.close()
+
+    # Pre-quarantine snapshot, the same kind of backup an operator takes before quarantining.
+    create_backup(db_path, backups_dir=backups_dir, prefix="pre_quarantine")
+
+    summary = quarantine_pre_a1_records(db_path=db_path, outputs_dir="outputs")
+
     quarantine_dir = Path("outputs/quarantine")
     assert quarantine_dir.exists()
-
     quarantine_files = sorted([f.name for f in quarantine_dir.iterdir() if f.is_file()])
 
-    # 11 base files moved from pre-A1 legacy runs:
-    # 7 reports: demo_research_brief.md, gemini-research.html, how_kiro_is_being_used_for_development_b.md,
-    #            kiro_research_brief.md, measuring_roi_and_developer_productivity.md,
-    #            research_report_gemini.md, research_report_v2.md
-    # 4 JSONs:   field_note_export.json, publish_export_out_458ae9566b28.json,
-    #            publish_export_out_636bd066b77e.json, publish_export_out_df7b5084c036.json
     base_files = [f for f in quarantine_files if not f.endswith(".quarantined.txt")]
     watermark_files = [f for f in quarantine_files if f.endswith(".quarantined.txt")]
 
+    assert len(summary["files_quarantined"]) == 11
     assert len(base_files) == 11, f"Expected 11 base files in quarantine, found {len(base_files)}: {base_files}"
     assert len(watermark_files) == 11, f"Expected 11 companion watermark files in quarantine, found {len(watermark_files)}"
     assert len(quarantine_files) == 22, f"Expected 22 total files (11 + 11 watermarks), found {len(quarantine_files)}"
+    for rel_path in KNOWN_PRE_A1_FILES:
+        assert not Path(rel_path).exists(), f"{rel_path} should have been moved out of outputs/"
 
-    # 3 outputs formerly marked published must be legacy-ungraded in ledger.db
-    ledger_db = Path("ledger/ledger.db")
-    if ledger_db.exists():
-        conn = sqlite3.connect(str(ledger_db))
-        cur = conn.cursor()
-        for oid in ("out_636bd066b77e", "out_df7b5084c036", "out_458ae9566b28"):
-            cur.execute("SELECT status FROM outputs WHERE id = ?", (oid,))
-            row = cur.fetchone()
-            assert row is not None, f"Output {oid} not found in ledger.db"
-            assert row[0] == "legacy-ungraded", f"Output {oid} status is '{row[0]}', expected 'legacy-ungraded'"
-        conn.close()
+    # The three formerly published outputs must now be legacy-ungraded in the ledger.
+    conn = sqlite3.connect(db_path)
+    for oid in legacy_ids:
+        row = conn.execute("SELECT status FROM outputs WHERE id = ?", (oid,)).fetchone()
+        assert row is not None, f"Output {oid} not found in ledger.db"
+        assert row[0] == "legacy-ungraded", f"Output {oid} status is '{row[0]}', expected 'legacy-ungraded'"
+    conn.close()
 
-    # Backups directory must contain pre-migration / pre-quarantine database snapshots
-    backups_dir = Path("ledger/backups")
-    assert backups_dir.exists()
-    backup_files = list(backups_dir.glob("*.db"))
-    assert len(backup_files) > 0, "Expected backup snapshots in ledger/backups/"
+    # The pre-quarantine backup snapshot exists in the backups directory.
+    backup_files = list(Path(backups_dir).glob("*.db"))
+    assert any(b.name.startswith("pre_quarantine_") for b in backup_files), "Expected pre-quarantine snapshot in backups/"
