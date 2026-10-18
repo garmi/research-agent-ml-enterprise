@@ -1,0 +1,453 @@
+{
+ "version": 1,
+ "created": "2026-10-18",
+ "labeller": "Claude (needs owner review)",
+ "how_built": "Real academic harvest at the Check A retry width for four questions; labels by hand using config.yaml head_term_synonyms.",
+ "items": [
+  {
+   "question_key": "kiro",
+   "question": "What empirical evidence exists regarding Amazon Kiro adoption, productivity gains, and delivery trade-offs in engineering teams?",
+   "source_id": "e19e0e1510673f60",
+   "lane": "academic",
+   "title": "Human-AI Collaboration in Software Engineering: Enhancing Developer Productivity through Intelligent Assistants",
+   "text": "Human-AI Collaboration in Software Engineering: Enhancing Developer Productivity through Intelligent Assistants. Enterprise software teams report a frustrating inconsistency: the same AI coding assistants producing compelling results in controlled studies return uneven outcomes in production. The problem is architectural, not technological. A capable AI coding assistant deployed without adequate codebase context, integrated at only one SDLC touchpoint, and missing any mechanism through which developers calibrate their trust in its suggestions will underperform relative to its documented potent",
+   "label": "on_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "kiro",
+   "question": "What empirical evidence exists regarding Amazon Kiro adoption, productivity gains, and delivery trade-offs in engineering teams?",
+   "source_id": "6924b27bdb92b85b",
+   "lane": "academic",
+   "title": "SDAD: Spec-Driven Agentic Development for the AI-Native SDLC",
+   "text": "SDAD: Spec-Driven Agentic Development for the AI-Native SDLC. Frontier coding agents backed by large language models with context windows from hundreds of thousands to millions of tokens are restructuring the Software Development Life Cycle (SDLC). Rich context handling and multi-step reasoning now allow substantial Functional Requirement Documents (FRDs) and repository context to be ingested in a single workflow, making specification quality the execution fuel for autonomous delivery. This report formalises Spec-Driven Agentic Development (SDAD) as a synthesis of disciplined up-front formalis",
+   "label": "on_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "kiro",
+   "question": "What empirical evidence exists regarding Amazon Kiro adoption, productivity gains, and delivery trade-offs in engineering teams?",
+   "source_id": "8c012d3b4563a315",
+   "lane": "academic",
+   "title": "SPEC-DRIVEN DEVELOPMENT FOR ENTERPRISE AGENTIC SOFTWARE ENGINEERING: A GOVERNANCE FRAMEWORK FOR RELIABLE AI-GENERATED SOFTWARE",
+   "text": "SPEC-DRIVEN DEVELOPMENT FOR ENTERPRISE AGENTIC SOFTWARE ENGINEERING: A GOVERNANCE FRAMEWORK FOR RELIABLE AI-GENERATED SOFTWARE. AI coding assistants are evolving into agents that can plan, edit repositories, run tools, test software, and prepare deployable changes. Natural-language prompts are useful for expressing intent, but they rarely encode the complete set of enterprise requirements that govern architecture, cybersecurity, reliability, and operations. This study proposes the Specification Governance and Validation Framework (SGVF), a design-science artifact that treats structured specifi",
+   "label": "on_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "kiro",
+   "question": "What empirical evidence exists regarding Amazon Kiro adoption, productivity gains, and delivery trade-offs in engineering teams?",
+   "source_id": "a9c24d46182c54a2",
+   "lane": "academic",
+   "title": "Productivity vs. Compliance: The New Engineering Challenge of AI Coding Assistants in Regulated Codebases",
+   "text": "Productivity vs. Compliance: The New Engineering Challenge of AI Coding Assistants in Regulated Codebases. Background: Large language model (LLM)-based coding assistants have moved from experimental developer utilities into everyday software engineering practice. Contemporary studies show that these tools can improve task completion, code comprehension, and routine implementation speed, while also introducing verification costs, usability limits, and security uncertainty. In regulated industries, the relevant question is not only whether AI assistance improves productivity, but whether AI-assi",
+   "label": "on_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "kiro",
+   "question": "What empirical evidence exists regarding Amazon Kiro adoption, productivity gains, and delivery trade-offs in engineering teams?",
+   "source_id": "fd023bde5dcdce6c",
+   "lane": "academic",
+   "title": "Developer productivity in AI-driven engineering teams",
+   "text": "Developer productivity in AI-driven engineering teams. Artificial Intelligence (AI) is transforming the software engineering practice of the modern days, and it directly affects how development teams are organized and how the productivity of the developer is gauged. Artificially intelligent applications are becoming common place, in the form of code completion tools or assistants, automated testing suites, and intelligent project management systems, to automate workflows, lessen human effort and enable decision-making on the basis of data. This paper discusses how AI may affect the productivit",
+   "label": "on_topic",
+   "borderline": true,
+   "note": "general AI in engineering teams, not assistants specifically"
+  },
+  {
+   "question_key": "kiro",
+   "question": "What empirical evidence exists regarding Amazon Kiro adoption, productivity gains, and delivery trade-offs in engineering teams?",
+   "source_id": "e7f664fe1fbb32d2",
+   "lane": "academic",
+   "title": "Spec-Driven Development for Agentic Software Engineering: Harnessing Human-Agent Teamwork",
+   "text": "Spec-Driven Development for Agentic Software Engineering: Harnessing Human-Agent Teamwork. Context: Software engineering is moving from AI-assisted practices like vibe coding, in which assistants accelerate individual developers, towards Agentic Software Engineering (ASE), in which autonomous agents are delegated goal-level tasks. However, industry reports a productivity paradox: as individual productivity increases, team throughput, review capacity, and stability degrade because team-scale software engineering discipline is neglected. Objective: This paper aims to establish the conceptual and",
+   "label": "on_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "kiro",
+   "question": "What empirical evidence exists regarding Amazon Kiro adoption, productivity gains, and delivery trade-offs in engineering teams?",
+   "source_id": "23b0b0755ca5f0c7",
+   "lane": "academic",
+   "title": "The Vibe Shift in Software Engineering: Evaluating AI-Led Conversational Programming for Performance, Cognition, and Responsible Adoption",
+   "text": "The Vibe Shift in Software Engineering: Evaluating AI-Led Conversational Programming for Performance, Cognition, and Responsible Adoption. This study evaluates Vibe Coding, an emerging AI-led conversational programming paradigm that enables developers to generate software through natural-language interaction with large language models. Using a mixed-methods design, the study assessed performance efficiency, cognitive implications, and responsible adoption in comparison with traditional and AI-assisted coding environments. Thirty participants, including professional developers and advanced comp",
+   "label": "on_topic",
+   "borderline": true,
+   "note": "vibe coding: conversational AI programming"
+  },
+  {
+   "question_key": "kiro",
+   "question": "What empirical evidence exists regarding Amazon Kiro adoption, productivity gains, and delivery trade-offs in engineering teams?",
+   "source_id": "7ae3b66bd9c76580",
+   "lane": "academic",
+   "title": "Generative AI Assistants in Software Development: Productivity Gains, Code Quality, and Security Trade-offs",
+   "text": "Generative AI Assistants in Software Development: Productivity Gains, Code Quality, and Security Trade-offs. Generative artificial intelligence (AI) coding assistants promise to shorten software-development tasks, yet task speed alone cannot establish an improvement in engineering productivity. This critical narrative review asks whether assistants help developers complete work faster without increasing functional defects, maintenance burden, or security weaknesses. The final analytical corpus comprises 20 principal sources available through September 27, 2026, including experiments, field tri",
+   "label": "on_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "kiro",
+   "question": "What empirical evidence exists regarding Amazon Kiro adoption, productivity gains, and delivery trade-offs in engineering teams?",
+   "source_id": "fdcc0727cedcd1da",
+   "lane": "academic",
+   "title": "Skill-Augmented AI Coding Agents: A Two-Layer Framework for SKILL.md Design and Developer Productivity",
+   "text": "Skill-Augmented AI Coding Agents: A Two-Layer Framework for SKILL.md Design and Developer Productivity. AI coding agents are in widespread professional use, yet developer productivity gains remain inconsistent. Controlled studies report speedups of 21–56% in some settings and slowdowns of up to 19% in others. We argue that this variance is not attributable to model capability but to the absence of structured, project-specific knowledge made available to the agent. This paper addresses that gap by introducing SKILL.md files as a first-class design artifact for AI-augmented coding workflows and ",
+   "label": "on_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "kiro",
+   "question": "What empirical evidence exists regarding Amazon Kiro adoption, productivity gains, and delivery trade-offs in engineering teams?",
+   "source_id": "9a6cd60664eef893",
+   "lane": "academic",
+   "title": "Methods and Techniques of Agentic Software Engineering: A Systematic Literature Review",
+   "text": "Methods and Techniques of Agentic Software Engineering: A Systematic Literature Review. The development of agentic software engineering (ASE) is shifting the software development process, specifically by adopting autonomous agents into the fundamental software development process, where autonomous agents using large language models (LLMs) and artificial intelligence (AI) make decisions, write code, and collaborate across the entire software development lifecycle. The systematic review is a summary of literature on the agentic software engineering methodologies, frameworks, and techniques publi",
+   "label": "on_topic",
+   "borderline": true,
+   "note": "agentic SE literature review"
+  },
+  {
+   "question_key": "kiro",
+   "question": "What empirical evidence exists regarding Amazon Kiro adoption, productivity gains, and delivery trade-offs in engineering teams?",
+   "source_id": "6b40bbb61c548c9a",
+   "lane": "academic",
+   "title": "Does AI Policy Adoption Matter? Evidence on Productivity and ICT Trade Competitiveness",
+   "text": "Does AI Policy Adoption Matter? Evidence on Productivity and ICT Trade Competitiveness. Does AI Policy Adoption Matter? Evidence on Productivity and ICT Trade Competitiveness. Research publication from Elsevier BV. Evaluates empirical impact, metrics, and technology findings.",
+   "label": "off_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "kiro",
+   "question": "What empirical evidence exists regarding Amazon Kiro adoption, productivity gains, and delivery trade-offs in engineering teams?",
+   "source_id": "6282ae9273c20488",
+   "lane": "academic",
+   "title": "Adoption and Effects of Software Engineering Best Practices in Machine Learning",
+   "text": "Adoption and Effects of Software Engineering Best Practices in Machine Learning. The increasing reliance on applications with machine learning (ML) components calls for mature engineering techniques that ensure these are built in a robust and future-proof manner. We aim to empirically determine the state of the art in how teams develop, deploy and maintain software with ML components. We mined both academic and grey literature and identified 29 engineering best practices for ML applications. We conducted a survey among 313 practitioners to determine the degree of adoption for these practices a",
+   "label": "off_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "hospital",
+   "question": "How are hospitals governing clinical AI triage tools to manage patient safety and regulatory compliance?",
+   "source_id": "414b988e895d5717",
+   "lane": "academic",
+   "title": "From Siloed Algorithms to Compliance‑First Agentic Platforms: A Multi‑Layered Architecture for Hospital AI Systems",
+   "text": "From Siloed Algorithms to Compliance‑First Agentic Platforms: A Multi‑Layered Architecture for Hospital AI Systems. Hospitals are rapidly adopting artificial intelligence for triage, imaging, scheduling etc., yet most deployments remain isolated point solutions locked inside departmental silos, resulting in duplicated effort, hidden risks, and unrealised enterprise value. Despite explosive growth of AI in healthcare market and accelerating investment, an estimated 70–80% of healthcare AI pilots fail to scale, largely due to governance gaps, fragmented data, and missing integration blueprints. ",
+   "label": "on_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "hospital",
+   "question": "How are hospitals governing clinical AI triage tools to manage patient safety and regulatory compliance?",
+   "source_id": "f502d729c8a20e45",
+   "lane": "academic",
+   "title": "The EU AI Act: implications and compliance guidance for healthcare facilities",
+   "text": "The EU AI Act: implications and compliance guidance for healthcare facilities. Background: The European Union AI Act [Regulation (EU) 2024/1689] establishes the first comprehensive legal framework for artificial intelligence. While AI offers transformative potential in healthcare, its deployment introduces risks regarding safety, bias, and accountability. There is currently a lack of practical operational frameworks to help healthcare facilities transition from legal theory to clinical compliance. Methods: We performed a qualitative regulatory analysis of the EU AI Act, specifically focusing o",
+   "label": "on_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "hospital",
+   "question": "How are hospitals governing clinical AI triage tools to manage patient safety and regulatory compliance?",
+   "source_id": "3d8485bf6926e2e3",
+   "lane": "academic",
+   "title": "AI-Driven Data Governance and Compliance: Building Trustworthy Enterprise Intelligence Systems",
+   "text": "AI-Driven Data Governance and Compliance: Building Trustworthy Enterprise Intelligence Systems. Enterprise AI adoption has grown faster than the systems designed to manage it. By early 2024, 65% of organizations were using generative AI in at least one core business function, yet only 18% had an enterprise-wide council with authority over AI risk decisions. This gap creates real exposure. An example of the quantification of AI risk within the economy includes the increase in public data breaches, liability lawsuits against chatbots, and regulatory fines. Based on findings from the 2024 IBM Cos",
+   "label": "off_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "hospital",
+   "question": "How are hospitals governing clinical AI triage tools to manage patient safety and regulatory compliance?",
+   "source_id": "4431dddb110a9b0e",
+   "lane": "academic",
+   "title": "Governing medical AI under the EU AI Act: an integrated compliance-by-design framework",
+   "text": "Governing medical AI under the EU AI Act: an integrated compliance-by-design framework. Artificial intelligence (AI) is becoming an increasingly important component of healthcare, supporting diagnosis, clinical decision-making, medical imaging, triage, and patient-facing services. While these technologies offer significant opportunities to improve healthcare delivery, they also raise important questions about patient safety, fairness, privacy, transparency, cybersecurity, and accountability. This paper examines the regulatory framework governing medical AI in the European Union, focusing on th",
+   "label": "on_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "hospital",
+   "question": "How are hospitals governing clinical AI triage tools to manage patient safety and regulatory compliance?",
+   "source_id": "4eefa708e99bf544",
+   "lane": "academic",
+   "title": "Governing Healthcare AI in the Real World: How Fairness, Transparency, and Human Oversight Can Coexist: A Narrative Review",
+   "text": "Governing Healthcare AI in the Real World: How Fairness, Transparency, and Human Oversight Can Coexist: A Narrative Review. Artificial intelligence (AI) is rapidly shifting from experimental pilots to mainstream clinical infrastructure, redefining how evidence, accountability, and ethics intersect in healthcare. This narrative review integrates insights from peer-reviewed studies and policy frameworks to examine seven cross-cutting aspects: bias and fairness, explainability, safety and quality, privacy and data protection, accountability and liability, human oversight, and procurement and depl",
+   "label": "on_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "hospital",
+   "question": "How are hospitals governing clinical AI triage tools to manage patient safety and regulatory compliance?",
+   "source_id": "03ea807e2408713c",
+   "lane": "academic",
+   "title": "A Self-Governing AI-Driven Agent for Advanced Patient Data Structuring",
+   "text": "A Self-Governing AI-Driven Agent for Advanced Patient Data Structuring. Abstract modern healthcare environments produce large amounts of various data, including structured EHR fields, narratives in clinical documentation, transcripts of telemedicine sessions, diagnostic imaging reports, and wearables and remote monitoring devices. A large fraction of this data is unstructured or semi-structured or inconsistently encoded, further contributing to documentation burden, impeding interoperability, and limiting the provision of timely and datadriven decision support. This paper presents a self-direc",
+   "label": "off_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "hospital",
+   "question": "How are hospitals governing clinical AI triage tools to manage patient safety and regulatory compliance?",
+   "source_id": "ea401aaf549348dd",
+   "lane": "academic",
+   "title": "Cloud-Based Data Governance Architectures for Pharmacovigilance: Ensuring Security, Privacy, Compliance, And Patient Safety in Healthcare Systems",
+   "text": "Cloud-Based Data Governance Architectures for Pharmacovigilance: Ensuring Security, Privacy, Compliance, And Patient Safety in Healthcare Systems. Cloud-based data governance frameworks are increasingly recognized as critical infrastructure for modern pharmacovigilance systems, enabling scalable, secure, and compliant management of real-world safety data. This paper explores the architecture, regulatory alignment, and operational advantages of cloud-integrated pharmacovigilance (PV) models, especially those augmented by artificial intelligence (AI) tools for signal detection and decision suppo",
+   "label": "off_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "hospital",
+   "question": "How are hospitals governing clinical AI triage tools to manage patient safety and regulatory compliance?",
+   "source_id": "66c09148db3ad3a8",
+   "lane": "academic",
+   "title": "AI and Big Data Security, Governance, and Regulatory Compliance in Enterprise Cloud Platforms: A Regulatory Document Analysis for the Saudi Public Sector",
+   "text": "AI and Big Data Security, Governance, and Regulatory Compliance in Enterprise Cloud Platforms: A Regulatory Document Analysis for the Saudi Public Sector. &amp;nbsp;Saudi Arabia's digital transformation agenda has produced a regulatory environment that is comprehensive in its ambition but uneven in its operational specificity when applied to artificial intelligence and big data workloads. Public-sector enterprises in the Kingdom are deploying AI capabilities at scale, embedding machine learning into enterprise resource planning processes, integrating cloud-native data platforms with SAP and ad",
+   "label": "off_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "hospital",
+   "question": "How are hospitals governing clinical AI triage tools to manage patient safety and regulatory compliance?",
+   "source_id": "9b68d1d8af3f8e7d",
+   "lane": "academic",
+   "title": "AI-based Clinical Decision Support for Primary Care: A Real-World Study",
+   "text": "AI-based Clinical Decision Support for Primary Care: A Real-World Study. We evaluate the impact of large language model-based clinical decision support in live care. In partnership with Penda Health, a network of primary care clinics in Nairobi, Kenya, we studied AI Consult, a tool that serves as a safety net for clinicians by identifying potential documentation and clinical decision-making errors. AI Consult integrates into clinician workflows, activating only when needed and preserving clinician autonomy. We conducted a quality improvement study, comparing outcomes for 39,849 patient visits ",
+   "label": "off_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "hospital",
+   "question": "How are hospitals governing clinical AI triage tools to manage patient safety and regulatory compliance?",
+   "source_id": "1ca43b122ad70b53",
+   "lane": "academic",
+   "title": "Blockchain-Enhanced Clinical Risk Management for AI Healthcare Systems : Privacy-Preserving Incident Response and Compliance Monitoring",
+   "text": "Blockchain-Enhanced Clinical Risk Management for AI Healthcare Systems : Privacy-Preserving Incident Response and Compliance Monitoring. The rapid integration of artificial intelligence (AI) into healthcare systems has revolutionized clinical workflows, diagnostics, and decision support mechanisms. However, this transformation introduces significant challenges in clinical risk management, particularly concerning data privacy, incident traceability, and regulatory compliance. Traditional risk management frameworks struggle to provide tamper-resistant audit trails and privacy-preserving incident",
+   "label": "on_topic",
+   "borderline": true,
+   "note": "clinical AI risk management via blockchain"
+  },
+  {
+   "question_key": "hospital",
+   "question": "How are hospitals governing clinical AI triage tools to manage patient safety and regulatory compliance?",
+   "source_id": "29f720876cb9a429",
+   "lane": "academic",
+   "title": "Engineering AI Agents for Clinical Workflows: A Case Study in Architecture,MLOps, and Governance",
+   "text": "Engineering AI Agents for Clinical Workflows: A Case Study in Architecture,MLOps, and Governance. The integration of Artificial Intelligence (AI) into clinical settings presents a software engineering challenge, demanding a shift from isolated models to robust, governable, and reliable systems. However, brittle, prototype-derived architectures often plague industrial applications and a lack of systemic oversight, creating a ``responsibility vacuum'' where safety and accountability are compromised. This paper presents an industry case study of the ``Maria'' platform, a production-grade AI syste",
+   "label": "on_topic",
+   "borderline": true,
+   "note": "clinical AI agent engineering with a governance section"
+  },
+  {
+   "question_key": "hospital",
+   "question": "How are hospitals governing clinical AI triage tools to manage patient safety and regulatory compliance?",
+   "source_id": "dcf69c920549e314",
+   "lane": "academic",
+   "title": "Toward a Regulatory Validation Framework for AI-Assisted Clinical Trial Activation and Execution: Formal Verification, Deterministic Compliance, and Patient Safety Assurance",
+   "text": "Toward a Regulatory Validation Framework for AI-Assisted Clinical Trial Activation and Execution: Formal Verification, Deterministic Compliance, and Patient Safety Assurance. Artificial intelligence systems are entering clinical trial operations across every phase of the trial lifecycle, from protocol ingestion validation, regulatory document generation, site activation, patient eligibility prediction, enrollment monitoring, protocol adherence support during execution, and execution compliance. Yet regulatory frameworks have not kept pace with the unique validation challenges these systems pre",
+   "label": "off_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "sourdough",
+   "question": "What empirical evidence exists on quantum-secure sourdough fermentation controllers?",
+   "source_id": "f539ff5242d5f793",
+   "lane": "academic",
+   "title": "Secure Software Engineering Through Sensible AutoMation (SESAM)",
+   "text": "Secure Software Engineering Through Sensible AutoMation (SESAM). Secure Software Engineering Through Sensible AutoMation (SESAM). Research publication from 2025 ACM/IEEE International Symposium on Empirical Software Engineering and Measurement (ESEM). Evaluates empirical impact, metrics, and technology findings.",
+   "label": "off_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "sourdough",
+   "question": "What empirical evidence exists on quantum-secure sourdough fermentation controllers?",
+   "source_id": "4b1dce5f1518d3e6",
+   "lane": "academic",
+   "title": "Smart Fermentation Technologies: Microbial Process Control in Traditional Fermented Foods",
+   "text": "Smart Fermentation Technologies: Microbial Process Control in Traditional Fermented Foods. Traditional fermented foods are appreciated worldwide for their cultural significance and health-promoting properties. However, traditional fermentation production suffers from many obstacles such as microbial variability, varying quality, and lack of scalability. The implementation of smart fermentation technologies, including biosensors, the Internet of Things (IoT), artificial intelligence (AI), and machine learning (ML), hold the key to the optimization of microbial process control, enhance product c",
+   "label": "off_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "sourdough",
+   "question": "What empirical evidence exists on quantum-secure sourdough fermentation controllers?",
+   "source_id": "c30e57d9f5e17cbd",
+   "lane": "academic",
+   "title": "Carob Flour Addition to Sourdough: Effect of Sourdough Fermentation, Dough Rheology and Bread Quality",
+   "text": "Carob Flour Addition to Sourdough: Effect of Sourdough Fermentation, Dough Rheology and Bread Quality. Carob flour (CF) has been widely used in bakery formulations since containing various bioactive compounds, high percentage of fibre, protein, vitamins and minerals. Sourdough fermentation is considered as a promising tool to improve sensorial, textural and nutritional features of baked goods. The aim of this study is to investigate the potential usage of Type I sourdough incorporated with carob flour in bread making .Empirical rheological measurements were also performed in the flour blended ",
+   "label": "off_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "sourdough",
+   "question": "What empirical evidence exists on quantum-secure sourdough fermentation controllers?",
+   "source_id": "6e16337df9927b90",
+   "lane": "academic",
+   "title": "Use of Nash equilibrium in finding game theoretic robust security bound on quantum bit error rate",
+   "text": "Use of Nash equilibrium in finding game theoretic robust security bound on quantum bit error rate. Nash equilibrium is employed to find a game theoretic robust security bound on quantum bit error rate (QBER) for DL04 protocol which is a scheme for quantum secure direct communication that has been experimentally realized recently. The receiver, sender and eavesdropper (Eve) are considered to be quantum players (players having the capability to perform quantum operations). Specifically, Eve is considered to have the capability of performing quantum attacks (e.g., Wójcik's original attack, Wójcik",
+   "label": "off_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "sourdough",
+   "question": "What empirical evidence exists on quantum-secure sourdough fermentation controllers?",
+   "source_id": "87e9f2842935f1ee",
+   "lane": "academic",
+   "title": "Technology of Sourdough Fermentation and Sourdough Application",
+   "text": "Technology of Sourdough Fermentation and Sourdough Application. Technology of Sourdough Fermentation and Sourdough Application. Research publication from Handbook on Sourdough Biotechnology. Evaluates empirical impact, metrics, and technology findings.",
+   "label": "off_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "sourdough",
+   "question": "What empirical evidence exists on quantum-secure sourdough fermentation controllers?",
+   "source_id": "6c0d0a3d21a126a1",
+   "lane": "academic",
+   "title": "Handbook of Sourdough Microbiota and Fermentation",
+   "text": "Handbook of Sourdough Microbiota and Fermentation. Handbook of Sourdough Microbiota and Fermentation. Research publication from Elsevier. Evaluates empirical impact, metrics, and technology findings.",
+   "label": "off_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "sourdough",
+   "question": "What empirical evidence exists on quantum-secure sourdough fermentation controllers?",
+   "source_id": "90d40a84abfe4361",
+   "lane": "academic",
+   "title": "Recent development in sourdough-based metabolites in biochemical products",
+   "text": "Recent development in sourdough-based metabolites in biochemical products. Recent development in sourdough-based metabolites in biochemical products. Research publication from Handbook of Sourdough Microbiota and Fermentation. Evaluates empirical impact, metrics, and technology findings.",
+   "label": "off_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "sourdough",
+   "question": "What empirical evidence exists on quantum-secure sourdough fermentation controllers?",
+   "source_id": "c641c825ca7fb500",
+   "lane": "academic",
+   "title": "A eucharist of sourdough or wafer? What a thousand-year-old religious quarrel tells us about fermentation",
+   "text": "A eucharist of sourdough or wafer? What a thousand-year-old religious quarrel tells us about fermentation. A eucharist of sourdough or wafer? What a thousand-year-old religious quarrel tells us about fermentation. Research publication from The Conversation Media Group Ltd. Evaluates empirical impact, metrics, and technology findings.",
+   "label": "off_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "assistants",
+   "question": "How do AI coding assistants affect developer productivity in enterprise software delivery?",
+   "source_id": "0221d8a378ed3c93",
+   "lane": "academic",
+   "title": "Trustworthy and Secure LLM-Assisted Code Generation for Enterprise Software Development",
+   "text": "Trustworthy and Secure LLM-Assisted Code Generation for Enterprise Software Development. Large Language Models (LLMs) are increasingly embedded in enterprise software development workflows for source-code generation, debugging, documentation, test creation, refactoring, and design assistance. While these systems improve productivity and reduce repetitive programming effort, their deployment in enterprise environments introduces significant risks related to insecure code suggestions, hallucinated functionality, non-compliant logic, weak explainability, dependency misuse, and over-reliance by de",
+   "label": "on_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "assistants",
+   "question": "How do AI coding assistants affect developer productivity in enterprise software delivery?",
+   "source_id": "e19e0e1510673f60",
+   "lane": "academic",
+   "title": "Human-AI Collaboration in Software Engineering: Enhancing Developer Productivity through Intelligent Assistants",
+   "text": "Human-AI Collaboration in Software Engineering: Enhancing Developer Productivity through Intelligent Assistants. Enterprise software teams report a frustrating inconsistency: the same AI coding assistants producing compelling results in controlled studies return uneven outcomes in production. The problem is architectural, not technological. A capable AI coding assistant deployed without adequate codebase context, integrated at only one SDLC touchpoint, and missing any mechanism through which developers calibrate their trust in its suggestions will underperform relative to its documented potent",
+   "label": "on_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "assistants",
+   "question": "How do AI coding assistants affect developer productivity in enterprise software delivery?",
+   "source_id": "a9c24d46182c54a2",
+   "lane": "academic",
+   "title": "Productivity vs. Compliance: The New Engineering Challenge of AI Coding Assistants in Regulated Codebases",
+   "text": "Productivity vs. Compliance: The New Engineering Challenge of AI Coding Assistants in Regulated Codebases. Background: Large language model (LLM)-based coding assistants have moved from experimental developer utilities into everyday software engineering practice. Contemporary studies show that these tools can improve task completion, code comprehension, and routine implementation speed, while also introducing verification costs, usability limits, and security uncertainty. In regulated industries, the relevant question is not only whether AI assistance improves productivity, but whether AI-assi",
+   "label": "on_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "assistants",
+   "question": "How do AI coding assistants affect developer productivity in enterprise software delivery?",
+   "source_id": "39999eef3149c15b",
+   "lane": "academic",
+   "title": "AI-Assisted Software Engineering Productivity: Evidence, Measurement, and Enterprise Adoption",
+   "text": "AI-Assisted Software Engineering Productivity: Evidence, Measurement, and Enterprise Adoption. This paper analyzes how AI assistance changes software engineering productivity and how the change should be measured in real engineering environments.The key claim is that productivity gains from AI are real but conditional: the gains are strongest on bounded, repetitive, or search-heavy work, and much less predictable on high-context maintenance, quality-sensitive code, and mature repositories with strict review expectations.Rather than relying on one metric, the paper integrates the SPACE framewor",
+   "label": "on_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "assistants",
+   "question": "How do AI coding assistants affect developer productivity in enterprise software delivery?",
+   "source_id": "874b05eec81baee9",
+   "lane": "academic",
+   "title": "AI-Driven Product Development: Cognitive Software Delivery at Enterprise Scale",
+   "text": "AI-Driven Product Development: Cognitive Software Delivery at Enterprise Scale. Enterprise software development faces a significant challenge in harnessing the full potential of generative artificial intelligence (GenAI) tools, which often operate as disconnected point solutions across the software delivery lifecycle. This fragmentation leads to context loss, redundant workflows, and missed opportunities for true digital transformation. This article introduces Cognitive Software Delivery (CSD), a framework designed to integrate isolated AI tools into a unified, context-aware ecosystem. CSD is ",
+   "label": "on_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "assistants",
+   "question": "How do AI coding assistants affect developer productivity in enterprise software delivery?",
+   "source_id": "fd023bde5dcdce6c",
+   "lane": "academic",
+   "title": "Developer productivity in AI-driven engineering teams",
+   "text": "Developer productivity in AI-driven engineering teams. Artificial Intelligence (AI) is transforming the software engineering practice of the modern days, and it directly affects how development teams are organized and how the productivity of the developer is gauged. Artificially intelligent applications are becoming common place, in the form of code completion tools or assistants, automated testing suites, and intelligent project management systems, to automate workflows, lessen human effort and enable decision-making on the basis of data. This paper discusses how AI may affect the productivit",
+   "label": "on_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "assistants",
+   "question": "How do AI coding assistants affect developer productivity in enterprise software delivery?",
+   "source_id": "e288eb410b80a63b",
+   "lane": "academic",
+   "title": "Examining the Use and Impact of an AI Code Assistant on Developer Productivity and Experience in the Enterprise",
+   "text": "Examining the Use and Impact of an AI Code Assistant on Developer Productivity and Experience in the Enterprise. AI assistants are being created to help software engineers conduct a variety of coding-related tasks, such as writing, documenting, and testing code. We describe the use of the watsonx Code Assistant (WCA), an LLM-powered coding assistant deployed internally within IBM. Through surveys of two user cohorts (N=669) and unmoderated usability testing (N=15), we examined developers' experiences with WCA and its impact on their productivity. We learned about their motivations for using (o",
+   "label": "on_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "assistants",
+   "question": "How do AI coding assistants affect developer productivity in enterprise software delivery?",
+   "source_id": "fb4c539ee96f888a",
+   "lane": "academic",
+   "title": "AI Assisted Code Generation for Enterprise Java Services Productivity, Reliability, and Governance Considerations",
+   "text": "AI Assisted Code Generation for Enterprise Java Services Productivity, Reliability, and Governance Considerations. Enterprise Java platforms have long served as the backbone of mission critical systems across industries such as banking, healthcare, insurance, telecommunications, and large scale commerce. These systems are characterized by strict requirements around correctness, security, backward compatibility, operational stability, and regulatory compliance. By April 2023, advances in large language models and AI assisted developer tooling had introduced a new class of code generation capabi",
+   "label": "on_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "assistants",
+   "question": "How do AI coding assistants affect developer productivity in enterprise software delivery?",
+   "source_id": "9b1785220b3ce2e4",
+   "lane": "academic",
+   "title": "The Impact of LLM-Assistants on Software Developer Productivity: A Systematic Review and Mapping Study",
+   "text": "The Impact of LLM-Assistants on Software Developer Productivity: A Systematic Review and Mapping Study. Large language model assistants (LLM-assistants) present new opportunities to transform software development. Developers are increasingly adopting these tools across tasks, including coding, testing, debugging, documentation, and design. Yet, despite growing interest, there is no synthesis of how LLM-assistants affect software developer productivity. In this paper, we present a systematic review and mapping of 39 peer-reviewed studies published between January 2014 and December 2024 that exa",
+   "label": "on_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "assistants",
+   "question": "How do AI coding assistants affect developer productivity in enterprise software delivery?",
+   "source_id": "814df0c2df29365d",
+   "lane": "academic",
+   "title": "Engineering Enterprise-Grade Generative AI: Architectures, Agentic Frameworks, and Protocols for Production-Ready LLM Systems",
+   "text": "Engineering Enterprise-Grade Generative AI: Architectures, Agentic Frameworks, and Protocols for Production-Ready LLM Systems. Databricks has harnessed the power of Generative useful across a wide variety of fields, placing GenAI at the AI for business AI in their full-stack platform, driven by heart of the next wave of enterprise technology. Large Language Models (LLMs), to revolutionize enterprise Making these models work reliably in real business settings, software ecosystems through advancements in reasoning, au- tomation, and intelligent content generation. Leveraging the true however, is",
+   "label": "off_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "assistants",
+   "question": "How do AI coding assistants affect developer productivity in enterprise software delivery?",
+   "source_id": "fdcc0727cedcd1da",
+   "lane": "academic",
+   "title": "Skill-Augmented AI Coding Agents: A Two-Layer Framework for SKILL.md Design and Developer Productivity",
+   "text": "Skill-Augmented AI Coding Agents: A Two-Layer Framework for SKILL.md Design and Developer Productivity. AI coding agents are in widespread professional use, yet developer productivity gains remain inconsistent. Controlled studies report speedups of 21–56% in some settings and slowdowns of up to 19% in others. We argue that this variance is not attributable to model capability but to the absence of structured, project-specific knowledge made available to the agent. This paper addresses that gap by introducing SKILL.md files as a first-class design artifact for AI-augmented coding workflows and ",
+   "label": "on_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "assistants",
+   "question": "How do AI coding assistants affect developer productivity in enterprise software delivery?",
+   "source_id": "9270599fef75ae22",
+   "lane": "academic",
+   "title": "The Impact of AI Coding Assistants on Software Engineering: A Longitudinal Study",
+   "text": "The Impact of AI Coding Assistants on Software Engineering: A Longitudinal Study. AI coding assistants have become prolific in recent years. Through a longitudinal mixed-methods investigation, we examined how professional software engineers perceive the effects of AI coding assistants in regard to task focus, developer experience, and productivity. Two questionnaires were administered six months apart, yielding 158 eligible participants at the first time point, 101 at the second, and a matched longitudinal cohort of 95. Participants reported spending less time on most development tasks, with 8",
+   "label": "on_topic",
+   "borderline": false
+  }
+ ]
+}
