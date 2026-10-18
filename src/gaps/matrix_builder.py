@@ -58,9 +58,11 @@ class GapMatrixBuilder:
         search_logs_override: Optional[List[Any]] = None,
     ) -> GapMatrixEntry:
         """Evaluate evidence across lanes and determine the strategic gap outcome."""
-        all_claims = self.repo.list_claims(question_id=question_id)
-        if not all_claims and claims_override:
+        # A run passes its own claims; only fall back to every ledger claim for the question without one.
+        if claims_override is not None:
             all_claims = [c for c in claims_override if c.question_id == question_id or not c.question_id]
+        else:
+            all_claims = self.repo.list_claims(question_id=question_id)
         search_logs = self.repo.list_search_logs(question_id=question_id)
         if not search_logs and search_logs_override:
             search_logs = [s for s in search_logs_override if s.question_id == question_id or not s.question_id]

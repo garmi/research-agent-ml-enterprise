@@ -68,6 +68,9 @@ checks:
   check_a:
     min_on_topic_sources: 1
     floor_min_terms: 1
+  check_b:
+    min_claims: 3
+    min_sources: 2
 
 # Provider per stage: "gemini" (free Google AI Studio) or "ollama" (free local model).
 llm:

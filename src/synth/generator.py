@@ -150,9 +150,11 @@ class SynthesisEngine:
         )
 
         # 2. Retrieve eligible claims (approved or auto, not rejected)
-        all_claims = self.repo.list_claims(question_id=question_id)
-        if not all_claims and claims_override:
+        # A run passes its own claims; only fall back to every ledger claim for the question without one.
+        if claims_override is not None:
             all_claims = [c for c in claims_override if c.question_id == question_id or not c.question_id]
+        else:
+            all_claims = self.repo.list_claims(question_id=question_id)
         eligible_claims = [c for c in all_claims if c.status != "rejected"]
         claims_by_id = {c.id: c for c in eligible_claims}
 
