@@ -14,6 +14,7 @@ Requirements:
 7. Operator exclusions (by content key) remove claims from the draft, are listed as
    excluded, are logged to reviews, and can push the run into BLOCKED.
 8. A re-draft runs the approved refined question, not the raw Step 1 input text.
+9. The extractor's "(Location: ...)" tag does not count toward the 25-word excerpt cap.
 """
 
 from __future__ import annotations
@@ -240,3 +241,17 @@ def test_redraft_uses_approved_refined_question():
     pkg = {"refined_question": "What measurable productivity impact do AI coding assistants have?"}
     assert approved_question_text(pkg, {"strategic_question": "raw typed text"}) == pkg["refined_question"]
     assert approved_question_text(None, {"strategic_question": "Question the run used"}) == "Question the run used"
+
+
+# ------------------------------------------------------------------------------
+# Test 9: The location tag does not count toward the 25-word cap
+# ------------------------------------------------------------------------------
+def test_location_tag_not_counted_in_excerpt_cap():
+    full = " ".join(["word"] * 25) + " (Location: Abstract)"
+    too_long = " ".join(["word"] * 26) + " (Location: Abstract)"
+    result = run_check_b(
+        [_claim("ok", "s1", excerpt=full), _claim("long", "s1", excerpt=too_long)],
+        _sources("s1"), run_id="r", min_claims=1, min_sources=1,
+    )
+    assert [c.id for c in result.wellformed] == ["ok"]
+    assert "long" in result.set_aside
