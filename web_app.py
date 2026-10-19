@@ -59,6 +59,8 @@ from src.ui.rerun import board_editor_key, export_view, papers_for_rerun
 from src.ui.publish_view import gate_rows, gates_summary, publish_eligibility
 from src.ui.run_status import run_status, status_banner_html, status_code, step_rail, step_rail_html
 from src.ui.brief_view import brief_meta_line, distinct_signals, plain_html, roadmap_html
+from src.ui.run_jobs import RunJobs
+from src.llm.model_names import gemini_model_name
 
 
 logger = logging.getLogger("ExecutiveResearchStudio")
@@ -98,9 +100,9 @@ def get_available_models() -> Dict[str, str]:
 
     # Remote engines opt-in only
     if has_key:
-        options["Google Gemini 2.5 Flash (Remote API — sends prompt out-of-boundary) [Configured]"] = "gemini"
+        options[f"Google Gemini ({gemini_model_name()}) (Remote API — sends prompt out-of-boundary) [Configured]"] = "gemini"
     else:
-        options["Google Gemini 2.5 Flash (Remote API — sends prompt out-of-boundary) [API Key Required]"] = "gemini"
+        options[f"Google Gemini ({gemini_model_name()}) (Remote API — sends prompt out-of-boundary) [API Key Required]"] = "gemini"
     return options
 
 
@@ -698,8 +700,6 @@ if "formulated_question_obj" not in st.session_state:
 if "research_results" not in st.session_state:
     st.session_state["research_results"] = None
 
-if "history" not in st.session_state:
-    st.session_state["history"] = []
 
 if "is_running" not in st.session_state:
     st.session_state["is_running"] = False
@@ -795,15 +795,17 @@ def run_production_pipeline(
     tone: str,
     map_provider: str,
     reduce_provider: str,
-    progress_box: Any,
+    progress_box: Any = None,
     papers_override: Optional[List[Dict[str, Any]]] = None,
     custom_lane_urls: Optional[Dict[str, List[str]]] = None,
     allow_remote_practitioner_synthesis: bool = False,
     practitioner_abstraction_confirmed: bool = False,
     reasoned_package: Optional[Dict[str, Any]] = None,
     excluded_claim_keys: Optional[List[str]] = None,
+    on_progress: Optional[Callable[[int, str, float], None]] = None,
 ) -> Dict[str, Any]:
-    """Execute the formal 8-stage research engine workflow across Academic, Enterprise, and Practitioner lanes."""
+    """Execute the formal 8-stage research engine workflow across Academic, Enterprise, and Practitioner lanes.
+    In a background job (S9) progress goes to on_progress; it must not touch Streamlit."""
     stage_titles = {
         1: "Stage 1/8: Question Register (Gate 1 - YAML + SQLite Sync)",
         2: "Stage 2/8: Three-Lane Evidence Harvesting (Lanes A, B, C)",
@@ -815,7 +817,7 @@ def run_production_pipeline(
         8: "Stage 8/8: Publish Gate Verification & Versioned Deliverables",
     }
 
-    def on_progress(stage_idx: int, stage_msg: str, progress_val: float):
+    def box_progress(stage_idx: int, stage_msg: str, progress_val: float):
         stage_label = stage_titles.get(stage_idx, f"Stage {stage_idx}/8")
         progress_box.markdown(
             f"""
@@ -841,7 +843,7 @@ def run_production_pipeline(
         tone=tone,
         map_provider=map_provider,
         reduce_provider=reduce_provider,
-        on_progress=on_progress,
+        on_progress=on_progress or box_progress,
         academic_papers_override=papers_override,
         custom_lane_urls=custom_lane_urls,
         allow_remote_practitioner_synthesis=allow_remote_practitioner_synthesis,
@@ -849,8 +851,56 @@ def run_production_pipeline(
         reasoned_package=reasoned_package,
         excluded_claim_keys=excluded_claim_keys,
     )
-    progress_box.empty()
+    if progress_box is not None:
+        progress_box.empty()
     return results
+
+
+@st.cache_resource
+def get_run_jobs(base_dir: str) -> RunJobs:
+    """One job registry per server process (shared by all sessions), keyed by its directory."""
+    return RunJobs(base_dir, error_formatter=format_user_friendly_error)
+
+
+run_jobs = get_run_jobs(str(Path(default_outputs_dir()) / "runs"))
+
+
+def launch_run_job(meta: Dict[str, Any], **pipeline_kwargs: Any) -> None:
+    """Run the pipeline as a background job (S9) so it outlives this browser session, keep the
+    job id in the URL so a reconnect or reload picks it up, then rerun to show its progress."""
+    job_id = run_jobs.start(
+        lambda on_progress: run_production_pipeline(on_progress=on_progress, **pipeline_kwargs), meta=meta
+    )
+    st.query_params["run"] = job_id
+    st.session_state["loaded_job"] = None
+    st.rerun()
+
+
+def resume_run_from_url() -> Optional[Dict[str, Any]]:
+    """Load the run named in the URL into this session once it has finished; return the job."""
+    job = run_jobs.get(st.query_params.get("run"))
+    if job and job["state"] == "done" and st.session_state.get("loaded_job") != job["job_id"]:
+        st.session_state["research_results"] = job["results"]
+        st.session_state["loaded_job"] = job["job_id"]
+        st.session_state["current_question"] = job["meta"].get("topic", "")
+        if job["meta"].get("last_lane_urls") is not None:
+            st.session_state["last_lane_urls"] = job["meta"]["last_lane_urls"]
+    return job
+
+
+@st.fragment(run_every=2)
+def render_job_progress(job_id: str) -> None:
+    """Live progress for a background run; reruns the page when the run finishes."""
+    job = run_jobs.get(job_id)
+    if not job:
+        return
+    if job["state"] != "running":
+        st.rerun(scope="app")
+    st.info(
+        f"⏳ **Research is running** (stage {job.get('stage') or 0} of 8): {job.get('message', '')}\n\n"
+        "You can keep this page open. If the connection drops, reload the page: the run carries on and its result appears here."
+    )
+    st.progress(min(max(float(job.get("progress") or 0.0), 0.0), 1.0))
 
 
 # ==============================================================================
@@ -859,6 +909,7 @@ def run_production_pipeline(
 available_models = get_available_models()
 has_gemini_key = bool(os.getenv("GEMINI_API_KEY", "").strip())
 ollama_online = is_ollama_reachable()
+current_job = resume_run_from_url()
 results = st.session_state.get("research_results")
 
 
@@ -905,25 +956,26 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
 
-    # 3. PREVIOUS RUNS SECTION
+    # 3. PREVIOUS RUNS: finished runs on this server, so they survive a new session (S9)
     st.markdown('<div class="sidebar-pod-title" style="margin-top: 1rem;">Previous Research Runs</div>', unsafe_allow_html=True)
-    if not st.session_state["history"]:
+    past_runs = run_jobs.recent(limit=8)
+    if not past_runs:
         st.markdown(
             """
             <div style="font-size: 0.78rem; color: #94A3B8; background: #F8FAFC; border: 1px dashed #E2E8F0; border-radius: 8px; padding: 0.75rem; text-align: center;">
-                No runs yet this session.
+                No finished runs yet.
             </div>
             """,
             unsafe_allow_html=True,
         )
     else:
-        for idx, item in enumerate(reversed(st.session_state["history"])):
-            run_title = item.get("topic", "Research Run")
+        for item in past_runs:
+            run_title = item["meta"].get("topic") or "Research Run"
             if len(run_title) > 36:
                 run_title = run_title[:33] + "..."
-            if st.button(f"📋 {run_title}", key=f"hist_{idx}", use_container_width=True):
-                st.session_state["research_results"] = item["results"]
-                st.session_state["current_question"] = item["topic"]
+            if st.button(f"📋 {run_title}", key=f"hist_{item['job_id']}", use_container_width=True):
+                st.query_params["run"] = item["job_id"]
+                st.session_state["loaded_job"] = None
                 st.rerun()
 
     if st.session_state["research_results"] is not None:
@@ -931,6 +983,8 @@ with st.sidebar:
         if st.button("➕ Start new research", use_container_width=True):
             st.session_state["research_results"] = None
             st.session_state["current_question"] = ""
+            st.session_state["loaded_job"] = None
+            st.query_params.pop("run", None)
             st.rerun()
 
 
@@ -1097,43 +1151,31 @@ if run_submitted:
 
         st.session_state["current_question"] = active_query
         st.session_state["last_lane_urls"] = lane_urls
-        progress_placeholder = st.empty()
-        eta_desc = "~45–60 seconds" if "Fast" in depth_option else "~3–5 minutes"
-        total_custom = sum(len(v) for v in lane_urls.values())
-        custom_note = f" (including {total_custom} custom sources)" if total_custom else ""
-        eta_banner = st.info(f"⏱️ Estimated runtime: **{eta_desc}**. Executing Phases 2 → 3 → 4{custom_note}...")
-        try:
-            results = run_production_pipeline(
-                topic=active_query,
-                depth=depth_option,
-                tone=tone_option,
-                map_provider=target_provider,
-                reduce_provider=target_provider,
-                progress_box=progress_placeholder,
-                papers_override=_generate_mock_papers(active_query) if is_stub_requested else None,
-                custom_lane_urls=lane_urls,
-                allow_remote_practitioner_synthesis=allow_remote_prac_synth,
-                practitioner_abstraction_confirmed=prac_abs_confirmed,
-                reasoned_package=intake_state.get("reasoned_package"),
-            )
-            eta_banner.empty()
-            st.session_state["research_results"] = results
+        launch_run_job(
+            {"topic": active_query, "last_lane_urls": lane_urls},
+            topic=active_query,
+            depth=depth_option,
+            tone=tone_option,
+            map_provider=target_provider,
+            reduce_provider=target_provider,
+            papers_override=_generate_mock_papers(active_query) if is_stub_requested else None,
+            custom_lane_urls=lane_urls,
+            allow_remote_practitioner_synthesis=allow_remote_prac_synth,
+            practitioner_abstraction_confirmed=prac_abs_confirmed,
+            reasoned_package=intake_state.get("reasoned_package"),
+        )
 
-            st.session_state["history"].append({
-                "topic": active_query,
-                "results": results,
-                "timestamp": datetime.now().strftime("%H:%M:%S"),
-            })
-            st.rerun()
-        except Exception as exc:
-            progress_placeholder.empty()
-            err = format_user_friendly_error(exc)
-            st.error(
-                f"**{err['title']}**\n\n"
-                f"• **What happened:** {err['what_happened']}\n\n"
-                f"• **What completed:** {err['what_completed']}\n\n"
-                f"• **What to do next:** {err['next_steps']}"
-            )
+# A background run in progress, or one that failed, is shown here (S9).
+if current_job and current_job["state"] == "running":
+    render_job_progress(current_job["job_id"])
+elif current_job and current_job["state"] == "failed":
+    err = current_job.get("error") or {}
+    st.error(
+        f"**{err.get('title', 'Run failed')}**\n\n"
+        f"• **What happened:** {err.get('what_happened', '')}\n\n"
+        + (f"• **What completed:** {err['what_completed']}\n\n" if err.get("what_completed") else "")
+        + (f"• **What to do next:** {err['next_steps']}" if err.get("next_steps") else "")
+    )
 
 
 # ==============================================================================
@@ -1366,27 +1408,19 @@ if results:
                 if not remaining:
                     st.error("Cannot exclude all papers. At least 1 paper is required for synthesis.")
                 else:
-                    progress_box = st.empty()
-                    try:
-                        refreshed = run_production_pipeline(
-                            topic=approved_question_text(st.session_state.get("s2_active_package"), results),
-                            depth=depth_option,
-                            tone=tone_option,
-                            map_provider=rerun_provider,
-                            reduce_provider=rerun_provider,
-                            progress_box=progress_box,
-                            papers_override=remaining,
-                            allow_remote_practitioner_synthesis=allow_remote_prac_synth,
-                            practitioner_abstraction_confirmed=prac_abs_confirmed,
-                            reasoned_package=st.session_state.get("s2_active_package"),
-                        )
-                        st.session_state["research_results"] = refreshed
-                        st.success("✓ Feedback Loop complete — synthesis updated!")
-                        st.rerun()
-                    except Exception as re_exc:
-                        progress_box.empty()
-                        err = format_user_friendly_error(re_exc)
-                        st.error(f"Re-synthesis failed: {err['what_happened']}")
+                    topic_rerun = approved_question_text(st.session_state.get("s2_active_package"), results)
+                    launch_run_job(
+                        {"topic": topic_rerun, "last_lane_urls": st.session_state.get("last_lane_urls")},
+                        topic=topic_rerun,
+                        depth=depth_option,
+                        tone=tone_option,
+                        map_provider=rerun_provider,
+                        reduce_provider=rerun_provider,
+                        papers_override=remaining,
+                        allow_remote_practitioner_synthesis=allow_remote_prac_synth,
+                        practitioner_abstraction_confirmed=prac_abs_confirmed,
+                        reasoned_package=st.session_state.get("s2_active_package"),
+                    )
 
     # ==========================================================================
     # CLAIMS & GAPS: the claim ledger and the gap matrix
@@ -1491,30 +1525,22 @@ if results:
             lane_urls_redraft = {k: list(v) for k, v in (st.session_state.get("last_lane_urls") or {}).items()}
             if new_source_url.strip():
                 lane_urls_redraft.setdefault("academic", []).append(new_source_url.strip())
-            progress_box = st.empty()
-            try:
-                refreshed = run_production_pipeline(
-                    topic=approved_question_text(st.session_state.get("s2_active_package"), results),
-                    depth=depth_option,
-                    tone=tone_option,
-                    map_provider=rerun_provider,
-                    reduce_provider=rerun_provider,
-                    progress_box=progress_box,
-                    # Custom-URL papers are re-fetched from lane_urls_redraft, so they are not passed twice.
-                    papers_override=papers_for_rerun(results) or None,
-                    custom_lane_urls=lane_urls_redraft,
-                    allow_remote_practitioner_synthesis=allow_remote_prac_synth,
-                    practitioner_abstraction_confirmed=prac_abs_confirmed,
-                    reasoned_package=st.session_state.get("s2_active_package"),
-                    excluded_claim_keys=excluded_keys,
-                )
-                st.session_state["research_results"] = refreshed
-                st.session_state["last_lane_urls"] = lane_urls_redraft
-                st.rerun()
-            except Exception as re_exc:
-                progress_box.empty()
-                err = format_user_friendly_error(re_exc)
-                st.error(f"Re-draft failed: {err['what_happened']}")
+            topic_redraft = approved_question_text(st.session_state.get("s2_active_package"), results)
+            launch_run_job(
+                {"topic": topic_redraft, "last_lane_urls": lane_urls_redraft},
+                topic=topic_redraft,
+                depth=depth_option,
+                tone=tone_option,
+                map_provider=rerun_provider,
+                reduce_provider=rerun_provider,
+                # Custom-URL papers are re-fetched from lane_urls_redraft, so they are not passed twice.
+                papers_override=papers_for_rerun(results) or None,
+                custom_lane_urls=lane_urls_redraft,
+                allow_remote_practitioner_synthesis=allow_remote_prac_synth,
+                practitioner_abstraction_confirmed=prac_abs_confirmed,
+                reasoned_package=st.session_state.get("s2_active_package"),
+                excluded_claim_keys=excluded_keys,
+            )
 
     # ==========================================================================
     # CHECKS & PUBLISH: gates G1-G6, scorecard, human publish, downloads
@@ -1700,62 +1726,7 @@ if results:
         )
 
 else:
-    # --------------------------------------------------------------------------
-    # THREE-LANE ARCHITECTURE & INGESTION READINESS (VISIBLE BEFORE RUN)
-    # --------------------------------------------------------------------------
-    st.markdown("### 🌐 Active Three-Lane Architecture & Ingestion Readiness")
-    st.caption("When you click **Run Research**, Phases 2–4 automatically harvest and audit evidence across these three isolated lanes (track progress in the left sidebar):")
-
-    init_col_a, init_col_b, init_col_c = st.columns(3)
-
-    with init_col_a:
-        st.markdown(
-            """
-            <div style="background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 10px; padding: 1rem;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
-                    <span style="font-weight: 700; color: #1E40AF; font-size: 0.92rem;">🎓 Lane A: Academic Literature</span>
-                    <span class="lane-badge-a">AUTO</span>
-                </div>
-                <div style="font-size: 0.8rem; color: #1E293B;">
-                    Searches arXiv, OpenAlex, Crossref & Semantic Scholar with venue tiering and ≤ 25-word verbatim excerpts.
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-    with init_col_b:
-        st.markdown(
-            """
-            <div style="background: #F5F3FF; border: 1px solid #DDD6FE; border-radius: 10px; padding: 1rem;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
-                    <span style="font-weight: 700; color: #6D28D9; font-size: 0.92rem;">🏢 Lane B: Enterprise Literature</span>
-                    <span class="lane-badge-b">CAPPED</span>
-                </div>
-                <div style="font-size: 0.8rem; color: #1E293B;">
-                    Harvests DORA benchmarks, SEC EDGAR filings & engineering blogs while capping commercial claims.
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-    with init_col_c:
-        st.markdown(
-            """
-            <div style="background: #ECFDF5; border: 1px solid #A7F3D0; border-radius: 10px; padding: 1rem;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
-                    <span style="font-weight: 700; color: #047857; font-size: 0.92rem;">🛠️ Lane C: Practitioner Delivery</span>
-                    <span class="lane-badge-c">🔒 LOCAL</span>
-                </div>
-                <div style="font-size: 0.8rem; color: #1E293B;">
-                    Integrates local field observations from practitioner records with mandatory privacy abstraction.
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
+    # BEFORE A RUN: the question register
     with st.expander("📋 Browse Registered Inquiries (Gate 1 Question Register)", expanded=False):
         reg_questions = ledger_service.repo.list_questions()
         if not reg_questions:

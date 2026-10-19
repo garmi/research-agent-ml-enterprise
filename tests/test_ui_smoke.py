@@ -107,11 +107,9 @@ def test_executive_studio_ui_smoke():
                 assert page.locator("text=Executive AI Research Studio").count() > 0
                 assert page.locator("text=100% Traceable Evidence Engine").count() > 0
 
-                # 3. Assert Active Three-Lane Architecture & Ingestion Readiness on FIRST LOAD
-                assert page.locator("text=Active Three-Lane Architecture & Ingestion Readiness").count() > 0
-                assert page.locator("text=Lane A: Academic Literature").count() > 0
-                assert page.locator("text=Lane B: Enterprise Literature").count() > 0
-                assert page.locator("text=Lane C: Practitioner Delivery").count() > 0
+                # 3. S9 removed the pre-run three-lane readiness cards; the step rail shows instead.
+                assert page.locator("text=Active Three-Lane Architecture & Ingestion Readiness").count() == 0
+                assert page.locator("text=1. Question").count() > 0
 
                 # 4. Assert Intake Panel & Console
                 assert page.locator("text=Frame your question").count() > 0

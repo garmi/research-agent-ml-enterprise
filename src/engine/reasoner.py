@@ -597,8 +597,8 @@ def resolve_model_name(provider: str) -> str:
         cfg = _load_llm_config().get("ollama", {})
         return str(os.getenv("OLLAMA_MODEL") or cfg.get("model", "qwen2.5:3b-instruct")).strip()
     if p == "gemini":
-        cfg = _load_llm_config().get("gemini", {})
-        return str(os.getenv("GEMINI_MODEL") or cfg.get("model", "gemini-2.5-flash")).strip()
+        from src.llm.model_names import gemini_model_name
+        return gemini_model_name(_load_llm_config())
     return p or "unknown"
 
 
