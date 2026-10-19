@@ -72,14 +72,41 @@ def fetch_url_metadata(url: str) -> Tuple[str, str, str]:
             title = title_match.group(1).strip() if title_match else default_title
             text = re.sub(r"<[^>]+>", " ", html[:4000])
             text = " ".join(text.split())
-            excerpt = text[:600] if len(text) > 40 else f"Empirical findings and technology analysis from {url}."
+            # S11: only text the page actually holds; an unreadable page gives an empty excerpt.
+            excerpt = text[:600] if len(text) > 40 else ""
             return title[:120], excerpt, domain
     except Exception:
-        return default_title[:120], f"Empirical technical literature and verified findings from {url}.", domain
+        return default_title[:120], "", domain
+
+
+# Preprint servers and self-archives (S11), by DOI prefix or URL. APIs often report the publisher
+# (SSRN papers come back as "Elsevier BV"), which would pass them off as peer-reviewed journals.
+PREPRINT_SERVERS = (
+    ("10.2139/", "ssrn.com", "SSRN"),
+    ("10.5281/", "zenodo.org", "Zenodo"),
+    ("10.21203/", "researchsquare.com", "Research Square"),
+    ("10.20944/", "preprints.org", "Preprints.org"),
+    ("10.36227/", "techrxiv.org", "TechRxiv"),
+    ("10.31219/", "osf.io", "OSF Preprints"),
+    ("10.13140/", "researchgate.net", "ResearchGate"),
+    ("10.22541/", "authorea.com", "Authorea"),
+    ("10.6084/", "figshare.com", "Figshare"),
+)
+
+
+def preprint_server(p: Dict[str, Any]) -> Optional[str]:
+    ids = " ".join(str(p.get(k) or "") for k in ("doi", "url", "link")).lower()
+    for prefix, domain, name in PREPRINT_SERVERS:
+        if prefix in ids or domain in ids:
+            return name
+    return None
 
 
 def resolve_honest_venue_and_type(p: Dict[str, Any]) -> Tuple[str, str]:
     """Resolve genuine publication venue and accurate source type, eliminating API provider leaks."""
+    server = preprint_server(p)
+    if server:
+        return server, "Preprint"
     v = (p.get("venue") or "").strip()
     source_api = (p.get("source") or "").strip()
     container = (p.get("container_title") or "").strip()
@@ -117,7 +144,8 @@ def resolve_honest_venue_and_type(p: Dict[str, Any]) -> Tuple[str, str]:
     elif any(w in v_lower for w in ("book", "monograph")):
         s_type = "Book"
     else:
-        s_type = "Peer-Reviewed Journal" if ("doi" in p or "10." in url) else "Preprint"
+        # A DOI alone does not make a peer-reviewed journal (S11): the venue has to say so.
+        s_type = "Publication (venue not verified)"
 
     return v, s_type
 
@@ -284,6 +312,7 @@ class MultiLaneResearchRunner:
         self._ephemeral_search_logs = []
         self._run_excluded_claims: List[Tuple[Claim, str, str]] = []
         self._run_content_keys: Dict[str, str] = {}
+        self._papers_without_abstract: List[Dict[str, Any]] = []
         self._source_cache: Dict[str, Optional[Source]] = {}
         self._check_llm_cache: Optional[Tuple[Any]] = None
         is_quick = "Fast" in depth
@@ -345,8 +374,13 @@ class MultiLaneResearchRunner:
         report(2, "Three-Lane Harvesting: Ingesting Academic (A), Enterprise (B), and Practitioner (C) evidence...", 0.28)
 
         # Lane A: Academic Literature
+        # S11: queries from the approved question and its sub-questions, condensed to key terms.
+        from src.analysis.queries import research_queries
+
+        academic_queries = research_queries(topic, approved_package)
         academic_papers = self._harvest_academic_lane(
             topic=topic,
+            queries=academic_queries,
             query_limit=query_limit,
             max_per_query=max_per_query,
             max_papers=max_academic_papers,
@@ -386,10 +420,16 @@ class MultiLaneResearchRunner:
             map_provider=map_provider, run_id=run_id, attempt=0, approval_ref=approval_ref,
             approved_package=approved_package,
         )
-        if not check_a.passed:
+        # One retry (S3, S11): widen when Check A fails, or when fewer on-topic papers than the depth's
+        # target survived. Thin evidence makes a shallow brief, so it is worth one more, wider search.
+        targets = (((self.config or {}).get("checks") or {}).get("check_a") or {}).get("target_on_topic_papers") or {}
+        target = int(targets.get("fast" if is_quick else "deep", 0) or 0)
+        on_topic_papers = sum(1 for p in academic_papers if paper_source_id(p) in check_a.on_topic_ids)
+        if not check_a.passed or (academic_papers_override is None and on_topic_papers < target):
             report(2, "Check A: Too little on-topic evidence. Widening the search once...", 0.36)
             retry_papers = self._harvest_academic_lane(
                 topic=topic,
+                queries=academic_queries,
                 query_limit=query_limit * 2,
                 max_per_query=max_per_query * 2,
                 max_papers=max_academic_papers * 2,
@@ -1134,6 +1174,7 @@ class MultiLaneResearchRunner:
         question_id: str,
         run_id: str,
         custom_urls: Optional[List[str]] = None,
+        queries: Optional[List[str]] = None,
     ) -> List[Dict[str, Any]]:
         """Harvest academic literature from OpenAlex, Crossref, arXiv, and Semantic Scholar."""
         from src.analysis.relevance import rank_papers, stems_match
@@ -1142,7 +1183,7 @@ class MultiLaneResearchRunner:
         if override is not None:
             selected = list(override)
         else:
-            queries = build_topic_queries(topic)
+            queries = list(queries or build_topic_queries(topic))
             openalex = OpenAlexClient()
             crossref = CrossrefClient()
             arxiv = ArxivClient()
@@ -1160,16 +1201,11 @@ class MultiLaneResearchRunner:
                 # Fallback to topic search if empty
                 all_papers = arxiv.search(topic, max_results=max_papers)
 
-            # Sanitize abstracts
-            valid = []
-            for p in all_papers:
-                ab = (p.get("abstract") or "").strip()
-                if len(ab) >= 60:
-                    valid.append(p)
-                elif p.get("title"):
-                    v = p.get("venue") or p.get("source") or "Academic Literature"
-                    p["abstract"] = f"{p['title']}. Research publication from {v}. Evaluates empirical impact, metrics, and technology findings."
-                    valid.append(p)
+            # Real abstracts only (S11): fetch a missing abstract by DOI, or set the paper aside.
+            from src.analysis.abstracts import fill_abstracts
+
+            valid, set_aside = fill_abstracts([p for p in all_papers if p.get("title")], [openalex, semantic])
+            self._papers_without_abstract.extend(set_aside)
 
             ranked = rank_papers(valid, topic)
             selected = ranked[:max_papers] if ranked else valid[:max_papers]
@@ -1186,7 +1222,7 @@ class MultiLaneResearchRunner:
                     "id": src_id,
                     "title": f"[Custom User Source] {t}",
                     "abstract": a,
-                    "year": datetime.datetime.now().year,
+                    "year": "Date unknown",  # S11: the page's date is not known; today's year would be invented
                     "venue": d,
                     "url": u_clean,
                     "relevance_score": 0.99,
@@ -1577,9 +1613,10 @@ class MultiLaneResearchRunner:
                 prac_collector.add_observation(
                     question_id=question_obj.id,
                     situation=f"[Custom User Observation] {t}" if not u_clean.startswith("http") else f"[Custom User Observation] Ingested from {u_clean}",
-                    decision="Integrated automated verification gates for custom stack",
-                    action=f"Observed delivery outcome and telemetry: {a}",
-                    outcome="Maintained verified governance and zero ungrounded regression",
+                    # S11: record only what the note holds; decision and outcome are the operator's to add.
+                    decision="Not recorded",
+                    action=a or "Not recorded",
+                    outcome="Not recorded",
                     sector="technology_delivery",
                     date=datetime.date.today().isoformat(),
                     metric={"observation_status": "verified"},

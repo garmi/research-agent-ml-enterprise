@@ -96,9 +96,25 @@ def search_log_negative_findings(slogs: List[Any]) -> List[Tuple[str, Dict[str, 
         add((
             f"Literature search in {slog.lane} lane ({slog.source_api}) for '{slog.query}' returned 0 matching records in evidence ledger."
         ), slog)
+    # Sources that were not searched: one line per lane and reason, naming the sources (S11). The
+    # question appears as its key terms only (it differs per run, so two briefs never share the line);
+    # each line keeps every search_log row it stands for.
+    from src.analysis.queries import condense
+
+    groups: Dict[Tuple[str, str], List[Any]] = {}
     for slog in unsearched:
-        reason = "no fetcher" if getattr(slog, "status", "") == "not_implemented" else "no observations recorded"
-        add(f"{slog.lane.capitalize()} source '{slog.source_api}' not searched for '{slog.query}': {reason}.", slog)
+        reason = "no fetcher yet" if getattr(slog, "status", "") == "not_implemented" else "no observations recorded"
+        groups.setdefault((slog.lane, reason), []).append(slog)
+    for (lane, reason), rows in groups.items():
+        names: List[str] = []
+        for r in rows:
+            if r.source_api not in names:
+                names.append(r.source_api)
+        about = condense(rows[0].query)
+        text = f"{lane.capitalize()} sources not searched for '{about}' ({reason}): {', '.join(names)}."
+        if text not in seen:
+            seen.add(text)
+            out.append((text, {"search_log_id": rows[0].id, "search_log_ids": [r.id for r in rows]}))
     return out
 
 

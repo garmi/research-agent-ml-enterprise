@@ -110,3 +110,27 @@ def finding_card_html(
         </summary>
         {body}
     </details>"""
+
+
+def paper_card_html(p: Dict[str, Any]) -> str:
+    """One Evidence-tab paper card (S11). Built without blank lines (a blank line ends Markdown's HTML
+    block and the rest shows as raw code), with escaped text and http(s)-only links."""
+    esc = lambda v: html.escape(str(v or ""))
+    url = html.escape(safe_url(p.get("url")), quote=True)
+    year = str(p.get("year") or "")
+    when = f"Published: <strong>{esc(year)}</strong>" if year and year != "Date unknown" else "Date: <em>Date unknown</em>"
+    custom = '<span class="paper-tag paper-custom">🏷️ Custom URL</span>' if p.get("is_custom") else ""
+    parts = [
+        '<div class="paper-card">',
+        '<div class="paper-card-head">',
+        f'<a href="{url}" target="_blank" class="cite-pill">[{esc(p.get("key"))}]</a>',
+        f'<div>{custom}<span class="paper-tag">{esc(p.get("type"))}</span></div>',
+        "</div>",
+        f'<div class="paper-card-title"><a href="{url}" target="_blank">{esc(p.get("title"))} ↗</a></div>',
+        f'<div class="paper-card-meta">{when} &nbsp;•&nbsp; Venue: <strong>{esc(p.get("venue"))}</strong>'
+        + (f' &nbsp;•&nbsp; DOI/URL: <code>{esc(p.get("doi"))}</code>' if p.get("doi") else "")
+        + "</div>",
+        "</div>",
+    ]
+    return "".join(parts)
+
