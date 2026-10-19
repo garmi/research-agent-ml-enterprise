@@ -57,7 +57,7 @@ from src.ui.evidence_view import finding_card_html, render_sentence
 from src.ui.intake_view import approved_question_text, effective_provider, render_intake_view
 from src.ui.rerun import board_editor_key, export_view, papers_for_rerun
 from src.ui.publish_view import gate_rows, gates_summary, publish_eligibility
-from src.ui.run_status import run_status, status_banner_html, step_rail, step_rail_html
+from src.ui.run_status import run_status, status_banner_html, status_code, step_rail, step_rail_html
 from src.ui.brief_view import brief_meta_line, distinct_signals, plain_html, roadmap_html
 
 
@@ -882,7 +882,7 @@ with st.sidebar:
     st.markdown('<div class="sidebar-pod-title">Steps</div>', unsafe_allow_html=True)
     st.markdown(step_rail_html(step_rail(results)), unsafe_allow_html=True)
 
-    # 3. SYSTEM STATUS POD
+    # 2. SYSTEM STATUS POD
     st.markdown(
         f"""
         <div class="sidebar-pod">
@@ -905,7 +905,7 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
 
-    # 4. PREVIOUS RUNS SECTION
+    # 3. PREVIOUS RUNS SECTION
     st.markdown('<div class="sidebar-pod-title" style="margin-top: 1rem;">Previous Research Runs</div>', unsafe_allow_html=True)
     if not st.session_state["history"]:
         st.markdown(
@@ -1145,7 +1145,7 @@ if results:
     paper_map = {p["key"]: p for p in results.get("papers", [])}
     claims_by_id_map = {c["id"]: c for c in results.get("claims", [])}
     gap_info = results.get("gap_matrix") or {}
-    status = (results.get("publish_res", {}).get("status") or results.get("quality_scorecard", {}).get("band") or "NOT_PUBLISHABLE").upper()
+    status = status_code(results)
 
     # ONE STATUS BANNER (S8): where the run stopped, why, and what to do next
     st.markdown(status_banner_html(run_status(results)), unsafe_allow_html=True)
@@ -1161,8 +1161,8 @@ if results:
             unsafe_allow_html=True,
         )
 
-    # Phase-organized Tabs (4 Clear Phase Tabs instead of 7 overlapping tabs)
-    phase_tab4, phase_tab2, phase_tab3, phase_tab_gov = st.tabs([
+    # One tab per step after the question
+    tab_brief, tab_evidence, tab_claims, tab_checks = st.tabs([
         "Brief",
         "Evidence",
         "Claims & gaps",
@@ -1170,9 +1170,9 @@ if results:
     ])
 
     # ==========================================================================
-    # TAB 1 (PHASE 4): EXECUTIVE SYNTHESIS & FULLY TRACEABLE FINDINGS
+    # BRIEF: the draft read as an executive brief
     # ==========================================================================
-    with phase_tab4:
+    with tab_brief:
         verdict_text = results.get("verdict") or (
             f"Empirical synthesis across {len(results.get('papers', []))} academic papers and "
             f"{len(results.get('claims', []))} ledger claims."
@@ -1256,9 +1256,9 @@ if results:
             st.markdown(roadmap_html(results.get("roadmap", [])), unsafe_allow_html=True)
 
     # ==========================================================================
-    # TAB 2 (PHASE 2): HARVESTED 3-LANE SOURCES & FEEDBACK LOOP 1
+    # EVIDENCE: the three lanes' sources, Check A detail, exclude-and-re-draft
     # ==========================================================================
-    with phase_tab2:
+    with tab_evidence:
         st.markdown("### Evidence")
         # Check A: on-topic evidence (DEC-016)
         check_a_info = results.get("check_a") or {}
@@ -1389,9 +1389,9 @@ if results:
                         st.error(f"Re-synthesis failed: {err['what_happened']}")
 
     # ==========================================================================
-    # TAB 3 (PHASE 3): ATOMIC CLAIM LEDGER & STRATEGIC GAP MATRIX
+    # CLAIMS & GAPS: the claim ledger and the gap matrix
     # ==========================================================================
-    with phase_tab3:
+    with tab_claims:
         st.markdown("### Claims & gaps")
         st.markdown(
             "Every extracted claim is stored in the evidence ledger with its full untruncated assertion, "
@@ -1517,9 +1517,9 @@ if results:
                 st.error(f"Re-draft failed: {err['what_happened']}")
 
     # ==========================================================================
-    # TAB 4 (PHASE 4B): GOVERNANCE AUDIT (G1–G6), SCORECARD & EXPORTS
+    # CHECKS & PUBLISH: gates G1-G6, scorecard, human publish, downloads
     # ==========================================================================
-    with phase_tab_gov:
+    with tab_checks:
         st.markdown("### Checks & publish")
         audit_res = results.get("gates_audit", {})
         # A gate with no data counts as a fail (S6): only an audited PASS on all six is a pass.

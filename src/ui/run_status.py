@@ -9,6 +9,8 @@ from __future__ import annotations
 import html
 from typing import Any, Dict, List, Optional
 
+from src.ui.publish_view import publish_eligibility
+
 STEPS = ("Question", "Evidence", "Claims", "Brief", "Checks & publish")
 
 _STATUS = {
@@ -30,8 +32,14 @@ def _reasons(results: Dict[str, Any]) -> List[str]:
     return [str(r) for r in (pub.get("reasons") or ([pub["reason"]] if pub.get("reason") else []))]
 
 
-def _status(results: Dict[str, Any]) -> str:
-    return str(results.get("status") or (results.get("publish_res") or {}).get("status") or "").upper()
+def status_code(results: Dict[str, Any]) -> str:
+    """The run's status, derived once for the banner, the step rail and the exports."""
+    return str(
+        results.get("status")
+        or (results.get("publish_res") or {}).get("status")
+        or (results.get("quality_scorecard") or {}).get("band")
+        or "NOT_PUBLISHABLE"
+    ).upper()
 
 
 def run_status(results: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
@@ -39,21 +47,29 @@ def run_status(results: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
     if not results:
         return None
     stopped = results.get("stopped_at")
+    # A stopped run keeps every recorded reason (an unconfirmed practitioner abstraction comes first).
+    stop_why = _reasons(results) or [str(results.get("stop_reason") or "")]
     if stopped == "check_a":
         return {"level": "error", "headline": "Stopped after the search: not enough on-topic evidence",
-                "why": [str(results.get("stop_reason") or "Too few sources were about the approved question.")],
-                "next_step": "Rephrase or widen the question in Step 1, then run again."}
+                "why": stop_why,
+                "next_step": "See which sources were judged off-topic on the Evidence tab, then rephrase "
+                             "or widen the question in Step 1 and run again."}
     if stopped == "check_b":
         return {"level": "error", "headline": "Stopped before drafting: too few usable claims",
-                "why": [str(results.get("stop_reason") or "Too few well-formed claims.")],
-                "next_step": "Add sources, or re-include claims on the Evidence step, then re-draft."}
+                "why": stop_why,
+                "next_step": "Add sources, or re-include claims on the Evidence tab, then re-draft."}
     if results.get("is_fallback"):
         return {"level": "warn", "headline": "Draft built from extracted quotes only: the model was unavailable",
                 "why": [str(results.get("blocking_banner") or "The language model did not respond.")],
                 "next_step": "Check the model connection, then run again. This draft cannot be published."}
-    status = _status(results)
+    status = status_code(results)
     level, headline, next_step = _STATUS.get(
         status, ("warn", f"Run ended with status {status or 'unknown'}", "Run it again."))
+    if status in ("PUBLISH_READY", "REVISE"):
+        # The banner never offers what the Publish step refuses (test mode, hosted demo, no draft).
+        eligible, _, why_not = publish_eligibility(results)
+        if not eligible:
+            level, next_step = "warn", f"Publishing is not available here: {why_not}"
     return {"level": level, "headline": headline, "why": _reasons(results), "next_step": next_step}
 
 
@@ -81,7 +97,7 @@ def step_rail(results: Optional[Dict[str, Any]]) -> List[Dict[str, str]]:
     if not results:
         return [{"label": s, "state": "current" if s == "Question" else "pending", "detail": ""} for s in STEPS]
     stop_index = {"check_a": 1, "check_b": 2}.get(results.get("stopped_at") or "")
-    status = _status(results)
+    status = status_code(results)
     if stop_index is None:
         last = {"PUBLISHED": "done", "PUBLISH_READY": "current", "REVISE": "current"}.get(status, "stopped")
         states = ["done"] * 4 + [last]
