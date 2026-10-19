@@ -4,6 +4,7 @@ import os
 from typing import Any, Dict
 
 from src.llm.gemini_client import GeminiClient
+from src.llm.model_names import gemini_model_name
 from src.llm.ollama_client import OllamaClient
 
 
@@ -14,10 +15,7 @@ def build_llm(provider: str, config: Dict[str, Any]):
         from src.llm.stub_client import StubLLM
         return StubLLM()
     if p_clean == "gemini":
-        cfg = config.get("gemini", {})
-        raw_model = os.getenv("GEMINI_MODEL") or cfg.get("model", "gemini-2.5-flash")
-        model = str(raw_model).strip()
-        return GeminiClient(model=model)
+        return GeminiClient(model=gemini_model_name(config))
     if p_clean in ("ollama", "local"):
         cfg = config.get("ollama", {})
         raw_ollama_model = os.getenv("OLLAMA_MODEL") or cfg.get("model", "qwen2.5:3b-instruct")

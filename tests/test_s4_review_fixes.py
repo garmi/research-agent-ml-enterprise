@@ -87,7 +87,8 @@ def test_reruns_keep_practitioner_settings():
     redraft = src[src.index("evidence_board_redraft"):]
     loop1 = src[src.index("Execute Feedback Loop"):src.index("evidence_board_redraft")]
     for block in (redraft, loop1):
-        call = block[block.index("run_production_pipeline("):]
+        # S9: re-drafts run as background jobs through launch_run_job(...).
+        call = block[block.index("launch_run_job("):]
         call = call[:call.index(")\n")]
         assert "practitioner_abstraction_confirmed=prac_abs_confirmed" in call
         assert "allow_remote_practitioner_synthesis=allow_remote_prac_synth" in call

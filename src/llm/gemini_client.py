@@ -6,6 +6,8 @@ from typing import Optional
 
 import requests
 
+from src.llm.model_names import gemini_model_name
+
 
 class GeminiClient:
     """Minimal Gemini REST client (Google AI Studio key). Same interface as OllamaClient."""
@@ -14,7 +16,7 @@ class GeminiClient:
         self.api_key = (api_key or os.getenv("GEMINI_API_KEY", "")).strip()
         if not self.api_key:
             raise RuntimeError("GEMINI_API_KEY is not set. Add it to .env (AI Studio key).")
-        raw_model = model or os.getenv("GEMINI_MODEL") or "gemini-2.5-flash"
+        raw_model = model or gemini_model_name()
         self.model = str(raw_model).strip()
         self.retries = retries
         self.timeout = timeout
