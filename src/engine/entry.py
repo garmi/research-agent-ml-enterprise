@@ -93,6 +93,7 @@ def start_run(
     elif "topic" not in run_args:
         run_args["topic"] = question_text
     run_args["approved_question"] = run_args["topic"]
+    run_args["approved_package"] = reasoned_pkg or None
     run_args["approval_ref"] = {
         "question_id": question_id,
         "version": approval.version,

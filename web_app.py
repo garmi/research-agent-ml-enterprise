@@ -54,6 +54,7 @@ from src.engine.ids import resolve_question_id
 from src.engine.stub_mode import is_stub_mode
 from src.ui.safe_page import safe_page, format_error_payload, render_safe_error
 from src.ui.intake_view import approved_question_text, effective_provider, render_intake_view
+from src.ui.rerun import board_editor_key, export_view, papers_for_rerun
 
 
 logger = logging.getLogger("ExecutiveResearchStudio")
@@ -769,6 +770,7 @@ def run_production_pipeline(
     allow_remote_practitioner_synthesis: bool = False,
     practitioner_abstraction_confirmed: bool = False,
     reasoned_package: Optional[Dict[str, Any]] = None,
+    excluded_claim_keys: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """Execute the formal 8-stage research engine workflow across Academic, Enterprise, and Practitioner lanes."""
     stage_titles = {
@@ -814,6 +816,7 @@ def run_production_pipeline(
         allow_remote_practitioner_synthesis=allow_remote_practitioner_synthesis,
         practitioner_abstraction_confirmed=practitioner_abstraction_confirmed,
         reasoned_package=reasoned_package,
+        excluded_claim_keys=excluded_claim_keys,
     )
     progress_box.empty()
     return results
@@ -1125,6 +1128,8 @@ with st.expander(
                 allow_remote_prac_synth = False
 
 selected_provider = available_models.get(sel_model_label, "gemini").strip()
+# Re-runs (Feedback Loop 1, evidence board) resolve the engine the same way the main run does.
+rerun_provider = effective_provider(selected_provider, has_gemini_key=bool(os.getenv("GEMINI_API_KEY", "").strip()), ollama_ok=ollama_online)
 
 
 # ==============================================================================
@@ -1151,6 +1156,7 @@ if run_submitted:
                 target_provider = "stub"
 
         st.session_state["current_question"] = active_query
+        st.session_state["last_lane_urls"] = lane_urls
         progress_placeholder = st.empty()
         eta_desc = "~45–60 seconds" if "Fast" in depth_option else "~3–5 minutes"
         total_custom = sum(len(v) for v in lane_urls.values())
@@ -1657,7 +1663,7 @@ if results:
                 st.warning("Please select at least one paper to exclude.")
             else:
                 excluded_keys = {re.search(r"\[(P\d+)\]", s).group(1) for s in excluded_papers if re.search(r"\[(P\d+)\]", s)}
-                remaining = [p.get("raw", p) for p in results["papers"] if p["key"] not in excluded_keys]
+                remaining = papers_for_rerun(results, drop_keys=excluded_keys, drop_custom=False)
                 if not remaining:
                     st.error("Cannot exclude all papers. At least 1 paper is required for synthesis.")
                 else:
@@ -1667,10 +1673,12 @@ if results:
                             topic=approved_question_text(st.session_state.get("s2_active_package"), results),
                             depth=depth_option,
                             tone=tone_option,
-                            map_provider=selected_provider,
-                            reduce_provider=selected_provider,
+                            map_provider=rerun_provider,
+                            reduce_provider=rerun_provider,
                             progress_box=progress_box,
                             papers_override=remaining,
+                            allow_remote_practitioner_synthesis=allow_remote_prac_synth,
+                            practitioner_abstraction_confirmed=prac_abs_confirmed,
                             reasoned_package=st.session_state.get("s2_active_package"),
                         )
                         st.session_state["research_results"] = refreshed
@@ -1733,6 +1741,81 @@ if results:
             render_safe_table(claims_table_data, use_container_width=True)
         else:
             st.info("No claims recorded in ledger for this run.")
+
+        # EVIDENCE BOARD (S4): choose the claims that go into the draft. Check B re-runs on re-draft.
+        st.markdown("---")
+        st.markdown("#### 🗂️ Evidence Board: choose which claims go into the draft")
+        check_b_info = results.get("check_b") or {}
+        if results.get("stopped_at") == "check_b":
+            st.error(f"**Run blocked at Check B.** {results.get('stop_reason', '')}")
+        elif check_b_info:
+            st.caption(f"Check B passed: {check_b_info.get('reason', '')}")
+
+        excluded_list = results.get("excluded_claims", [])
+        operator_excluded = [c for c in excluded_list if c.get("exclusion_kind") == "operator"]
+        set_aside = [c for c in excluded_list if c not in operator_excluded]
+        board_claims = list(claims_list) + operator_excluded
+        if board_claims:
+            import pandas as pd
+
+            board_df = pd.DataFrame([
+                {
+                    "Include": c not in operator_excluded,
+                    "Claim": c["assertion"],
+                    "Source": f"[{c.get('source_key', 'SRC')}] {c.get('source_title', 'Unknown')}",
+                    "Lane": c["lane"].capitalize(),
+                    "Grade": c["grade"].capitalize(),
+                }
+                for c in board_claims
+            ])
+            edited = st.data_editor(
+                board_df,
+                key=board_editor_key(results),
+                hide_index=True,
+                use_container_width=True,
+                disabled=["Claim", "Source", "Lane", "Grade"],
+            )
+            excluded_keys = [c["content_key"] for c, keep in zip(board_claims, edited["Include"].tolist()) if not keep]
+            st.caption(f"{len(board_claims) - len(excluded_keys)} of {len(board_claims)} claims will go into the draft.")
+        else:
+            excluded_keys = []
+            st.caption("No claims to choose from yet. Add a source below and re-draft.")
+        if set_aside:
+            with st.expander(f"{len(set_aside)} malformed claims were set aside by Check B"):
+                render_safe_table(
+                    [{"Claim": c["assertion"], "Source": c.get("source_title", ""), "Why": c["exclusion_reason"]} for c in set_aside],
+                    use_container_width=True,
+                )
+
+        new_source_url = st.text_input("Add a source URL (academic lane)", key="evidence_board_new_url")
+        if st.button("🔄 Re-draft with these choices", type="primary", key="evidence_board_redraft"):
+            lane_urls_redraft = {k: list(v) for k, v in (st.session_state.get("last_lane_urls") or {}).items()}
+            if new_source_url.strip():
+                lane_urls_redraft.setdefault("academic", []).append(new_source_url.strip())
+            progress_box = st.empty()
+            try:
+                refreshed = run_production_pipeline(
+                    topic=approved_question_text(st.session_state.get("s2_active_package"), results),
+                    depth=depth_option,
+                    tone=tone_option,
+                    map_provider=rerun_provider,
+                    reduce_provider=rerun_provider,
+                    progress_box=progress_box,
+                    # Custom-URL papers are re-fetched from lane_urls_redraft, so they are not passed twice.
+                    papers_override=papers_for_rerun(results) or None,
+                    custom_lane_urls=lane_urls_redraft,
+                    allow_remote_practitioner_synthesis=allow_remote_prac_synth,
+                    practitioner_abstraction_confirmed=prac_abs_confirmed,
+                    reasoned_package=st.session_state.get("s2_active_package"),
+                    excluded_claim_keys=excluded_keys,
+                )
+                st.session_state["research_results"] = refreshed
+                st.session_state["last_lane_urls"] = lane_urls_redraft
+                st.rerun()
+            except Exception as re_exc:
+                progress_box.empty()
+                err = format_user_friendly_error(re_exc)
+                st.error(f"Re-draft failed: {err['what_happened']}")
 
     # ==========================================================================
     # TAB 4 (PHASE 4B): GOVERNANCE AUDIT (G1–G6), SCORECARD & EXPORTS
@@ -1836,7 +1919,7 @@ if results:
 
     if perm.can_download_full:
         brief_content = builder.build_markdown(topic_str, syn_raw) if syn_raw else f"# Executive Research Brief\n\n**Topic:** {topic_str}\n\n## Verdict\n{results.get('verdict', '')}\n"
-        json_content = json.dumps(syn_raw or results, indent=2)
+        json_content = json.dumps(syn_raw or export_view(results), indent=2)
     elif perm.can_download_draft:
         brief_content = builder.build_draft_markdown(topic_str, syn_raw, failing_gates=perm.failing_gates, status=status)
         draft_json_obj = {

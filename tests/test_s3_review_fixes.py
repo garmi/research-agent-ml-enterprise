@@ -62,7 +62,10 @@ def _runner(tmp_path: Path) -> MultiLaneResearchRunner:
     db, prac = str(tmp_path / "l.db"), str(tmp_path / "p.db")
     apply_migrations(db_path=db)
     apply_migrations(db_path=prac)
-    return MultiLaneResearchRunner(db_path=db, practitioner_db_path=prac, questions_yaml_path=str(tmp_path / "q.yaml"))
+    runner = MultiLaneResearchRunner(db_path=db, practitioner_db_path=prac, questions_yaml_path=str(tmp_path / "q.yaml"))
+    # Thin fixture: these tests check Check A and run status, not evidence volume (Check B, DEC-017).
+    runner.config.setdefault("checks", {})["check_b"] = {"min_claims": 1, "min_sources": 1}
+    return runner
 
 
 # ------------------------------------------------------------------------------

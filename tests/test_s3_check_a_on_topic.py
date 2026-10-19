@@ -16,6 +16,9 @@ Requirements:
 7. On-topic harvest proceeds past Check A and the run status is persisted.
 8. A model that is unavailable or unparseable abstains; the rules decide.
 9. The approved question and its hashes reach the runner through start_run.
+10. The model is shown the approved package (sub-questions, scope) and the configured
+    synonyms for the question's terms, and the prompt defines on-topic as the whole subject.
+11. Malformed model output (non-object entries, wrong types) abstains instead of crashing.
 """
 
 from __future__ import annotations
@@ -130,6 +133,7 @@ def _runner(tmp_path: Path, llm: Any) -> MultiLaneResearchRunner:
     )
     runner._build_check_llm = lambda provider: llm  # type: ignore[assignment]
     runner._harvest_enterprise_lane = lambda **kwargs: []  # type: ignore[assignment]
+    runner.config.setdefault("checks", {})["check_b"] = {"min_claims": 1, "min_sources": 1}
     return runner
 
 
@@ -301,7 +305,7 @@ def test_on_topic_run_passes_check_a_and_persists_status(tmp_path):
     repo = LedgerRepository(db_path=runner.db_path)
     status, _ = repo.get_run_status(res["run_id"])
     assert status == res["status"]
-    run_level = [v for v in repo.list_check_verdicts(res["run_id"]) if v["object_type"] == "run"]
+    run_level = [v for v in repo.list_check_verdicts(res["run_id"], check_id=CHECK_A_ID) if v["object_type"] == "run"]
     assert [v["final"] for v in run_level] == ["pass"]
 
 
@@ -379,5 +383,58 @@ def test_approved_question_threads_through_start_run(tmp_path, monkeypatch):
     assert captured["approval_ref"]["question_sha256"] == approval.question_sha256
     assert captured["approval_ref"]["version"] == approval.version
 
+    assert captured["approved_package"] == package
     kept = _filter_runner_args(MultiLaneResearchRunner(db_path=str(tmp_path / "l.db")).run_workflow, captured)
-    assert "approved_question" in kept and "approval_ref" in kept
+    assert "approved_question" in kept and "approval_ref" in kept and "approved_package" in kept
+
+
+# ------------------------------------------------------------------------------
+# Test 10: The model sees the approved package and the configured synonyms
+# ------------------------------------------------------------------------------
+def test_model_prompt_carries_package_and_synonyms():
+    class Recorder(FakeCheckLLM):
+        def generate(self, prompt, **kwargs):
+            self.prompt = prompt
+            return super().generate(prompt, **kwargs)
+
+    llm = Recorder()
+    package = {
+        "refined_question": "What evidence exists on Kiro adoption in engineering teams?",
+        "sub_questions": ["How does spec-driven tooling change review effort?"],
+        "in_scope": ["enterprise engineering teams"],
+        "out_of_scope": ["consumer chat assistants"],
+    }
+    import src.engine.check_a_on_topic as check_a_module
+
+    items = build_source_items(AI_PAPERS[:1], [], [])
+    original = check_a_module.PROMPT_FILE_PATH
+    check_a_module.PROMPT_FILE_PATH = "prompts/check_a_on_topic_v2.md"
+    try:
+        run_check_a(
+            question=package["refined_question"], items=items, llm=llm, run_id="r", attempt=0,
+            package=package, synonyms={"kiro": ["spec-driven development"], "sourdough": ["levain"]},
+        )
+    finally:
+        check_a_module.PROMPT_FILE_PATH = original
+    assert "How does spec-driven tooling change review effort?" in llm.prompt
+    assert "enterprise engineering teams" in llm.prompt and "consumer chat assistants" in llm.prompt
+    assert "kiro: spec driven development" in llm.prompt.lower()
+    assert "levain" not in llm.prompt, "only synonyms for the question's own terms are shown"
+    assert "one part" in llm.prompt.lower()
+
+
+# ------------------------------------------------------------------------------
+# Test 11: Malformed model output abstains instead of crashing
+# ------------------------------------------------------------------------------
+def test_malformed_model_entries_abstain():
+    class Garbled:
+        model = "garbled"
+
+        def generate(self, prompt, **kwargs):
+            return json.dumps({"verdicts": ["S1 on_topic", {"id": "S2", "verdict": "off_topic", "reason": 7}, None]})
+
+    items = build_source_items(AI_PAPERS[:2], [], [])
+    result = run_check_a(question=AI_QUESTION, items=items, llm=Garbled(), run_id="r", attempt=0)
+    by_id = {v.object_id: v for v in result.verdicts if v.object_type == "source"}
+    assert by_id["p-ai-1"].model_verdict == "abstain"
+    assert by_id["p-ai-2"].model_verdict == "off_topic"

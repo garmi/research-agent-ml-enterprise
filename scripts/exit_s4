@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ==============================================================================
+# Exit Script for Slice S4: run-scoped evidence, Check B and the evidence board
+# ==============================================================================
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$REPO_ROOT"
+PY="${PY:-.venv/bin/python}"
+
+echo "======================================================================"
+echo "Executing Slice S4 Exit Verification Script"
+echo "======================================================================"
+
+export RESEARCH_USER="exit-script-s4"
+
+PYTHONPATH=. "$PY" - << 'EOF'
+import sys
+import tempfile
+from pathlib import Path
+
+sys.path.insert(0, "tests")
+from test_s4_evidence_board import PAPERS_RUN1, PAPERS_RUN2, _run, _runner, _claim, _sources
+
+from src.engine.check_b_wellformed import CHECK_B_ID, run_check_b
+from src.ledger.repository import LedgerRepository
+
+print("--- 1. Check B is rules only and explains itself ---")
+r = run_check_b([_claim("c1", "s1"), _claim("c2", "s1", excerpt="")], _sources("s1"), run_id="r", min_claims=3, min_sources=2)
+assert not r.passed and all(v.model_verdict is None for v in r.verdicts)
+print(f"Verdict: {r.reason_plain}")
+
+with tempfile.TemporaryDirectory() as tmp:
+    print("--- 2. A second run does not inherit the first run's claims ---")
+    runner = _runner(Path(tmp))
+    res1 = _run(runner, PAPERS_RUN1)
+    res2 = _run(runner, PAPERS_RUN2)
+    leaked = {c["source_id"] for c in res2["claims"]} & {p["id"] for p in PAPERS_RUN1}
+    assert not leaked, leaked
+    print(f"Run 2 shows {len(res2['claims'])} claims, all from its own sources.")
+
+    print("--- 3. Evidence board exclusion is applied and logged ---")
+    key = res1["claims"][0]["content_key"]
+    res3 = _run(runner, PAPERS_RUN1, excluded_claim_keys=[key])
+    assert key not in {c["content_key"] for c in res3["claims"]}
+    assert key in {c["content_key"] for c in res3["excluded_claims"]}
+    print(f"Check B: {res3['check_b']['reason']}")
+
+with tempfile.TemporaryDirectory() as tmp:
+    print("--- 4. Thin evidence stops as BLOCKED before drafting ---")
+    runner = _runner(Path(tmp), min_claims=3, min_sources=2)
+    res = _run(runner, PAPERS_RUN1[:1])
+    assert res["status"] == "BLOCKED" and res["stopped_at"] == "check_b" and res["doc_id"] is None
+    status, reason = LedgerRepository(db_path=runner.db_path).get_run_status(res["run_id"])
+    assert status == "BLOCKED"
+    print(f"Run status persisted: {status}")
+    print(f"Reason shown to the user: {res['stop_reason']}")
+EOF
+
+echo ""
+echo -n "[1/2] Running Slice S3-S4 test suites... "
+PYTHONPATH=. "$PY" -m pytest tests/test_s3_check_a_on_topic.py tests/test_s4_evidence_board.py -q
+echo "OK (all S3/S4 tests passed)"
+
+echo -n "[2/2] Running full regression test suite... "
+PYTHONPATH=. "$PY" -m pytest tests/ evals/ -q
+echo "OK (full repository tests passed)"
+
+echo ""
+echo "======================================================================"
+echo "Slice S4 Exit Verification: ALL CHECKS PASSED (EXIT 0)"
+echo "======================================================================"
+exit 0

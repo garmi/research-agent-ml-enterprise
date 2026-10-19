@@ -269,16 +269,22 @@ class MultiLaneResearchRunner:
         practitioner_abstraction_confirmed: bool = False,
         approved_question: Optional[str] = None,
         approval_ref: Optional[Dict[str, Any]] = None,
+        approved_package: Optional[Dict[str, Any]] = None,
+        excluded_claim_keys: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """Execute the full 8-stage multi-lane workflow.
 
         `approved_question` / `approval_ref` come from the Gate 1 approval (via start_run)
-        and are what Check A judges harvested evidence against.
+        and are what Check A judges harvested evidence against. `excluded_claim_keys` are
+        the claims the operator unticked on the evidence board (by content key).
         """
         start_time = time.time()
         self._ephemeral_sources = {}
         self._ephemeral_claims = []
         self._ephemeral_search_logs = []
+        self._run_excluded_claims: List[Tuple[Claim, str, str]] = []
+        self._run_content_keys: Dict[str, str] = {}
+        self._source_cache: Dict[str, Optional[Source]] = {}
         self._check_llm_cache: Optional[Tuple[Any]] = None
         is_quick = "Fast" in depth
         max_academic_papers = 5 if is_quick else 10
@@ -378,6 +384,7 @@ class MultiLaneResearchRunner:
         check_a = self._run_check_a(
             check_question, academic_papers, enterprise_claims, practitioner_claims,
             map_provider=map_provider, run_id=run_id, attempt=0, approval_ref=approval_ref,
+            approved_package=approved_package,
         )
         if not check_a.passed:
             report(2, "Check A: Too little on-topic evidence. Widening the search once...", 0.36)
@@ -397,6 +404,7 @@ class MultiLaneResearchRunner:
             check_a = self._run_check_a(
                 check_question, academic_papers, enterprise_claims, practitioner_claims,
                 map_provider=map_provider, run_id=run_id, attempt=1, approval_ref=approval_ref,
+                approved_package=approved_package,
             )
         if not check_a.passed:
             return self._stop_at_check_a(
@@ -429,7 +437,44 @@ class MultiLaneResearchRunner:
         # STAGE 4: EVIDENCE LEDGER & DETERMINISTIC GRADING
         # ----------------------------------------------------------------------
         report(4, "Evidence Ledger & Grading: Persisting claims and applying rules.yaml grading...", 0.56)
-        all_claims = self._grade_and_persist_claims(academic_claims, question_obj.id)
+        academic_claims = self._grade_and_persist_claims(academic_claims, question_obj.id)
+
+        # ----------------------------------------------------------------------
+        # CHECK B: WELL-FORMED CLAIMS (rules only, no model)
+        # ----------------------------------------------------------------------
+        from src.engine.check_b_wellformed import claim_content_keys
+
+        # This run's claims only: all three lanes, including practitioner claims exported to the ledger.
+        run_claims = _merge_by_key(list(academic_claims) + list(enterprise_claims) + list(practitioner_claims), self._ephemeral_claims, lambda c: c.id)
+        run_claims = [c for c in run_claims if c.status != "rejected"]
+        self._run_content_keys = claim_content_keys(run_claims)
+        excluded_keys = set(excluded_claim_keys or [])
+        operator_excluded = [c for c in run_claims if self._run_content_keys[c.id] in excluded_keys]
+        if operator_excluded:
+            run_claims = [c for c in run_claims if self._run_content_keys[c.id] not in excluded_keys]
+            self._log_operator_exclusions(operator_excluded, run_id)
+        if excluded_claim_keys is not None:
+            self._log_operator_reinclusions(run_claims, run_id)
+        self._run_excluded_claims = [(c, "Excluded on the evidence board.", "operator") for c in operator_excluded]
+        report(4, "Check B: Confirming there are enough well-formed claims from enough sources...", 0.60)
+        check_b = self._run_check_b(run_claims, run_id, excluded_count=len(operator_excluded))
+        self._run_excluded_claims += [(c, check_b.set_aside[c.id], "set_aside") for c in run_claims if c.id in check_b.set_aside]
+        if not check_b.passed:
+            return self._stop_at_check_b(
+                topic=topic,
+                question_obj=question_obj,
+                run_id=run_id,
+                check_a=check_a,
+                check_b=check_b,
+                academic_papers=academic_papers,
+                has_unconfirmed_practitioner_notes=has_unconfirmed_practitioner_notes,
+                elapsed_seconds=int(time.time() - start_time),
+            )
+        kept_ids = {c.id for c in check_b.wellformed}
+        self._ephemeral_claims = list(check_b.wellformed)
+        academic_claims = [c for c in academic_claims if c.id in kept_ids]
+        enterprise_claims = [c for c in enterprise_claims if c.id in kept_ids]
+        practitioner_claims = [c for c in practitioner_claims if c.id in kept_ids]
 
         # ----------------------------------------------------------------------
         # STAGE 5: STRATEGIC GAP MATRIX (Gate 4)
@@ -592,6 +637,7 @@ class MultiLaneResearchRunner:
             elapsed_seconds=elapsed,
         )
         result["check_a"] = self._check_a_summary(check_a)
+        result["check_b"] = self._check_summary(check_b)
         reasons = (pub_res or {}).get("reasons") or []
         self._safe_set_run_status(run_id, result["status"], "; ".join(str(r) for r in reasons) or None)
         return result
@@ -625,6 +671,7 @@ class MultiLaneResearchRunner:
         run_id: str,
         attempt: int,
         approval_ref: Optional[Dict[str, Any]],
+        approved_package: Optional[Dict[str, Any]] = None,
     ) -> Any:
         from src.engine.check_a_on_topic import build_source_items, run_check_a
         from src.engine.checks import record_verdicts
@@ -644,6 +691,7 @@ class MultiLaneResearchRunner:
             floor_min_terms=int(cfg.get("floor_min_terms", 1)),
             synonyms=research_cfg.get("head_term_synonyms"),
             approval_ref=approval_ref,
+            package=approved_package,
         )
         record_verdicts(self.repo, result.verdicts)
         return result
@@ -666,6 +714,148 @@ class MultiLaneResearchRunner:
                 for v in check_a.verdicts if v.object_type == "source"
             ],
         }
+
+    def _run_check_b(self, run_claims: List[Claim], run_id: str, excluded_count: int) -> Any:
+        from src.engine.check_b_wellformed import run_check_b
+        from src.engine.checks import record_verdicts
+
+        cfg = ((self.config or {}).get("checks") or {}).get("check_b") or {}
+        lookup = {c.source_id: self._source(c.source_id) for c in run_claims}
+        result = run_check_b(
+            run_claims,
+            {k: v for k, v in lookup.items() if v is not None},
+            run_id=run_id,
+            min_claims=int(cfg.get("min_claims", 1)),
+            min_sources=int(cfg.get("min_sources", 1)),
+            excluded_count=excluded_count,
+        )
+        record_verdicts(self.repo, result.verdicts)
+        return result
+
+    @staticmethod
+    def _check_summary(check: Any) -> Dict[str, Any]:
+        return {"passed": check.passed, "reason": check.reason_plain}
+
+    def _source(self, source_id: str) -> Optional[Source]:
+        """This run's view of a source: the harvest's copy, else the ledger's, looked up once per run."""
+        if source_id in self._ephemeral_sources:
+            return self._ephemeral_sources[source_id]
+        cache = getattr(self, "_source_cache", None)
+        if cache is None:
+            cache = self._source_cache = {}
+        if source_id not in cache:
+            cache[source_id] = self.repo.get_source(source_id)
+        return cache[source_id]
+
+    def _log_operator_exclusions(self, claims: List[Claim], run_id: str) -> None:
+        """Log each exclusion once: a claim whose latest evidence-board review is already
+        'exclude' was excluded on an earlier re-draft and is not logged again."""
+        if os.getenv("HOSTED_DEMO") == "1":
+            return
+        reviewer = os.getenv("RESEARCH_USER") or "operator"
+        for c in claims:
+            if self.repo.latest_review_action("evidence_board", c.id) == "exclude":
+                continue
+            self.repo.insert_review(Review(
+                id=f"rev_{uuid.uuid4().hex[:10]}",
+                gate="evidence_board",
+                object_type="claim",
+                object_id=c.id,
+                action="exclude",
+                after_json={"run_id": run_id, "content_key": self._run_content_keys.get(c.id)},
+                reason="Excluded on the evidence board before drafting.",
+                reviewer=reviewer,
+            ))
+
+    def _log_operator_reinclusions(self, kept: List[Claim], run_id: str) -> None:
+        """A board re-draft that brings back a previously excluded claim logs an 'include'."""
+        if os.getenv("HOSTED_DEMO") == "1":
+            return
+        reviewer = os.getenv("RESEARCH_USER") or "operator"
+        for c in kept:
+            if self.repo.latest_review_action("evidence_board", c.id) == "exclude":
+                self.repo.insert_review(Review(
+                    id=f"rev_{uuid.uuid4().hex[:10]}",
+                    gate="evidence_board",
+                    object_type="claim",
+                    object_id=c.id,
+                    action="include",
+                    after_json={"run_id": run_id, "content_key": self._run_content_keys.get(c.id)},
+                    reason="Re-included on the evidence board.",
+                    reviewer=reviewer,
+                ))
+
+    def _format_papers(self, academic_papers: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], Dict[str, Dict[str, Any]]]:
+        papers_formatted: List[Dict[str, Any]] = []
+        paper_by_id: Dict[str, Dict[str, Any]] = {}
+        for i, p in enumerate(academic_papers, start=1):
+            v, t = resolve_honest_venue_and_type(p)
+            yr = p.get("year")
+            yr_str = "Date unknown" if (yr is None or str(yr).lower() in ("none", "null", "", "date unknown")) else str(yr)
+            p_entry = {
+                "id": p.get("id"),
+                "key": f"P{i}",
+                "title": p.get("title", "Untitled"),
+                "year": yr_str,
+                "venue": v,
+                "doi": p.get("doi") or p.get("url") or p.get("link") or "Indexed",
+                "type": t,
+                "url": p.get("url") or p.get("link") or "https://scholar.google.com",
+                "relevance_score": float(p.get("relevance_score", 0.0)),
+                "is_custom": bool(p.get("is_custom", False) or "[Custom User Source]" in p.get("title", "")),
+            }
+            papers_formatted.append(p_entry)
+            if p.get("id"):
+                paper_by_id[str(p.get("id"))] = p_entry
+        return papers_formatted, paper_by_id
+
+    def _format_claim(self, c: Claim, paper_by_id: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+        from src.engine.check_b_wellformed import claim_content_key
+
+        src = self._source(c.source_id)
+        p_info = paper_by_id.get(str(c.source_id))
+        return {
+            "id": c.id,
+            "content_key": getattr(self, "_run_content_keys", {}).get(c.id) or claim_content_key(c),
+            "source_id": c.source_id,
+            "lane": (src.lane if src else "academic").upper(),
+            "assertion": c.text,
+            "excerpt": c.source_excerpt,
+            "grade": c.grade.upper(),
+            "entity": c.entity,
+            "entity_match": c.entity_match,
+            "study_type": c.study_type,
+            "source_key": p_info["key"] if p_info else str(c.source_id),
+            "source_title": p_info["title"] if p_info else (src.title if src else "Unknown"),
+            "source_url": p_info["url"] if p_info else (src.url if src and src.url else "#"),
+            "venue": p_info["venue"] if p_info else (src.venue or src.org if src else "Academic Repo"),
+            "year": p_info["year"] if p_info else (src.pub_date if src and src.pub_date else str(c.claim_date or "Date unknown")),
+            "rules": ", ".join(c.grade_reasons_json or ["Default rules"]),
+            "is_custom": bool((src and "[Custom User Source]" in src.title) or (p_info and p_info.get("is_custom"))),
+        }
+
+    def _format_enterprise_sources(self, claims: List[Claim]) -> List[Dict[str, Any]]:
+        out: List[Dict[str, Any]] = []
+        for sid in sorted({c.source_id for c in claims}):
+            s = self._source(sid)
+            if s and s.lane == "enterprise":
+                out.append({
+                    "id": s.id,
+                    "title": s.title,
+                    "url": s.url or "https://dora.dev",
+                    "venue": s.venue or s.org,
+                    "commercial_stake": s.commercial_stake,
+                    "source_type": s.source_type,
+                    "pub_date": s.pub_date,
+                    "is_custom": "[Custom User Source]" in s.title,
+                })
+        return out
+
+    def _format_excluded_claims(self, paper_by_id: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:
+        return [
+            {**self._format_claim(c, paper_by_id), "exclusion_reason": why, "exclusion_kind": kind}
+            for c, why, kind in getattr(self, "_run_excluded_claims", [])
+        ]
 
     def _safe_set_run_status(self, run_id: str, status: str, reason: Optional[str] = None) -> None:
         if os.getenv("HOSTED_DEMO") != "1":
@@ -702,7 +892,7 @@ class MultiLaneResearchRunner:
         """Check A failed after its one retry: stop with zero findings and draft nothing.
 
         Only rule-built negative findings ("searched, nothing found") are returned, each tied
-        to its search_log row. An unconfirmed practitioner abstraction still wins as BLOCKED.
+        to its search_log row.
         """
         from src.synth.generator import search_log_negative_findings
 
@@ -710,33 +900,90 @@ class MultiLaneResearchRunner:
             f"Stopped at Check A: {check_a.reason_plain} "
             "The search was widened once. Nothing was drafted, so there are no findings to publish."
         )
-        status = "NOT_PUBLISHABLE"
-        reasons = [stop_reason]
-        if has_unconfirmed_practitioner_notes:
-            status = "BLOCKED"
-            reasons.insert(0, "Gate 6: Practitioner abstraction not confirmed by operator.")
         self._ephemeral_claims = [c for c in self._ephemeral_claims if c.id not in {h.id for h in harvested_claims}]
         self._safe_reject_claims(
             [c.id for c in harvested_claims], run_id=run_id,
             reason="Check A stopped the run: too little on-topic evidence, nothing drafted.",
         )
+        negatives = search_log_negative_findings(self._ephemeral_search_logs)
+        payload = self._stopped_payload(
+            stopped_at="check_a", status="NOT_PUBLISHABLE", stop_reason=stop_reason,
+            question_obj=question_obj, run_id=run_id, academic_papers=[], claims=[],
+            has_unconfirmed_practitioner_notes=has_unconfirmed_practitioner_notes,
+            elapsed_seconds=elapsed_seconds,
+        )
+        payload["check_a"] = self._check_a_summary(check_a)
+        payload["negative_findings"] = [text for text, _ in negatives]
+        payload["sentence_traces"] = [
+            {"ordinal": i, "text": text, "type": "negative_finding", "claims": [], "checks_json": checks}
+            for i, (text, checks) in enumerate(negatives, start=1)
+        ]
+        return payload
+
+    def _stop_at_check_b(
+        self,
+        topic: str,
+        question_obj: Question,
+        run_id: str,
+        check_a: Any,
+        check_b: Any,
+        academic_papers: List[Dict[str, Any]],
+        has_unconfirmed_practitioner_notes: bool,
+        elapsed_seconds: int,
+    ) -> Dict[str, Any]:
+        """Check B failed: stop as BLOCKED before drafting, but return the claims for the evidence board."""
+        stop_reason = (
+            f"Stopped at Check B: {check_b.reason_plain} "
+            "Nothing was drafted. Add sources or re-include claims on the evidence board, then re-draft."
+        )
+        payload = self._stopped_payload(
+            stopped_at="check_b", status="BLOCKED", stop_reason=stop_reason,
+            question_obj=question_obj, run_id=run_id, academic_papers=academic_papers,
+            claims=list(check_b.wellformed),
+            has_unconfirmed_practitioner_notes=has_unconfirmed_practitioner_notes,
+            elapsed_seconds=elapsed_seconds,
+        )
+        payload["check_a"] = self._check_a_summary(check_a)
+        payload["check_b"] = self._check_summary(check_b)
+        return payload
+
+    def _stopped_payload(
+        self,
+        *,
+        stopped_at: str,
+        status: str,
+        stop_reason: str,
+        question_obj: Question,
+        run_id: str,
+        academic_papers: List[Dict[str, Any]],
+        claims: List[Claim],
+        has_unconfirmed_practitioner_notes: bool,
+        elapsed_seconds: int,
+    ) -> Dict[str, Any]:
+        """Payload for a run a handoff check stopped. An unconfirmed practitioner abstraction still wins as BLOCKED."""
+        reasons = [stop_reason]
+        if has_unconfirmed_practitioner_notes:
+            status = "BLOCKED"
+            reasons.insert(0, "Gate 6: Practitioner abstraction not confirmed by operator.")
         gap_entry = self.gap_builder.evaluate_question_lanes(
             question_obj.id,
             run_id=run_id,
-            claims_override=[],
+            claims_override=claims,
             sources_override=self._ephemeral_sources,
             search_logs_override=self._ephemeral_search_logs,
         )
         self._safe_set_run_status(run_id, status, "; ".join(reasons))
         outcome_raw = getattr(gap_entry, "outcome", 4)
         outcome = int(outcome_raw) if str(outcome_raw).isdigit() else str(outcome_raw)
-        negatives = search_log_negative_findings(self._ephemeral_search_logs)
+        papers_formatted, paper_by_id = self._format_papers(academic_papers)
+        claims_formatted = [self._format_claim(c, paper_by_id) for c in claims]
+        lanes = [c["lane"] for c in claims_formatted]
         publish_res = {"published": False, "allowed": False, "status": status, "reason": " ".join(reasons), "reasons": reasons}
+        label = f"Check {stopped_at[-1].upper()}"
         return {
             "status": status,
-            "stopped_at": "check_a",
+            "stopped_at": stopped_at,
             "stop_reason": stop_reason,
-            "check_a": self._check_a_summary(check_a),
             "verdict": "",
             "duration": f"{elapsed_seconds}s",
             "question_id": question_obj.id,
@@ -752,20 +999,28 @@ class MultiLaneResearchRunner:
                 "rationale": getattr(gap_entry, "rationale", ""),
             },
             "lane_breakdown": {
-                "academic_sources_count": 0, "academic_count": 0, "academic_claims_count": 0,
-                "enterprise_sources_count": 0, "enterprise_claims_count": 0,
-                "practitioner_observations_count": 0, "practitioner_claims_count": 0,
+                "academic_sources_count": len(academic_papers), "academic_count": len(academic_papers),
+                "academic_claims_count": lanes.count("ACADEMIC"),
+                "enterprise_sources_count": len({c["source_id"] for c in claims_formatted if c["lane"] == "ENTERPRISE"}),
+                "enterprise_claims_count": lanes.count("ENTERPRISE"),
+                "practitioner_observations_count": 0, "practitioner_claims_count": lanes.count("PRACTITIONER"),
             },
-            "metrics": {"volume": "0 on-topic sources", "sources": "0 Repositories", "horizon": "n/a", "quality": "Not scored (stopped at Check A)"},
+            "metrics": {
+                "volume": f"{len(academic_papers)} Papers ({len(claims_formatted)} usable claims)",
+                "sources": f"{len({c['source_id'] for c in claims_formatted})} Sources",
+                "horizon": "n/a",
+                "quality": f"Not scored (stopped at {label})",
+            },
             "doc_id": None,
-            "signals": [], "findings": [], "risks": [], "roadmap": [],
-            "negative_findings": [text for text, _ in negatives],
+            "signals": [], "findings": [], "risks": [], "roadmap": [], "negative_findings": [],
             "business_signal": "",
-            "papers": [], "enterprise_sources": [], "practitioner_observations": [], "claims": [],
-            "sentence_traces": [
-                {"ordinal": i, "text": text, "type": "negative_finding", "claims": [], "checks_json": checks}
-                for i, (text, checks) in enumerate(negatives, start=1)
-            ],
+            "papers": papers_formatted,
+            "harvested_papers": list(academic_papers),
+            "enterprise_sources": self._format_enterprise_sources(claims),
+            "practitioner_observations": [],
+            "claims": claims_formatted,
+            "excluded_claims": self._format_excluded_claims(paper_by_id),
+            "sentence_traces": [],
             "generation_mode": "none",
             "is_fallback": False,
             "error_details": None,
@@ -1335,7 +1590,7 @@ class MultiLaneResearchRunner:
         """Persist academic claims in ledger.db and apply deterministic grading."""
         graded: List[Claim] = []
         for c in academic_claims:
-            src = self.repo.get_source(c.source_id) or self._ephemeral_sources.get(c.source_id)
+            src = self._source(c.source_id)
             if not src:
                 src = Source(
                     id=c.source_id,
@@ -1353,9 +1608,7 @@ class MultiLaneResearchRunner:
             self._safe_insert_claim(c)
             graded.append(c)
 
-        # Return all active claims for question
-        db_claims = self.repo.list_claims(question_id=question_id)
-        return db_claims if db_claims else list(self._ephemeral_claims)
+        return graded
 
     def _generate_executive_deliverables(
         self,
@@ -1552,31 +1805,10 @@ class MultiLaneResearchRunner:
             outcome_val = str(outcome_raw)
 
         # Formatted papers table & lookup maps for full source traceability
-        papers_formatted = []
-        paper_by_id: Dict[str, Dict[str, Any]] = {}
-        for i, p in enumerate(academic_papers, start=1):
-            v, t = resolve_honest_venue_and_type(p)
-            yr = p.get("year")
-            yr_str = "Date unknown" if (yr is None or str(yr).lower() in ("none", "null", "", "date unknown")) else str(yr)
-            p_entry = {
-                "id": p.get("id"),
-                "key": f"P{i}",
-                "title": p.get("title", "Untitled"),
-                "year": yr_str,
-                "venue": v,
-                "doi": p.get("doi") or p.get("url") or p.get("link") or "Indexed",
-                "type": t,
-                "url": p.get("url") or p.get("link") or "https://scholar.google.com",
-                "relevance_score": float(p.get("relevance_score", 0.0)),
-                "is_custom": bool(p.get("is_custom", False) or "[Custom User Source]" in p.get("title", "")),
-            }
-            papers_formatted.append(p_entry)
-            if p.get("id"):
-                paper_by_id[str(p.get("id"))] = p_entry
+        papers_formatted, paper_by_id = self._format_papers(academic_papers)
 
-        all_q_claims = self.repo.list_claims(question_id=question_obj.id)
-        if not all_q_claims:
-            all_q_claims = list(self._ephemeral_claims)
+        # Run-scoped: only the claims this run harvested and kept (never earlier runs').
+        all_q_claims = list(self._ephemeral_claims)
         claim_by_id: Dict[str, Claim] = {c.id: c for c in all_q_claims}
 
         def _build_sources_trace(claim_ids: List[str], sentence_text: str) -> List[Dict[str, Any]]:
@@ -1589,7 +1821,7 @@ class MultiLaneResearchRunner:
                 c_obj = claim_by_id.get(cid)
                 if not c_obj:
                     continue
-                src_obj = self.repo.get_source(c_obj.source_id) or self._ephemeral_sources.get(c_obj.source_id)
+                src_obj = self._source(c_obj.source_id)
                 p_info = paper_by_id.get(str(c_obj.source_id))
                 src_key = p_info["key"] if p_info else str(c_obj.source_id)
                 src_title = p_info["title"] if p_info else (src_obj.title if src_obj else c_obj.entity or "Verified Source")
@@ -1666,21 +1898,7 @@ class MultiLaneResearchRunner:
         ui_negative = [s.text for s in sentences if s.type == "negative_finding"]
 
         # Formatted enterprise sources (scoped strictly to claims for this question/run)
-        ent_sources_formatted = []
-        ent_source_ids = {c.source_id for c in enterprise_claims}
-        for sid in ent_source_ids:
-            s = self.repo.get_source(sid) or self._ephemeral_sources.get(sid)
-            if s and s.lane == "enterprise":
-                ent_sources_formatted.append({
-                    "id": s.id,
-                    "title": s.title,
-                    "url": s.url or "https://dora.dev",
-                    "venue": s.venue or s.org,
-                    "commercial_stake": s.commercial_stake,
-                    "source_type": s.source_type,
-                    "pub_date": s.pub_date,
-                    "is_custom": "[Custom User Source]" in s.title,
-                })
+        ent_sources_formatted = self._format_enterprise_sources(enterprise_claims)
 
         # Formatted practitioner observations (scoped strictly to this question)
         prac_obs_formatted = []
@@ -1699,27 +1917,8 @@ class MultiLaneResearchRunner:
                 })
 
         # Formatted atomic claims with full source metadata
-        claims_formatted = []
-        for c in all_q_claims:
-            src = self.repo.get_source(c.source_id) or self._ephemeral_sources.get(c.source_id)
-            p_info = paper_by_id.get(str(c.source_id))
-            claims_formatted.append({
-                "id": c.id,
-                "lane": (src.lane if src else ("academic" if p_info else "academic")).upper(),
-                "assertion": c.text,
-                "excerpt": c.source_excerpt,
-                "grade": c.grade.upper(),
-                "entity": c.entity,
-                "entity_match": c.entity_match,
-                "study_type": c.study_type,
-                "source_key": p_info["key"] if p_info else str(c.source_id),
-                "source_title": p_info["title"] if p_info else (src.title if src else "Unknown"),
-                "source_url": p_info["url"] if p_info else (src.url if src and src.url else "#"),
-                "venue": p_info["venue"] if p_info else (src.venue or src.org if src else "Academic Repo"),
-                "year": p_info["year"] if p_info else (src.pub_date if src and src.pub_date else str(c.claim_date or "2024")),
-                "rules": ", ".join(c.grade_reasons_json or ["Default rules"]),
-                "is_custom": bool((src and "[Custom User Source]" in src.title) or (p_info and p_info.get("is_custom"))),
-            })
+        claims_formatted = [self._format_claim(c, paper_by_id) for c in all_q_claims]
+        excluded_formatted = self._format_excluded_claims(paper_by_id)
 
         # Format roadmap
         roadmap_steps = []
@@ -1787,6 +1986,8 @@ class MultiLaneResearchRunner:
             "enterprise_sources": ent_sources_formatted,
             "practitioner_observations": prac_obs_formatted,
             "claims": claims_formatted,
+            "harvested_papers": list(academic_papers),
+            "excluded_claims": excluded_formatted,
             "sentence_traces": sentence_traces,
             "generation_mode": executive_synthesis.get("generation_mode", "model"),
             "is_fallback": bool(executive_synthesis.get("is_fallback", False)),

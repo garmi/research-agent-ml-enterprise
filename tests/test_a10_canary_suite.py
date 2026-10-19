@@ -36,11 +36,14 @@ def _create_runner(tmpdir: str) -> MultiLaneResearchRunner:
     q_yaml_path = str(Path(tmpdir) / "register.yaml")
     apply_migrations(db_path=db_path)
     apply_migrations(db_path=prac_db_path)
-    return MultiLaneResearchRunner(
+    runner = MultiLaneResearchRunner(
         db_path=db_path,
         practitioner_db_path=prac_db_path,
         questions_yaml_path=q_yaml_path,
     )
+    # Thin fixture: this test checks drafting, not evidence volume (Check B thresholds, DEC-016).
+    runner.config.setdefault("checks", {})["check_b"] = {"min_claims": 1, "min_sources": 1}
+    return runner
 
 
 def test_canary_suite_q1_kiro_vs_q2_hospitals_isolation_and_distinct_findings():

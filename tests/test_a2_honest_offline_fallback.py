@@ -26,6 +26,8 @@ def test_fallback_produces_extractive_claims_and_blocks_publication(monkeypatch)
             practitioner_db_path=prac_db,
             questions_yaml_path=yaml_reg,
         )
+        # Thin fixture: this test checks drafting, not evidence volume (Check B thresholds, DEC-016).
+        runner.config.setdefault("checks", {})["check_b"] = {"min_claims": 1, "min_sources": 1}
 
         dummy_papers = [
             {

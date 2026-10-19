@@ -45,5 +45,12 @@ You review and publish
 - **Retry:** the academic lane is re-harvested once with doubled query width. Enterprise feeds take no query width and are cached, so they are not re-harvested. If the run is still thin, it stops as `NOT_PUBLISHABLE`. Nothing is drafted and the payload carries zero findings.
 - **Rejections are attributed:** claims Check A drops are marked `rejected` with a `reviews` row (`gate = 'check_a'`, `reviewer = 'check_a'`), so the ledger shows they were not rejected by an operator.
 
+### Check B details (S4)
+- **Run-scoped input:** only this run's claims, across all three lanes. The gap matrix, the draft and the payload no longer read claims left by earlier runs of the same question; they fall back to the whole ledger only when no run claims are passed (the ledger browser view).
+- **Operator exclusions:** claims you untick on the evidence board are passed back on re-draft by content key (source plus normalised text, so the exclusion survives re-runs). Each one is logged to `reviews` with `gate = 'evidence_board'`.
+- **Per-claim rules (decisive):** a claim is set aside, with its reason in plain words, if its source is not in the ledger, its text is empty, it has no excerpt or an excerpt over 25 words, it has no evidence grade, or its source has no lane.
+- **Count rule (decisive):** at least `checks.check_b.min_claims` usable claims from at least `checks.check_b.min_sources` distinct sources (default 3 from 2). Otherwise the run stops as `BLOCKED` before drafting. The claims are still returned so the evidence board can show them.
+- **No model:** Check B never builds or calls a model; the same claims always give the same verdict and reason.
+
 ### Open risk
 Check C is the least certain. A hedge check on a small local model may be unreliable, so the bake-off (`evals/bakeoff_check_c.py`, S5) runs before C is allowed to hold sentences. If it falls short, C ships warn-only, like D.
