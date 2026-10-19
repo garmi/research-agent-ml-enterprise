@@ -53,7 +53,7 @@ from src.engine.entry import start_run
 from src.engine.ids import resolve_question_id
 from src.engine.stub_mode import is_stub_mode
 from src.ui.safe_page import safe_page, format_error_payload, render_safe_error
-from src.ui.evidence_view import finding_card_html, render_sentence
+from src.ui.evidence_view import finding_card_html, paper_card_html, render_sentence
 from src.ui.intake_view import approved_question_text, effective_provider, render_intake_view
 from src.ui.rerun import board_editor_key, export_view, papers_for_rerun
 from src.ui.publish_view import gate_rows, gates_summary, publish_eligibility
@@ -667,6 +667,13 @@ st.markdown(
     .roadmap-phase { background: #1E3A8A; color: white; border-radius: 6px; padding: 0.25rem 0.55rem; font-size: 0.74rem; font-weight: 700; white-space: nowrap; }
     .roadmap-action { font-weight: 700; font-size: 0.9rem; color: #0F172A; }
     .roadmap-impact { font-size: 0.8rem; color: #059669; font-weight: 600; margin-top: 0.1rem; }
+    .paper-card { background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px; padding: 1rem 1.25rem; margin-bottom: 0.75rem; }
+    .paper-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.35rem; }
+    .paper-tag { font-size: 0.76rem; background: #F1F5F9; color: #475569; padding: 0.15rem 0.55rem; border-radius: 4px; font-weight: 600; margin-left: 0.4rem; }
+    .paper-custom { background: #DBEAFE; color: #1E40AF; }
+    .paper-card-title { font-size: 0.98rem; font-weight: 700; margin-bottom: 0.25rem; }
+    .paper-card-title a { color: #0F172A; text-decoration: none; }
+    .paper-card-meta { font-size: 0.84rem; color: #64748B; overflow-wrap: anywhere; }
     .roadmap-basis { font-size: 0.78rem; color: #1E40AF; font-weight: 600; margin-top: 0.15rem; }
     .roadmap-flag { font-size: 0.78rem; color: #B45309; font-weight: 600; margin-top: 0.15rem; }
 
@@ -1327,27 +1334,7 @@ if results:
 
         st.markdown(f"#### 🎓 Lane A: Academic Papers Ingested ({len(results.get('papers', []))})")
         for p in results.get("papers", []):
-            custom_tag = '<span style="font-size: 0.72rem; background: #DBEAFE; color: #1E40AF; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 700; margin-left: 0.4rem;">🏷️ Custom URL</span>' if p.get("is_custom") else ""
-            st.markdown(
-                f"""
-                <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px; padding: 1rem 1.25rem; margin-bottom: 0.75rem;">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.35rem;">
-                        <a href="{p['url']}" target="_blank" class="cite-pill" style="font-size: 0.82rem; padding: 0.15rem 0.5rem;">[{p['key']}]</a>
-                        <div>
-                            {custom_tag}
-                            <span style="font-size: 0.76rem; background: #F1F5F9; color: #475569; padding: 0.15rem 0.55rem; border-radius: 4px; font-weight: 600;">{p['type']}</span>
-                        </div>
-                    </div>
-                    <div style="font-size: 0.98rem; font-weight: 700; color: #0F172A; margin-bottom: 0.25rem;">
-                        <a href="{p['url']}" target="_blank" style="color: #0F172A; text-decoration: none;">{p['title']} ↗</a>
-                    </div>
-                    <div style="font-size: 0.84rem; color: #64748B;">
-                        {"Published: <strong>" + p['year'] + "</strong>" if p.get('year') and p['year'] != 'Date unknown' else "Date: <em>Date unknown</em>"} &nbsp;•&nbsp; Venue: <strong>{p['venue']}</strong> &nbsp;•&nbsp; DOI/URL: <code style="font-size: 0.78rem;">{p['doi']}</code>
-                    </div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+            st.markdown(paper_card_html(p), unsafe_allow_html=True)
 
         st.markdown("---")
         ent_sources = results.get("enterprise_sources", [])

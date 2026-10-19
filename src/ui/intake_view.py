@@ -397,12 +397,12 @@ def render_intake_view() -> Dict[str, Any]:
         depth_option = st.selectbox(
             "Research Depth",
             options=[
-                "⚡ Fast (~45s • 2 rounds • up to 10 sources)",
-                "🔬 Deep (~3-5m • 5 rounds • comprehensive synthesis)",
+                "⚡ Fast (~1-2 min • up to 5 papers)",
+                "🔬 Deep (~3-6 min • up to 10 papers, wider search)",
             ],
-            index=0,
+            index=1,  # S11: Deep by default; Fast for a quick look
             key="select_research_depth",
-            help="Fast provides an immediate executive brief; Deep executes multi-round citation graph queries.",
+            help="Deep searches more query variants and keeps up to 10 papers; Fast keeps up to 5. Either widens the search once if too few papers are on topic.",
         )
     with col_tone:
         tone_option = st.selectbox(

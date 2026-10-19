@@ -236,9 +236,11 @@ def test_not_searched_is_one_line_per_lane():
                    result_count=0, status="not_searched", executed_at="x")]
     out = search_log_negative_findings(logs)
     texts = [t for t, _ in out]
+    # The question appears as its key terms only, so briefs for different questions never share the line (D1).
     assert texts == [
-        "Enterprise sources not searched (no fetcher yet): dora-dev-survey, sec-edgar-filings, aws-dev-blog.",
-        "Practitioner sources not searched (no observations recorded): field_notes.",
+        "Enterprise sources not searched for 'architectural frameworks required platform teams' (no fetcher yet): "
+        "dora-dev-survey, sec-edgar-filings, aws-dev-blog.",
+        "Practitioner sources not searched for 'architectural frameworks required platform teams' (no observations recorded): field_notes.",
     ]
     assert all(q not in t for t in texts)
     assert out[0][1]["search_log_ids"] == ["e0", "e1", "e2"] and out[0][1]["search_log_id"] == "e0"

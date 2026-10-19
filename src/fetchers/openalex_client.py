@@ -26,6 +26,23 @@ class OpenAlexClient:
         positions.sort(key=lambda x: x[0])
         return " ".join(w for _, w in positions)
 
+    name = "openalex"
+
+    def fetch_abstract(self, doi: str) -> str:
+        """The work's abstract by DOI, or '' when OpenAlex has none (S11: never invented)."""
+        from src.analysis.abstracts import bare_doi
+
+        d = bare_doi(doi)
+        if not d:
+            return ""
+        try:
+            resp = requests.get(f"{self.base_url}/doi:{d}", headers=self.headers, timeout=20)
+            if resp.status_code != 200:
+                return ""
+            return self._reconstruct_abstract((resp.json() or {}).get("abstract_inverted_index"))
+        except Exception:
+            return ""
+
     def search(self, query: str, max_results: int = 10) -> List[Dict[str, Any]]:
         # Clean query for URL encoding
         clean_q = re.sub(r"[^\w\s-]", " ", query).strip()

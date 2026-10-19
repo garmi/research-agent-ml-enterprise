@@ -36,6 +36,15 @@ tiers:
   unverified:
     description: "Unverified, predatory, or low-refereeing publications"
     matches:
+      # Self-archives and preprint platforms with no subject screening (S11)
+      - "zenodo"
+      - "researchgate"
+      - "research square"
+      - "preprints.org"
+      - "techrxiv"
+      - "osf preprints"
+      - "authorea"
+      - "figshare"
       - "wjarr"
       - "world journal of advanced research and reviews"
       - "ijsr"

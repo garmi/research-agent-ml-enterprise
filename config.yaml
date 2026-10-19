@@ -68,6 +68,10 @@ checks:
   check_a:
     min_on_topic_sources: 1
     floor_min_terms: 1
+    # S11: below this many on-topic academic papers, the search is widened once (the same single retry).
+    target_on_topic_papers:
+      fast: 3
+      deep: 5
   check_b:
     min_claims: 3
     min_sources: 2

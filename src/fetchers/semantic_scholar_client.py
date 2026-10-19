@@ -16,6 +16,24 @@ class SemanticScholarClient:
         if api_key:
             self.headers["x-api-key"] = api_key
 
+    name = "semantic_scholar"
+
+    def fetch_abstract(self, doi: str) -> str:
+        """The paper's abstract by DOI, or '' when Semantic Scholar has none (S11: never invented)."""
+        from src.analysis.abstracts import bare_doi
+
+        d = bare_doi(doi)
+        if not d:
+            return ""
+        base = self.base_url.rsplit("/search", 1)[0]
+        try:
+            resp = requests.get(f"{base}/DOI:{d}", params={"fields": "abstract"}, headers=self.headers, timeout=20)
+            if resp.status_code != 200:
+                return ""
+            return str((resp.json() or {}).get("abstract") or "")
+        except Exception:
+            return ""
+
     def search(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:
         clean_query = re.sub(r"[^\w\s-]", " ", query).strip()
         params = {
