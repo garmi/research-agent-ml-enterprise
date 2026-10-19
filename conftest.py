@@ -172,3 +172,9 @@ def isolate_test_ledger_and_outputs(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     denylist.write_text("# test denylist (empty)\n", encoding="utf-8")
     monkeypatch.setenv("RESEARCH_DENYLIST", str(denylist))
 
+
+
+@pytest.fixture(autouse=True)
+def _offline_enterprise_feeds(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Enterprise blog feeds are fetched live by default; tests stay offline unless they opt in with a mock."""
+    monkeypatch.setenv("ALLOW_LIVE_ENTERPRISE", "0")
