@@ -34,6 +34,19 @@ def claim_content_key(claim: Any) -> str:
     return hashlib.sha256(f"{claim.source_id}|{text}".encode("utf-8")).hexdigest()[:16]
 
 
+def claim_content_keys(claims: List[Any]) -> Dict[str, str]:
+    """Content keys for a run's claims, by claim id. A repeat of the same text from the same source
+    gets an occurrence suffix (in harvest order), so excluding one copy does not exclude the other."""
+    seen: Dict[str, int] = {}
+    keys: Dict[str, str] = {}
+    for c in claims:
+        base = claim_content_key(c)
+        n = seen.get(base, 0)
+        seen[base] = n + 1
+        keys[c.id] = base if n == 0 else f"{base}#{n}"
+    return keys
+
+
 def claim_problem(claim: Any, source: Optional[Any]) -> Optional[str]:
     """The first rule a claim breaks, in plain words, or None if it is well formed."""
     if source is None:

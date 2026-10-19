@@ -334,6 +334,15 @@ class LedgerRepository:
                 rows.append(d)
             return rows
 
+    def latest_review_action(self, gate: str, object_id: str) -> Optional[str]:
+        """The most recent review action for an object at a gate, or None."""
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT action FROM reviews WHERE gate = ? AND object_id = ? ORDER BY ts DESC, rowid DESC LIMIT 1;",
+                (gate, object_id),
+            ).fetchone()
+            return row["action"] if row else None
+
     # --- Reviews (Append-only audit) ---
     def insert_review(self, r: Review) -> None:
         self._check_write_permission()

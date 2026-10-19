@@ -55,6 +55,7 @@ from src.engine.stub_mode import is_stub_mode
 from src.ui.safe_page import safe_page, format_error_payload, render_safe_error
 from src.ui.evidence_view import finding_card_html
 from src.ui.intake_view import approved_question_text, effective_provider, render_intake_view
+from src.ui.rerun import board_editor_key, export_view, papers_for_rerun
 
 
 logger = logging.getLogger("ExecutiveResearchStudio")
@@ -1128,6 +1129,8 @@ with st.expander(
                 allow_remote_prac_synth = False
 
 selected_provider = available_models.get(sel_model_label, "gemini").strip()
+# Re-runs (Feedback Loop 1, evidence board) resolve the engine the same way the main run does.
+rerun_provider = effective_provider(selected_provider, has_gemini_key=bool(os.getenv("GEMINI_API_KEY", "").strip()), ollama_ok=ollama_online)
 
 
 # ==============================================================================
@@ -1574,7 +1577,7 @@ if results:
                 st.warning("Please select at least one paper to exclude.")
             else:
                 excluded_keys = {re.search(r"\[(P\d+)\]", s).group(1) for s in excluded_papers if re.search(r"\[(P\d+)\]", s)}
-                remaining = [p.get("raw", p) for p in results["papers"] if p["key"] not in excluded_keys]
+                remaining = papers_for_rerun(results, drop_keys=excluded_keys, drop_custom=False)
                 if not remaining:
                     st.error("Cannot exclude all papers. At least 1 paper is required for synthesis.")
                 else:
@@ -1584,10 +1587,12 @@ if results:
                             topic=approved_question_text(st.session_state.get("s2_active_package"), results),
                             depth=depth_option,
                             tone=tone_option,
-                            map_provider=selected_provider,
-                            reduce_provider=selected_provider,
+                            map_provider=rerun_provider,
+                            reduce_provider=rerun_provider,
                             progress_box=progress_box,
                             papers_override=remaining,
+                            allow_remote_practitioner_synthesis=allow_remote_prac_synth,
+                            practitioner_abstraction_confirmed=prac_abs_confirmed,
                             reasoned_package=st.session_state.get("s2_active_package"),
                         )
                         st.session_state["research_results"] = refreshed
@@ -1661,7 +1666,7 @@ if results:
             st.caption(f"Check B passed: {check_b_info.get('reason', '')}")
 
         excluded_list = results.get("excluded_claims", [])
-        operator_excluded = [c for c in excluded_list if c.get("exclusion_reason") == "Excluded on the evidence board."]
+        operator_excluded = [c for c in excluded_list if c.get("exclusion_kind") == "operator"]
         set_aside = [c for c in excluded_list if c not in operator_excluded]
         board_claims = list(claims_list) + operator_excluded
         if board_claims:
@@ -1679,7 +1684,7 @@ if results:
             ])
             edited = st.data_editor(
                 board_df,
-                key="evidence_board_editor",
+                key=board_editor_key(results),
                 hide_index=True,
                 use_container_width=True,
                 disabled=["Claim", "Source", "Lane", "Grade"],
@@ -1707,12 +1712,14 @@ if results:
                     topic=approved_question_text(st.session_state.get("s2_active_package"), results),
                     depth=depth_option,
                     tone=tone_option,
-                    map_provider=selected_provider,
-                    reduce_provider=selected_provider,
+                    map_provider=rerun_provider,
+                    reduce_provider=rerun_provider,
                     progress_box=progress_box,
                     # Custom-URL papers are re-fetched from lane_urls_redraft, so they are not passed twice.
-                    papers_override=[p.get("raw", p) for p in results.get("papers", []) if not p.get("is_custom")] or None,
+                    papers_override=papers_for_rerun(results) or None,
                     custom_lane_urls=lane_urls_redraft,
+                    allow_remote_practitioner_synthesis=allow_remote_prac_synth,
+                    practitioner_abstraction_confirmed=prac_abs_confirmed,
                     reasoned_package=st.session_state.get("s2_active_package"),
                     excluded_claim_keys=excluded_keys,
                 )
@@ -1826,7 +1833,7 @@ if results:
 
     if perm.can_download_full:
         brief_content = builder.build_markdown(topic_str, syn_raw) if syn_raw else f"# Executive Research Brief\n\n**Topic:** {topic_str}\n\n## Verdict\n{results.get('verdict', '')}\n"
-        json_content = json.dumps(syn_raw or results, indent=2)
+        json_content = json.dumps(syn_raw or export_view(results), indent=2)
     elif perm.can_download_draft:
         brief_content = builder.build_draft_markdown(topic_str, syn_raw, failing_gates=perm.failing_gates, status=status)
         draft_json_obj = {
