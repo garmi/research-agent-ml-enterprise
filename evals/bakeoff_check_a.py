@@ -14,12 +14,11 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 import time
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -48,25 +47,25 @@ def _scores(pairs: List[tuple]) -> Dict[str, Any]:
     }
 
 
-def main() -> None:
+def main(argv: Optional[List[str]] = None) -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--provider", default="ollama")
     ap.add_argument("--model", default=None, help="Ollama/Gemini model name (overrides config)")
     ap.add_argument("--prompt", default=check_a.PROMPT_FILE_PATH)
     ap.add_argument("--out", default=None)
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
     from dotenv import load_dotenv
 
     from src.llm.factory import build_llm
 
-    load_dotenv()  # same as web_app: picks up GEMINI_API_KEY from the nearest .env
+    if args.provider == "gemini":
+        load_dotenv()  # only the cloud provider needs a key from .env; local runs leave the env untouched
 
     cfg = yaml.safe_load(open("config.yaml", encoding="utf-8")) or {}
-    if args.model:
-        os.environ["OLLAMA_MODEL" if args.provider == "ollama" else "GEMINI_MODEL"] = args.model
     llm = build_llm(args.provider, cfg)
-    check_a.PROMPT_FILE_PATH = args.prompt
+    if args.model and hasattr(llm, "model"):
+        llm.model = args.model  # on this client only; no process-wide env or module state is changed
     synonyms = (cfg.get("research") or {}).get("head_term_synonyms")
 
     data = json.loads(DATA.read_text(encoding="utf-8"))
@@ -78,7 +77,10 @@ def main() -> None:
     t0 = time.time()
     for key, items in by_q.items():
         src_items = [SourceItem(source_id=f"{key}-{i}", lane=it["lane"], title=it["title"], text=it["text"]) for i, it in enumerate(items)]
-        res = run_check_a(items[0]["question"], src_items, llm, run_id=f"bakeoff-{key}", attempt=0, synonyms=synonyms)
+        res = run_check_a(
+            items[0]["question"], src_items, llm, run_id=f"bakeoff-{key}", attempt=0,
+            synonyms=synonyms, prompt_path=args.prompt,
+        )
         by_id = {v.object_id: v for v in res.verdicts if v.object_type == "source"}
         for i, it in enumerate(items):
             v = by_id[f"{key}-{i}"]
