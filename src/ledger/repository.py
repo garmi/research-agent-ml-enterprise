@@ -283,21 +283,30 @@ class LedgerRepository:
 
     # --- Handoff check verdicts ---
     def insert_check_verdict(self, row: Dict[str, Any]) -> None:
+        self.insert_check_verdicts([row])
+
+    def insert_check_verdicts(self, rows: List[Dict[str, Any]]) -> None:
+        """Insert verdict rows in one connection and transaction."""
+        if not rows:
+            return
         self._check_write_permission()
         with self._conn() as conn:
-            conn.execute(
+            conn.executemany(
                 """INSERT INTO check_verdicts
                    (id, check_id, run_id, object_type, object_id, model_verdict, rule_verdict,
                     rule_decisive, final, reason_plain, attempt, model_id, prompt_hash, details_json, created_at)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);""",
-                (
-                    row["id"], row["check_id"], row["run_id"], row["object_type"], row["object_id"],
-                    row.get("model_verdict"), row.get("rule_verdict"), int(bool(row.get("rule_decisive"))),
-                    row["final"], row["reason_plain"], int(row.get("attempt", 0)),
-                    row.get("model_id"), row.get("prompt_hash"),
-                    json.dumps(row["details_json"]) if row.get("details_json") is not None else None,
-                    row["created_at"],
-                ),
+                [
+                    (
+                        row["id"], row["check_id"], row["run_id"], row["object_type"], row["object_id"],
+                        row.get("model_verdict"), row.get("rule_verdict"), int(bool(row.get("rule_decisive"))),
+                        row["final"], row["reason_plain"], int(row.get("attempt", 0)),
+                        row.get("model_id"), row.get("prompt_hash"),
+                        json.dumps(row["details_json"]) if row.get("details_json") is not None else None,
+                        row["created_at"],
+                    )
+                    for row in rows
+                ],
             )
 
     def list_check_verdicts(self, run_id: str, check_id: Optional[str] = None) -> List[Dict[str, Any]]:
