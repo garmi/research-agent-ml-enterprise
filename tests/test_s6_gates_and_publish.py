@@ -12,6 +12,7 @@ Requirements:
 9. Publishing needs a named reviewer; REVISE also needs a reason; BLOCKED and NOT_PUBLISHABLE are refused.
 10. A publish writes runs.status = PUBLISHED and a reviews row with the reviewer and reason.
 11. The publish step's eligibility (enabled, needs a reason, why not) comes from one helper.
+12. Gate rows show the verdict and reason before the description; a gate missing from the audit is NO DATA.
 """
 
 from __future__ import annotations
@@ -27,7 +28,7 @@ from src.ledger.models import Claim, OutputDoc, OutputSentence, Question, Run, S
 from src.ledger.repository import LedgerRepository
 from src.score.checker import FAIL, NO_DATA, PASS, GateChecker
 from src.score.scorer import QualityScorer
-from src.ui.publish_view import publish_eligibility
+from src.ui.publish_view import gate_rows, gates_summary, publish_eligibility
 
 QUESTION = Question(id="q-s6", text="How do AI coding assistants affect enterprise software delivery cycle time?")
 SOURCE = Source(id="src-1", lane="academic", source_type="peer_reviewed", org="ICSE",
@@ -250,3 +251,16 @@ def test_publish_eligibility():
     assert publish_eligibility({"status": "PUBLISH_READY", "doc_id": "o", "is_stub_mode": True})[0] is False
     src = Path("web_app.py").read_text(encoding="utf-8")
     assert "publish_eligibility(results)" in src
+
+
+# ------------------------------------------------------------------------------
+# Test 12: Gate rows lead with the verdict
+# ------------------------------------------------------------------------------
+def test_gate_rows_verdict_first():
+    res = GateChecker().check_output(sentences=[], ledger_claims={})
+    rows = gate_rows(res.to_dict())
+    assert list(rows[0].keys()) == ["Gate", "Result", "Why", "What it checks"]
+    assert all(r["Result"].startswith("NO DATA") and r["Why"] and r["Why"] != "Not audited for this run." for r in rows)
+    missing = gate_rows({})
+    assert all(r["Result"].startswith("NO DATA") and r["Why"] == "Not audited for this run." for r in missing)
+    assert gates_summary({}) == "0/6 GATES PASS"

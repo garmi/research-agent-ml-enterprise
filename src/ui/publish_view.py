@@ -39,7 +39,7 @@ STATE_LABEL = {"PASS": "PASS", "FAIL": "FAIL", "NO_DATA": "NO DATA (counts as fa
 
 
 def gate_rows(gates_audit: Dict[str, Any]) -> list:
-    """Plain-English rows for the six gates. A gate missing from the audit shows as NO DATA."""
+    """Plain-English rows for the six gates, verdict first. A gate missing from the audit shows as NO DATA."""
     hard = (gates_audit or {}).get("hard_gates") or {}
     rows = []
     for gid, (name, checks) in GATE_PLAIN.items():
@@ -47,9 +47,9 @@ def gate_rows(gates_audit: Dict[str, Any]) -> list:
         state = g.get("state") or ("PASS" if g.get("pass") is True else "NO_DATA" if not g else "FAIL")
         rows.append({
             "Gate": f"{gid} {name}",
-            "What it checks": checks,
             "Result": STATE_LABEL.get(state, state),
             "Why": g.get("reason_plain") or ("Not audited for this run." if not g else ""),
+            "What it checks": checks,
         })
     return rows
 
