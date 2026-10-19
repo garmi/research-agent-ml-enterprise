@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ==============================================================================
+# Exit Script for Slice S5: hedges on claims, honest binding, draft view, Check C scaffolding
+# ==============================================================================
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$REPO_ROOT"
+PY="${PY:-.venv/bin/python}"
+
+echo "======================================================================"
+echo "Executing Slice S5 Exit Verification Script"
+echo "======================================================================"
+
+export RESEARCH_USER="exit-script-s5"
+
+PYTHONPATH=. "$PY" - << 'EOF'
+from src.engine.check_c_hedges import rules_hedge_verdict
+from src.extract.claim_extractor import extract_claims_from_paper
+from src.extract.hedges import find_hedge_terms
+from src.ledger.models import Claim
+from src.synth.generator import resolve_citations
+from src.ui.evidence_view import finding_card_html
+
+print("--- 1. Hedge terms are recorded on claims, by rule ---")
+claims = extract_claims_from_paper({
+    "id": "p-h", "title": "Assistants in delivery",
+    "abstract": "Results suggest that coding assistants may shorten cycle time by 14%. Teams adopted the tool in 2024.",
+}, "q")
+assert claims[0].hedge_terms_json == ["suggest", "may"] and claims[1].hedge_terms_json == []
+print(f"Claim 1 hedges: {claims[0].hedge_terms_json}; claim 2 hedges: {claims[1].hedge_terms_json}")
+
+print("--- 2. A sentence cites only what its own tags point to ---")
+cs = [Claim(id="c_a_1", source_id="pa", text="a", source_excerpt="e"), Claim(id="c_b_1", source_id="pb", text="b", source_excerpt="e")]
+by_id = {c.id: c for c in cs}
+assert resolve_citations("Both [P2] and [c_a_1] agree.", [{"id": "pa"}, {"id": "pb"}], cs, by_id) == ["c_b_1", "c_a_1"]
+assert resolve_citations("No tag here.", [{"id": "pa"}], cs, by_id) == []
+print("Tagged sentence resolves every tag; an untagged sentence stays unbound.")
+
+print("--- 3. The draft view shows an Unbound badge for uncited findings ---")
+html = finding_card_html({"id": "s1", "text": "Untagged claim.", "binding": "unbound", "sources_trace": []}, 1, "Untagged claim.")
+assert "Unbound" in html and "cites no ledger claim" in html
+print("Unbound finding renders its badge and explanation.")
+
+print("--- 4. Check C rules judge (not wired into runs yet) ---")
+assert rules_hedge_verdict(find_hedge_terms("AI may improve teamwork."), "AI improves teamwork.") == "dropped"
+assert rules_hedge_verdict(find_hedge_terms("AI may improve teamwork."), "AI could improve teamwork.") == "kept"
+print("Dropped hedge is flagged; reworded hedge is kept.")
+EOF
+
+echo ""
+echo -n "[1/3] Check C rules-only bake-off baseline... "
+PYTHONPATH=. "$PY" evals/bakeoff_check_c.py --provider rules --out "$(mktemp -d)/check_c_rules.json" > /dev/null
+echo "OK"
+
+echo -n "[2/3] Running Slice S5 test suites... "
+PYTHONPATH=. "$PY" -m pytest tests/test_s5_hedges_and_binding.py tests/test_s5_draft_ui.py -q
+echo "OK (all S5 tests passed)"
+
+echo -n "[3/3] Running full regression test suite... "
+PYTHONPATH=. "$PY" -m pytest tests/ evals/ -q
+echo "OK (full repository tests passed)"
+
+echo ""
+echo "======================================================================"
+echo "Slice S5 Exit Verification: ALL CHECKS PASSED (EXIT 0)"
+echo "======================================================================"
+exit 0
