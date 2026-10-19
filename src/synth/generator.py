@@ -29,6 +29,29 @@ from src.score.scorer import QualityScorer
 logger = logging.getLogger(__name__)
 
 
+def search_log_negative_findings(slogs: List[Any]) -> List[Tuple[str, Dict[str, Any]]]:
+    """Rule-built 'searched, nothing found' / 'not searched' statements, each tied to its search_log row."""
+    searched_zero = [s for s in slogs if getattr(s, "status", "searched_ok") == "searched_ok" and s.result_count == 0]
+    unsearched = [s for s in slogs if getattr(s, "status", "searched_ok") in ("not_implemented", "not_searched", "skipped_by_scope")]
+    out: List[Tuple[str, Dict[str, Any]]] = []
+    seen: Set[str] = set()
+
+    def add(text: str, slog: Any) -> None:
+        # A retried harvest logs the same search twice; state each boundary once (first row cited).
+        if text not in seen:
+            seen.add(text)
+            out.append((text, {"search_log_id": slog.id}))
+
+    for slog in searched_zero:
+        add((
+            f"Literature search in {slog.lane} lane ({slog.source_api}) for '{slog.query}' returned 0 matching records in evidence ledger."
+        ), slog)
+    for slog in unsearched:
+        reason = "no fetcher" if getattr(slog, "status", "") == "not_implemented" else "no observations recorded"
+        add(f"{slog.lane.capitalize()} source '{slog.source_api}' not searched for '{slog.query}': {reason}.", slog)
+    return out
+
+
 def lint_output_text(
     sentences: List[OutputSentence],
     raw_topic: Optional[str] = None,
@@ -340,32 +363,18 @@ class SynthesisEngine:
         slogs = self.repo.list_search_logs(question_id=question_id)
         if not slogs and search_logs_override:
             slogs = [s for s in search_logs_override if s.question_id == question_id or not s.question_id]
-        searched_zero = [s for s in slogs if getattr(s, "status", "searched_ok") == "searched_ok" and s.result_count == 0]
-        unsearched = [s for s in slogs if getattr(s, "status", "searched_ok") in ("not_implemented", "not_searched", "skipped_by_scope")]
+        search_negatives = search_log_negative_findings(slogs)
 
-        if searched_zero or unsearched:
-            for slog in searched_zero:
+        if search_negatives:
+            for text, checks in search_negatives:
                 sentences.append(
                     OutputSentence(
                         id=f"{output_id}_{ordinal}",
                         output_id=output_id,
                         ordinal=ordinal,
-                        text=f"Literature search in {slog.lane} lane ({slog.source_api}) for '{slog.query}' returned 0 matching records in evidence ledger.",
+                        text=text,
                         type="negative_finding",
-                        checks_json={"search_log_id": slog.id},
-                    )
-                )
-                ordinal += 1
-            for slog in unsearched:
-                reason = "no fetcher" if getattr(slog, "status", "") == "not_implemented" else "no observations recorded"
-                sentences.append(
-                    OutputSentence(
-                        id=f"{output_id}_{ordinal}",
-                        output_id=output_id,
-                        ordinal=ordinal,
-                        text=f"{slog.lane.capitalize()} source '{slog.source_api}' not searched for '{slog.query}': {reason}.",
-                        type="negative_finding",
-                        checks_json={"search_log_id": slog.id},
+                        checks_json=checks,
                     )
                 )
                 ordinal += 1

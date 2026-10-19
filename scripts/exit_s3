@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ==============================================================================
+# Exit Script for Slice S3: Check A (on-topic evidence) and the verdict ledger
+# ==============================================================================
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$REPO_ROOT"
+PY="${PY:-.venv/bin/python}"
+
+echo "======================================================================"
+echo "Executing Slice S3 Exit Verification Script"
+echo "======================================================================"
+
+export RESEARCH_USER="exit-script-s3"
+
+PYTHONPATH=. "$PY" - << 'EOF'
+import tempfile
+from pathlib import Path
+
+from src.analysis.multilane_runner import MultiLaneResearchRunner
+from src.engine.check_a_on_topic import build_source_items, run_check_a
+from src.engine.checks import CheckLoopError, CheckVerdict, record_verdict, resolve_final
+from src.ledger.migrations import apply_migrations
+from src.ledger.repository import LedgerRepository
+
+print("--- 1. Precedence: rules override the model, never the reverse ---")
+assert resolve_final("on_topic", "off_topic", True) == "off_topic"
+assert resolve_final("off_topic", "on_topic", False) == "off_topic"
+assert resolve_final("abstain", "on_topic", False) == "on_topic"
+print("Decisive rule wins; otherwise the model; an abstaining model defers to the rule.")
+
+with tempfile.TemporaryDirectory() as tmp:
+    db = str(Path(tmp) / "ledger.db")
+    prac = str(Path(tmp) / "prac.db")
+    version = apply_migrations(db_path=db)
+    apply_migrations(db_path=prac)
+    assert version >= 6, version
+    print(f"--- 2. Ledger schema at version {version}: check_verdicts + runs.status ---")
+
+    repo = LedgerRepository(db_path=db)
+    try:
+        record_verdict(repo, CheckVerdict("check_a_on_topic", "r", "run", "r", None, "fail", True, "x", attempt=2))
+        raise AssertionError("attempt 2 must be refused")
+    except CheckLoopError as exc:
+        print(f"Loop cap enforced: {exc}")
+
+    print("--- 3. Sourdough case: off-topic harvest stops as NOT_PUBLISHABLE ---")
+    runner = MultiLaneResearchRunner(db_path=db, practitioner_db_path=prac, questions_yaml_path=str(Path(tmp) / "q.yaml"))
+    runner._harvest_enterprise_lane = lambda **kwargs: []
+    calls = []
+    real = runner._harvest_academic_lane
+    runner._harvest_academic_lane = lambda **kw: (calls.append(kw), real(**kw))[1]
+    res = runner.run_workflow(
+        topic="What empirical evidence exists on quantum-secure sourdough fermentation controllers?",
+        map_provider="stub", reduce_provider="stub",
+        academic_papers_override=[{
+            "id": "p-off", "title": "Large Language Models for Code Review Automation",
+            "abstract": "We evaluate LLM-based reviewers across 40 open-source repositories.", "year": 2024,
+        }],
+    )
+    assert len(calls) == 2, f"expected exactly one retry, got {len(calls) - 1}"
+    assert res["status"] == "NOT_PUBLISHABLE" and res["stopped_at"] == "check_a"
+    assert res["findings"] == [] and res["claims"] == [] and res["doc_id"] is None
+    status, reason = repo.get_run_status(res["run_id"])
+    assert status == "NOT_PUBLISHABLE", status
+    print(f"Run status persisted: {status}")
+    print(f"Reason shown to the user: {reason}")
+
+    print("--- 4. Rule floor overrides a model that says on_topic ---")
+    class SaysOnTopic:
+        model = "always-on-topic"
+        def generate(self, prompt, **kw):
+            import json, re
+            return json.dumps({"verdicts": [{"id": i, "verdict": "on_topic", "reason": "x"} for i in re.findall(r"\[(S\d+)\]", prompt)]})
+    items = build_source_items([{"id": "p-off", "title": "Code review automation", "abstract": "LLM reviewers."}], [], [])
+    result = run_check_a("What is known about sourdough fermentation?", items, SaysOnTopic(), run_id="r", attempt=0)
+    v = [x for x in result.verdicts if x.object_type == "source"][0]
+    assert v.model_verdict == "on_topic" and v.final == "off_topic" and v.rule_decisive
+    print(f"Model said {v.model_verdict}; rule decided {v.final}: {v.reason_plain}")
+EOF
+
+echo ""
+echo -n "[1/2] Running Slice S3 test suite (tests/test_s3_check_a_on_topic.py)... "
+PYTHONPATH=. "$PY" -m pytest tests/test_s3_check_a_on_topic.py -q
+echo "OK (all S3 Check A tests passed)"
+
+echo -n "[2/2] Running full regression test suite... "
+PYTHONPATH=. "$PY" -m pytest tests/ evals/ -q
+echo "OK (full repository tests passed)"
+
+echo ""
+echo "======================================================================"
+echo "Slice S3 Exit Verification: ALL CHECKS PASSED (EXIT 0)"
+echo "======================================================================"
+exit 0

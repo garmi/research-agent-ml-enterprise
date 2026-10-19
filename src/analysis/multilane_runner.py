@@ -17,6 +17,7 @@ Executes the formal 8-stage research pipeline:
 from __future__ import annotations
 
 import datetime
+import functools
 import hashlib
 import json
 import logging
@@ -40,7 +41,7 @@ from src.gaps.matrix_builder import GapMatrixBuilder
 from src.grade.grader import Grader
 from src.ledger.db import DEFAULT_LEDGER_PATH, default_ledger_path, default_practitioner_path
 from src.ledger.migrations import apply_migrations
-from src.ledger.models import Claim, OutputDoc, OutputSentence, Question, Run, SearchLog, Source
+from src.ledger.models import Claim, OutputDoc, OutputSentence, Question, Review, Run, SearchLog, Source
 from src.ledger.repository import LedgerRepository
 from src.ledger.service import LedgerService
 from src.publish.publisher import Publisher
@@ -119,6 +120,37 @@ def resolve_honest_venue_and_type(p: Dict[str, Any]) -> Tuple[str, str]:
         s_type = "Peer-Reviewed Journal" if ("doi" in p or "10." in url) else "Preprint"
 
     return v, s_type
+
+
+def _merge_by_key(first: List[Any], second: List[Any], key: Callable[[Any], str]) -> List[Any]:
+    """Concatenate two harvests, keeping the first occurrence of each key."""
+    seen = {key(x) for x in first}
+    merged = list(first)
+    for x in second:
+        k = key(x)
+        if k not in seen:
+            seen.add(k)
+            merged.append(x)
+    return merged
+
+
+def _mark_failed_runs(fn: Callable[..., Dict[str, Any]]) -> Callable[..., Dict[str, Any]]:
+    """If a run raises after it was registered, record runs.status = FAILED with the error."""
+
+    @functools.wraps(fn)
+    def wrapper(self: "MultiLaneResearchRunner", *args: Any, **kwargs: Any) -> Dict[str, Any]:
+        self._current_run_id = None
+        try:
+            return fn(self, *args, **kwargs)
+        except Exception as exc:
+            if self._current_run_id:
+                try:
+                    self._safe_set_run_status(self._current_run_id, "FAILED", f"{type(exc).__name__}: {exc}"[:500])
+                except Exception:
+                    logger.exception("Could not mark run %s as FAILED", self._current_run_id)
+            raise
+
+    return wrapper
 
 
 def get_default_local_provider() -> str:
@@ -220,6 +252,7 @@ class MultiLaneResearchRunner:
         if os.getenv("HOSTED_DEMO") != "1":
             self.repo.insert_output(doc)
 
+    @_mark_failed_runs
     def run_workflow(
         self,
         topic: str,
@@ -234,12 +267,19 @@ class MultiLaneResearchRunner:
         custom_prac_urls: Optional[List[str]] = None,
         allow_remote_practitioner_synthesis: bool = False,
         practitioner_abstraction_confirmed: bool = False,
+        approved_question: Optional[str] = None,
+        approval_ref: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
-        """Execute the full 8-stage multi-lane workflow."""
+        """Execute the full 8-stage multi-lane workflow.
+
+        `approved_question` / `approval_ref` come from the Gate 1 approval (via start_run)
+        and are what Check A judges harvested evidence against.
+        """
         start_time = time.time()
         self._ephemeral_sources = {}
         self._ephemeral_claims = []
         self._ephemeral_search_logs = []
+        self._check_llm_cache: Optional[Tuple[Any]] = None
         is_quick = "Fast" in depth
         max_academic_papers = 5 if is_quick else 10
         query_limit = 2 if is_quick else 4
@@ -287,8 +327,11 @@ class MultiLaneResearchRunner:
             question_ids=[question_obj.id],
             model_ids={"map": map_provider, "reduce": reduce_provider},
             code_version="v2.0-multilane",
+            config_json={"approval_ref": approval_ref or {}},
         )
         self._safe_insert_run(run_record)
+        self._current_run_id = run_id
+        self._safe_set_run_status(run_id, "RUNNING")
 
         # ----------------------------------------------------------------------
         # STAGE 2: THREE-LANE HARVESTING (Lanes A, B, C)
@@ -324,6 +367,57 @@ class MultiLaneResearchRunner:
             custom_urls=lane_urls.get("practitioner", []),
             practitioner_abstraction_confirmed=practitioner_abstraction_confirmed,
         )
+
+        # ----------------------------------------------------------------------
+        # CHECK A: ON-TOPIC EVIDENCE (model judges, rules decide; one retry)
+        # ----------------------------------------------------------------------
+        from src.engine.check_a_on_topic import paper_source_id
+
+        check_question = approved_question or topic
+        report(2, "Check A: Confirming harvested sources are about the approved question...", 0.34)
+        check_a = self._run_check_a(
+            check_question, academic_papers, enterprise_claims, practitioner_claims,
+            map_provider=map_provider, run_id=run_id, attempt=0, approval_ref=approval_ref,
+        )
+        if not check_a.passed:
+            report(2, "Check A: Too little on-topic evidence. Widening the search once...", 0.36)
+            retry_papers = self._harvest_academic_lane(
+                topic=topic,
+                query_limit=query_limit * 2,
+                max_per_query=max_per_query * 2,
+                max_papers=max_academic_papers * 2,
+                override=academic_papers_override,
+                question_id=question_obj.id,
+                run_id=run_id,
+                custom_urls=lane_urls.get("academic", []),
+            )
+            # Only the academic lane can be widened (more queries, more results per query). Enterprise
+            # feeds take no query width and are cached, so re-harvesting them would repeat the same items.
+            academic_papers = _merge_by_key(academic_papers, retry_papers, paper_source_id)
+            check_a = self._run_check_a(
+                check_question, academic_papers, enterprise_claims, practitioner_claims,
+                map_provider=map_provider, run_id=run_id, attempt=1, approval_ref=approval_ref,
+            )
+        if not check_a.passed:
+            return self._stop_at_check_a(
+                topic=topic,
+                question_obj=question_obj,
+                run_id=run_id,
+                check_a=check_a,
+                harvested_claims=list(enterprise_claims),
+                has_unconfirmed_practitioner_notes=has_unconfirmed_practitioner_notes,
+                elapsed_seconds=int(time.time() - start_time),
+            )
+        # Off-topic academic and enterprise sources are dropped. Practitioner notes were attached
+        # to this question by the operator: they get a verdict but are never removed by Check A.
+        academic_papers = [p for p in academic_papers if paper_source_id(p) in check_a.on_topic_ids]
+        off_ids = {c.id for c in enterprise_claims if str(c.source_id) not in check_a.on_topic_ids}
+        if off_ids:
+            enterprise_claims = [c for c in enterprise_claims if c.id not in off_ids]
+            self._ephemeral_claims = [c for c in self._ephemeral_claims if c.id not in off_ids]
+            self._safe_reject_claims(
+                list(off_ids), run_id=run_id, reason="Check A: its source was judged off-topic for the approved question.",
+            )
 
         # ----------------------------------------------------------------------
         # STAGE 3: ATOMIC CLAIM EXTRACTION
@@ -373,6 +467,7 @@ class MultiLaneResearchRunner:
         err_details = executive_synthesis.get("error_details")
 
         run_record.config_json = {
+            "approval_ref": approval_ref or {},
             "generation_mode": gen_mode,
             "is_fallback": is_fallback,
             "error_details": err_details,
@@ -479,7 +574,7 @@ class MultiLaneResearchRunner:
         elapsed = int(time.time() - start_time)
 
         # Assemble unified result object for presentation layer
-        return self._build_result_payload(
+        result = self._build_result_payload(
             topic=topic,
             question_obj=question_obj,
             run_id=run_id,
@@ -496,6 +591,190 @@ class MultiLaneResearchRunner:
             executive_synthesis=executive_synthesis,
             elapsed_seconds=elapsed,
         )
+        result["check_a"] = self._check_a_summary(check_a)
+        reasons = (pub_res or {}).get("reasons") or []
+        self._safe_set_run_status(run_id, result["status"], "; ".join(str(r) for r in reasons) or None)
+        return result
+
+    # ------------------------------------------------------------------
+    # Handoff checks (DEC-016)
+    # ------------------------------------------------------------------
+    def _build_check_llm(self, provider: Optional[str]) -> Any:
+        """Model used by the handoff checks, built once per run. None (abstain) if it cannot be built."""
+        if getattr(self, "_check_llm_cache", None) is None:
+            self._check_llm_cache = (self._make_check_llm(provider),)
+        return self._check_llm_cache[0]
+
+    def _make_check_llm(self, provider: Optional[str]) -> Any:
+        from src.llm.factory import build_llm
+
+        try:
+            return build_llm(provider or get_default_local_provider(), self.config or {})
+        except Exception as exc:
+            logger.info("Check model unavailable (%s); checks will abstain and rules decide.", exc)
+            return None
+
+    def _run_check_a(
+        self,
+        question: str,
+        academic_papers: List[Dict[str, Any]],
+        enterprise_claims: List[Claim],
+        practitioner_claims: List[Claim],
+        *,
+        map_provider: Optional[str],
+        run_id: str,
+        attempt: int,
+        approval_ref: Optional[Dict[str, Any]],
+    ) -> Any:
+        from src.engine.check_a_on_topic import build_source_items, run_check_a
+        from src.engine.checks import record_verdicts
+
+        cfg = ((self.config or {}).get("checks") or {}).get("check_a") or {}
+        research_cfg = (self.config or {}).get("research") or {}
+        items = build_source_items(
+            academic_papers, enterprise_claims, practitioner_claims, sources_lookup=self._ephemeral_sources,
+        )
+        result = run_check_a(
+            question,
+            items,
+            self._build_check_llm(map_provider),
+            run_id=run_id,
+            attempt=attempt,
+            min_on_topic_sources=int(cfg.get("min_on_topic_sources", 1)),
+            floor_min_terms=int(cfg.get("floor_min_terms", 1)),
+            synonyms=research_cfg.get("head_term_synonyms"),
+            approval_ref=approval_ref,
+        )
+        record_verdicts(self.repo, result.verdicts)
+        return result
+
+    @staticmethod
+    def _check_a_summary(check_a: Any) -> Dict[str, Any]:
+        return {
+            "passed": check_a.passed,
+            "reason": check_a.reason_plain,
+            "on_topic_count": check_a.on_topic_count,
+            "total_count": check_a.total_count,
+            "attempt": max((v.attempt for v in check_a.verdicts), default=0),
+            "sources": [
+                {
+                    "title": (v.details_json or {}).get("title", v.object_id),
+                    "lane": (v.details_json or {}).get("lane", ""),
+                    "verdict": v.final,
+                    "reason": v.reason_plain,
+                }
+                for v in check_a.verdicts if v.object_type == "source"
+            ],
+        }
+
+    def _safe_set_run_status(self, run_id: str, status: str, reason: Optional[str] = None) -> None:
+        if os.getenv("HOSTED_DEMO") != "1":
+            self.repo.set_run_status(run_id, status, reason)
+
+    def _safe_reject_claims(self, claim_ids: List[str], run_id: str, reason: str) -> None:
+        """Reject claims Check A dropped, with a reviews row so the ledger shows it was Check A
+        (not an operator) and why; the per-source verdicts are in check_verdicts."""
+        if os.getenv("HOSTED_DEMO") == "1" or not claim_ids:
+            return
+        self.repo.reject_claims(claim_ids)
+        for cid in claim_ids:
+            self.repo.insert_review(Review(
+                id=f"rev_{uuid.uuid4().hex[:10]}",
+                gate="check_a",
+                object_type="claim",
+                object_id=cid,
+                action="reject",
+                after_json={"run_id": run_id, "status": "rejected"},
+                reason=reason,
+                reviewer="check_a",
+            ))
+
+    def _stop_at_check_a(
+        self,
+        topic: str,
+        question_obj: Question,
+        run_id: str,
+        check_a: Any,
+        harvested_claims: List[Claim],
+        has_unconfirmed_practitioner_notes: bool,
+        elapsed_seconds: int,
+    ) -> Dict[str, Any]:
+        """Check A failed after its one retry: stop with zero findings and draft nothing.
+
+        Only rule-built negative findings ("searched, nothing found") are returned, each tied
+        to its search_log row. An unconfirmed practitioner abstraction still wins as BLOCKED.
+        """
+        from src.synth.generator import search_log_negative_findings
+
+        stop_reason = (
+            f"Stopped at Check A: {check_a.reason_plain} "
+            "The search was widened once. Nothing was drafted, so there are no findings to publish."
+        )
+        status = "NOT_PUBLISHABLE"
+        reasons = [stop_reason]
+        if has_unconfirmed_practitioner_notes:
+            status = "BLOCKED"
+            reasons.insert(0, "Gate 6: Practitioner abstraction not confirmed by operator.")
+        self._ephemeral_claims = [c for c in self._ephemeral_claims if c.id not in {h.id for h in harvested_claims}]
+        self._safe_reject_claims(
+            [c.id for c in harvested_claims], run_id=run_id,
+            reason="Check A stopped the run: too little on-topic evidence, nothing drafted.",
+        )
+        gap_entry = self.gap_builder.evaluate_question_lanes(
+            question_obj.id,
+            run_id=run_id,
+            claims_override=[],
+            sources_override=self._ephemeral_sources,
+            search_logs_override=self._ephemeral_search_logs,
+        )
+        self._safe_set_run_status(run_id, status, "; ".join(reasons))
+        outcome_raw = getattr(gap_entry, "outcome", 4)
+        outcome = int(outcome_raw) if str(outcome_raw).isdigit() else str(outcome_raw)
+        negatives = search_log_negative_findings(self._ephemeral_search_logs)
+        publish_res = {"published": False, "allowed": False, "status": status, "reason": " ".join(reasons), "reasons": reasons}
+        return {
+            "status": status,
+            "stopped_at": "check_a",
+            "stop_reason": stop_reason,
+            "check_a": self._check_a_summary(check_a),
+            "verdict": "",
+            "duration": f"{elapsed_seconds}s",
+            "question_id": question_obj.id,
+            "strategic_question": question_obj.text,
+            "scope": question_obj.scope,
+            "run_id": run_id,
+            "gap_matrix": {
+                "academic_state": getattr(gap_entry, "academic_state", "none found"),
+                "enterprise_state": getattr(gap_entry, "enterprise_state", "none found"),
+                "field_state": getattr(gap_entry, "field_state", "none found"),
+                "outcome": outcome,
+                "outcome_label": f"Outcome {outcome}" if isinstance(outcome, int) else str(outcome),
+                "rationale": getattr(gap_entry, "rationale", ""),
+            },
+            "lane_breakdown": {
+                "academic_sources_count": 0, "academic_count": 0, "academic_claims_count": 0,
+                "enterprise_sources_count": 0, "enterprise_claims_count": 0,
+                "practitioner_observations_count": 0, "practitioner_claims_count": 0,
+            },
+            "metrics": {"volume": "0 on-topic sources", "sources": "0 Repositories", "horizon": "n/a", "quality": "Not scored (stopped at Check A)"},
+            "doc_id": None,
+            "signals": [], "findings": [], "risks": [], "roadmap": [],
+            "negative_findings": [text for text, _ in negatives],
+            "business_signal": "",
+            "papers": [], "enterprise_sources": [], "practitioner_observations": [], "claims": [],
+            "sentence_traces": [
+                {"ordinal": i, "text": text, "type": "negative_finding", "claims": [], "checks_json": checks}
+                for i, (text, checks) in enumerate(negatives, start=1)
+            ],
+            "generation_mode": "none",
+            "is_fallback": False,
+            "error_details": None,
+            "blocking_banner": None,
+            "gates_audit": {"passed": False, "reasons": reasons},
+            "quality_scorecard": {"band": status, "total_score": 0},
+            "publish_res": publish_res,
+            "synthesis": {},
+        }
 
     def _resolve_or_create_question(self, topic: str) -> Question:
         """Find matching question in ledger or register a new one."""
@@ -556,7 +835,7 @@ class MultiLaneResearchRunner:
         custom_urls: Optional[List[str]] = None,
     ) -> List[Dict[str, Any]]:
         """Harvest academic literature from OpenAlex, Crossref, arXiv, and Semantic Scholar."""
-        from src.analysis.relevance import rank_papers
+        from src.analysis.relevance import rank_papers, stems_match
         from src.app import build_topic_queries, merge_papers
 
         if override is not None:
@@ -669,22 +948,6 @@ class MultiLaneResearchRunner:
             "about", "into", "through", "during", "before", "after", "above", "below",
             "regarding", "exists", "between",
         }
-        def stems_match(w1: str, w2: str) -> bool:
-            if w1 == w2:
-                return True
-            if len(w1) >= 4 and len(w2) >= 4 and (w1 in w2 or w2 in w1):
-                return True
-            prefix_len = 0
-            for a, b in zip(w1, w2):
-                if a == b:
-                    prefix_len += 1
-                else:
-                    break
-            if prefix_len >= 4:
-                return True
-            if prefix_len >= 3 and w1.startswith("cod") and w2.startswith("cod"):
-                return True
-            return False
 
         all_q_words = [w.lower() for w in re.findall(r"\b[a-zA-Z0-9-]{2,}\b", topic)]
         q_tokens = [w for w in all_q_words if w not in stopwords]

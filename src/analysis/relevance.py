@@ -32,6 +32,25 @@ def token_set(text: str) -> Set[str]:
     return set(normalize_text(text).split())
 
 
+def stems_match(w1: str, w2: str) -> bool:
+    """Loose stem equality used by the topic filters (e.g. 'assistant' ~ 'assistants')."""
+    if w1 == w2:
+        return True
+    if len(w1) >= 4 and len(w2) >= 4 and (w1 in w2 or w2 in w1):
+        return True
+    prefix_len = 0
+    for a, b in zip(w1, w2):
+        if a == b:
+            prefix_len += 1
+        else:
+            break
+    if prefix_len >= 4:
+        return True
+    if prefix_len >= 3 and w1.startswith("cod") and w2.startswith("cod"):
+        return True
+    return False
+
+
 def score_paper(paper: Dict[str, Any], topic: str) -> float:
     title = paper.get("title", "")
     abstract = paper.get("abstract", "")

@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from src.ledger.db import get_connection
 from src.ledger.models import (
@@ -220,10 +220,18 @@ class LedgerRepository:
     def insert_run(self, run: Run) -> None:
         self._check_write_permission()
         with self._conn() as conn:
+            # Upsert so a re-insert (e.g. adding config_json) never wipes runs.status.
             conn.execute(
-                """INSERT OR REPLACE INTO runs
+                """INSERT INTO runs
                    (id, started_at, config_json, code_version, model_ids, question_ids, seed, created_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?);""",
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                   ON CONFLICT(id) DO UPDATE SET
+                     started_at = excluded.started_at,
+                     config_json = excluded.config_json,
+                     code_version = excluded.code_version,
+                     model_ids = excluded.model_ids,
+                     question_ids = excluded.question_ids,
+                     seed = excluded.seed;""",
                 (
                     run.id, run.started_at,
                     json.dumps(run.config_json) if run.config_json else None,
@@ -248,6 +256,78 @@ class LedgerRepository:
             if d.get("question_ids"):
                 d["question_ids"] = json.loads(d["question_ids"])
             return Run(**d)
+
+    def set_run_status(self, run_id: str, status: str, reason: Optional[str] = None) -> None:
+        """Persist the run-level status (RUNNING, NOT_PUBLISHABLE, BLOCKED, ...) on the runs row."""
+        self._check_write_permission()
+        with self._conn() as conn:
+            conn.execute(
+                "UPDATE runs SET status = ?, status_reason = ? WHERE id = ?;",
+                (str(status).upper(), reason, run_id),
+            )
+
+    def get_run_status(self, run_id: str) -> Tuple[Optional[str], Optional[str]]:
+        with self._conn() as conn:
+            row = conn.execute("SELECT status, status_reason FROM runs WHERE id = ?;", (run_id,)).fetchone()
+            if not row:
+                return None, None
+            return row["status"], row["status_reason"]
+
+    def reject_claims(self, claim_ids: List[str]) -> None:
+        """Mark claims as rejected (kept for audit, excluded from findings)."""
+        if not claim_ids:
+            return
+        self._check_write_permission()
+        with self._conn() as conn:
+            conn.executemany("UPDATE claims SET status = 'rejected' WHERE id = ?;", [(cid,) for cid in claim_ids])
+
+    # --- Handoff check verdicts ---
+    def insert_check_verdict(self, row: Dict[str, Any]) -> None:
+        self.insert_check_verdicts([row])
+
+    def insert_check_verdicts(self, rows: List[Dict[str, Any]]) -> None:
+        """Insert verdict rows in one connection and transaction."""
+        if not rows:
+            return
+        self._check_write_permission()
+        with self._conn() as conn:
+            conn.executemany(
+                """INSERT INTO check_verdicts
+                   (id, check_id, run_id, object_type, object_id, model_verdict, rule_verdict,
+                    rule_decisive, final, reason_plain, attempt, model_id, prompt_hash, details_json, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);""",
+                [
+                    (
+                        row["id"], row["check_id"], row["run_id"], row["object_type"], row["object_id"],
+                        row.get("model_verdict"), row.get("rule_verdict"), int(bool(row.get("rule_decisive"))),
+                        row["final"], row["reason_plain"], int(row.get("attempt", 0)),
+                        row.get("model_id"), row.get("prompt_hash"),
+                        json.dumps(row["details_json"]) if row.get("details_json") is not None else None,
+                        row["created_at"],
+                    )
+                    for row in rows
+                ],
+            )
+
+    def list_check_verdicts(self, run_id: str, check_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        with self._conn() as conn:
+            if check_id:
+                cursor = conn.execute(
+                    "SELECT * FROM check_verdicts WHERE run_id = ? AND check_id = ? ORDER BY created_at, rowid;",
+                    (run_id, check_id),
+                )
+            else:
+                cursor = conn.execute(
+                    "SELECT * FROM check_verdicts WHERE run_id = ? ORDER BY created_at, rowid;", (run_id,)
+                )
+            rows = []
+            for r in cursor.fetchall():
+                d = dict(r)
+                d["rule_decisive"] = bool(d.get("rule_decisive"))
+                if d.get("details_json"):
+                    d["details_json"] = json.loads(d["details_json"])
+                rows.append(d)
+            return rows
 
     # --- Reviews (Append-only audit) ---
     def insert_review(self, r: Review) -> None:

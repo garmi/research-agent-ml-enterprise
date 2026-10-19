@@ -108,6 +108,7 @@ This log records all design choices, trade-offs, and deviations where prompt ass
 | DEC-013 | 2026-10-10 | Governance | Practitioner Isolation, Abstraction Gate, & JSON Export | Approved |
 | DEC-014 | 2026-10-10 | Fetchers | Enterprise Lane Real Fetchers, Rate Limiting, & Stopping Rule | Approved |
 | DEC-015 | 2026-10-18 | Governance | Record of Unreviewed Commits Merged Without Acceptance (b8cd874, a3c4b9d, 6c4360f) | Documented |
+| DEC-016 | 2026-10-18 | Pipeline | Handoff Checks A–D, Verdict Ledger, and No-Data-Is-FAIL Gates | Proposed |
 
 ---
 
@@ -163,4 +164,11 @@ This log records all design choices, trade-offs, and deviations where prompt ass
   - `6c4360f`: Sidebar phase workflow and feedback loop tracker changes.
 - **Decision:** Document `b8cd874`, `a3c4b9d`, and `6c4360f` explicitly as unreviewed deviations merged without acceptance. Tag commit `6c4360f` with local-only tag `s1-baseline`. All S2 work is strictly committed on branch `slice/s2-reasoned-question` in separate commits on top of `6c4360f` (tests first, then code, then docs/screens), staged by name, without merging to `main` or pushing upstream.
 - **Rationale:** Restores strict branch governance and traceability as mandated by S2 Review Round 3.
+
+---
+
+### DEC-016: Handoff Checks A–D, Verdict Ledger, and No-Data-Is-FAIL Gates
+- **Context:** Runs could draft from off-topic evidence (the sourdough case), every gate in Stage 7 defaulted to PASS when it had no data, and run status existed only in the returned dict. The approved question from S2 never reached the runner.
+- **Decision:** Add four handoff checks (topography in `docs/solution_design.md`): A (on-topic evidence, S3), B (well-formed claims, rules only, S4), C (hedges kept, S5, hold vs warn decided by bake-off), D (entailment, warn only, S8). Stage 7 gates treat missing data as FAIL (S6). Every verdict is written to a new `check_verdicts` table; `runs.status` and `runs.status_reason` are persisted (migration 006). Rules override models, never the reverse; nothing loops more than once.
+- **Rationale:** Stops early and honestly when evidence is thin, keeps models in an advisory role bounded by deterministic rules, and makes each stop traceable in the ledger.
 
