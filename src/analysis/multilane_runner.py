@@ -165,6 +165,16 @@ def labelled_venue(p: Dict[str, Any], grader: Any) -> Tuple[str, str, str]:
     return venue, s_type, tier
 
 
+def best_on_topic(papers: List[Dict[str, Any]], keep: int) -> List[Dict[str, Any]]:
+    """At most `keep` papers: every custom (operator-added) paper, then the best of the rest by relevance x
+    venue-tier weight. The kept papers stay in their original order, so [P#] numbering follows the harvest."""
+    custom = [p for p in papers if p.get("is_custom")]
+    rest = sorted((p for p in papers if not p.get("is_custom")),
+                  key=lambda p: float(p.get("relevance_score") or 0) * float(p.get("tier_weight") or 1.0), reverse=True)
+    chosen = {id(p) for p in custom + rest[:max(keep - len(custom), 0)]}
+    return [p for p in papers if id(p) in chosen]
+
+
 def _merge_by_key(first: List[Any], second: List[Any], key: Callable[[Any], str]) -> List[Any]:
     """Concatenate two harvests, keeping the first occurrence of each key."""
     seen = {key(x) for x in first}
@@ -331,7 +341,11 @@ class MultiLaneResearchRunner:
         self._source_cache: Dict[str, Optional[Source]] = {}
         self._check_llm_cache: Optional[Tuple[Any]] = None
         is_quick = "Fast" in depth
-        max_academic_papers = 5 if is_quick else 10
+        # S15: harvest `candidates`, let Check A judge them all, then keep the best `keep` on-topic papers.
+        depth_cfg = ((((self.config or {}).get("research") or {}).get("depth") or {}).get("fast" if is_quick else "deep") or {})
+        max_academic_papers = int(depth_cfg.get("candidates") or (12 if is_quick else 30))
+        keep_papers = int(depth_cfg.get("keep") or (5 if is_quick else 15))
+        self._breadth: Dict[str, int] = {}
         query_limit = 2 if is_quick else 4
         max_per_query = 4 if is_quick else 6
         lane_urls = dict(custom_lane_urls or {})
@@ -447,7 +461,7 @@ class MultiLaneResearchRunner:
                 queries=academic_queries,
                 query_limit=query_limit * 2,
                 max_per_query=max_per_query * 2,
-                max_papers=max_academic_papers * 2,
+                max_papers=max_academic_papers,
                 override=academic_papers_override,
                 question_id=question_obj.id,
                 run_id=run_id,
@@ -473,7 +487,13 @@ class MultiLaneResearchRunner:
             )
         # Off-topic academic and enterprise sources are dropped. Practitioner notes were attached
         # to this question by the operator: they get a verdict but are never removed by Check A.
+        checked = len(academic_papers)
         academic_papers = [p for p in academic_papers if paper_source_id(p) in check_a.on_topic_ids]
+        # S15: of the on-topic papers, carry the best `keep_papers` forward (relevance x venue-tier weight);
+        # papers the operator added by URL are always kept.
+        on_topic_count = len(academic_papers)
+        academic_papers = best_on_topic(academic_papers, keep_papers)
+        self._breadth = {"checked": checked, "on_topic": on_topic_count, "used": len(academic_papers)}
         off_ids = {c.id for c in enterprise_claims if str(c.source_id) not in check_a.on_topic_ids}
         if off_ids:
             enterprise_claims = [c for c in enterprise_claims if c.id not in off_ids]
@@ -1117,6 +1137,7 @@ class MultiLaneResearchRunner:
             "business_signal": "",
             "papers": papers_formatted,
             "harvested_papers": list(academic_papers),
+            "breadth": dict(getattr(self, "_breadth", {}) or {}),
             "enterprise_sources": self._format_enterprise_sources(claims),
             "practitioner_observations": [],
             "claims": claims_formatted,
@@ -2088,6 +2109,7 @@ class MultiLaneResearchRunner:
             "practitioner_observations": prac_obs_formatted,
             "claims": claims_formatted,
             "harvested_papers": list(academic_papers),
+            "breadth": dict(getattr(self, "_breadth", {}) or {}),
             "excluded_claims": excluded_formatted,
             "sentence_traces": sentence_traces,
             "generation_mode": executive_synthesis.get("generation_mode", "model"),

@@ -94,7 +94,8 @@ def test_keeps_best_on_topic_papers(tmp_path):
                          map_provider="stub", reduce_provider="stub")
     assert seen["max_papers"] == 30
     assert len(used["ids"]) == 15 and "p0" in used["ids"] and "p1" not in used["ids"]
-    assert used["ids"][1:] == [f"p{i}" for i in range(29, 15, -1)]
+    # The best 14 non-custom papers (scores 16-29), kept in harvest order so [P#] numbering is stable.
+    assert used["ids"] == ["p0"] + [f"p{i}" for i in range(16, 30)]
     assert res["breadth"] == {"checked": 30, "on_topic": 29, "used": 15}
 
 

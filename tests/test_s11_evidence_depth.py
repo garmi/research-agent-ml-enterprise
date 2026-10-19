@@ -269,5 +269,6 @@ def test_deep_is_default_and_labels_are_honest():
     src = Path("src/ui/intake_view.py").read_text(encoding="utf-8")
     block = src[src.index('"Research Depth"'):src.index('key="select_research_depth"')]
     assert "index=1" in block
-    assert "up to 5 papers" in block and "up to 10 papers" in block
+    # S15: Deep checks 30 and uses up to 15 papers; Fast checks 12 and uses up to 5.
+    assert "up to 5 papers" in block and "up to 15 papers" in block
     assert "2 rounds" not in block and "5 rounds" not in block
