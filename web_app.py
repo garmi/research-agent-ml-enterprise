@@ -54,7 +54,7 @@ from src.engine.ids import resolve_question_id
 from src.engine.stub_mode import is_stub_mode
 from src.ui.safe_page import safe_page, format_error_payload, render_safe_error
 from src.ui.evidence_view import finding_card_html
-from src.ui.intake_view import approved_question_text, render_intake_view
+from src.ui.intake_view import approved_question_text, effective_provider, render_intake_view
 
 
 logger = logging.getLogger("ExecutiveResearchStudio")
@@ -1031,6 +1031,16 @@ with st.expander(
     + (f" — Active Question: {st.session_state.get('current_question', '')[:75]}" if results else " (Current Phase)"),
     expanded=show_intake_expanded,
 ):
+    # Reasoning runs on the engine chosen in the Inference Model selector (rendered further down;
+    # its key holds the last choice), resolved the same way the run handler resolves it.
+    _sel_label = st.session_state.get("select_inference_model")
+    if _sel_label in available_models:
+        _sel_provider = available_models[_sel_label]
+    else:
+        _sel_provider = "stub" if is_stub_requested else ("ollama" if ollama_online else ("gemini" if has_gemini_key else "stub"))
+    st.session_state["selected_model_provider"] = effective_provider(
+        _sel_provider, has_gemini_key=bool(os.getenv("GEMINI_API_KEY", "").strip()), ollama_ok=ollama_online
+    )
     intake_state = render_intake_view()
     query_input = intake_state["question_text"]
     run_submitted = intake_state["run_submitted"]
@@ -1061,7 +1071,7 @@ with st.expander(
             else:
                 default_idx = next((i for i, k in enumerate(model_names) if available_models.get(k) == "stub"), 0)
 
-            sel_model_label = st.selectbox("Inference Model", model_names, index=default_idx)
+            sel_model_label = st.selectbox("Inference Model", model_names, index=default_idx, key="select_inference_model")
 
             if os.getenv("HOSTED_DEMO") == "1":
                 st.info("API key override disabled on shared instance.")
