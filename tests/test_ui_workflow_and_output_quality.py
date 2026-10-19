@@ -230,11 +230,11 @@ def test_web_app_sidebar_phase_tracker_and_feedback_loop_and_no_truncation():
     assert not at.exception, f"AppTest raised exception: {at.exception}"
 
     sidebar_md = " ".join(m.value for m in at.sidebar.markdown)
-    assert "Phase 1" in sidebar_md
-    assert "Phase 2" in sidebar_md
-    assert "Phase 3" in sidebar_md
-    assert "Phase 4" in sidebar_md
-    assert "Feedback Loop" in sidebar_md
+    # S8: the sidebar shows one step rail (Question -> Checks & publish) in place of the phase
+    # tracker and the feedback-loop pod.
+    for step in ("1. Question", "2. Evidence", "3. Claims", "4. Brief", "5. Checks &amp; publish"):
+        assert step in sidebar_md, step
+    assert "Feedback Loop" not in sidebar_md
 
     main_md = " ".join(m.value for m in at.markdown)
     # Full untruncated finding text and source traceability must be rendered

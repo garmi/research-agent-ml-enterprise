@@ -57,6 +57,8 @@ from src.ui.evidence_view import finding_card_html, render_sentence
 from src.ui.intake_view import approved_question_text, effective_provider, render_intake_view
 from src.ui.rerun import board_editor_key, export_view, papers_for_rerun
 from src.ui.publish_view import gate_rows, gates_summary, publish_eligibility
+from src.ui.run_status import run_status, status_banner_html, step_rail, step_rail_html
+from src.ui.brief_view import brief_meta_line, distinct_signals, plain_html, roadmap_html
 
 
 logger = logging.getLogger("ExecutiveResearchStudio")
@@ -644,6 +646,40 @@ st.markdown(
         visibility: hidden !important;
         display: none !important;
     }
+    /* S8: run status banner, step rail, brief */
+    .run-status { border-radius: 10px; padding: 0.8rem 1rem; margin: 0.75rem 0 1.1rem 0; font-size: 0.9rem; }
+    .run-status-head { font-weight: 800; font-size: 1rem; }
+    .run-status-why { margin: 0.35rem 0 0.25rem 1.1rem; padding: 0; font-size: 0.84rem; }
+    .run-status-next { margin-top: 0.35rem; font-size: 0.86rem; }
+    .step-rail { background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px; padding: 0.4rem 0.7rem; margin-bottom: 1rem; }
+    .step-row { display: flex; gap: 0.55rem; align-items: flex-start; padding: 0.4rem 0; border-bottom: 1px solid #F1F5F9; }
+    .step-row:last-child { border-bottom: none; }
+    .step-icon { font-weight: 800; width: 1rem; text-align: center; }
+    .step-label { font-weight: 700; font-size: 0.82rem; color: #0F172A; }
+    .step-pending .step-label { color: #94A3B8; font-weight: 600; }
+    .step-detail { font-size: 0.72rem; color: #64748B; }
+    .brief-meta { font-size: 0.82rem; color: #475569; margin: 0.25rem 0 1rem 0; }
+    .signal-list { margin: 0 0 1rem 1.1rem; padding: 0; font-size: 0.92rem; line-height: 1.5; }
+    .roadmap-note { font-size: 0.78rem; color: #64748B; margin-bottom: 0.4rem; }
+    .roadmap-item { display: flex; gap: 0.8rem; align-items: flex-start; background: white; border: 1px solid #E2E8F0; border-radius: 10px; padding: 0.75rem 1rem; margin-bottom: 0.5rem; }
+    .roadmap-phase { background: #1E3A8A; color: white; border-radius: 6px; padding: 0.25rem 0.55rem; font-size: 0.74rem; font-weight: 700; white-space: nowrap; }
+    .roadmap-action { font-weight: 700; font-size: 0.9rem; color: #0F172A; }
+    .roadmap-impact { font-size: 0.8rem; color: #059669; font-weight: 600; margin-top: 0.1rem; }
+
+    /* S8: phone width. Streamlit stacks st.columns by itself; these cover the custom HTML. */
+    @media (max-width: 640px) {
+        .block-container { padding: 1rem 0.75rem 2rem 0.75rem !important; }
+        .studio-header { flex-direction: column; align-items: flex-start !important; gap: 0.5rem; }
+        .studio-header h1 { font-size: 1.35rem !important; }
+        .meta-badge { display: none !important; }
+        .verdict-banner { padding: 0.9rem !important; }
+        .verdict-banner > div:first-child { flex-direction: column; align-items: flex-start !important; gap: 0.4rem; }
+        .run-status { padding: 0.7rem 0.8rem; }
+        .roadmap-item { flex-direction: column; gap: 0.4rem; }
+        div[data-baseweb="tab-list"] { overflow-x: auto; flex-wrap: nowrap; }
+        div[data-baseweb="tab-list"] button { white-space: nowrap; }
+        table { display: block; overflow-x: auto; }
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -825,8 +861,6 @@ has_gemini_key = bool(os.getenv("GEMINI_API_KEY", "").strip())
 ollama_online = is_ollama_reachable()
 results = st.session_state.get("research_results")
 
-if "active_workspace_phase" not in st.session_state:
-    st.session_state["active_workspace_phase"] = "Phase 4: Executive Synthesis & Audit" if results else "Phase 1: Question Framing & Scope"
 
 with st.sidebar:
     st.markdown(
@@ -844,98 +878,9 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
 
-    # 1. LIVE PHASE WORKFLOW TRACKER & OUTPUTS
-    has_results = results is not None
-    p1_status = "✅ Completed" if has_results else "🔵 Active"
-    p2_status = f"✅ {len(results.get('papers', []))} Papers • {len(results.get('enterprise_sources', []))} Ent" if has_results else "⏳ Pending"
-    p3_status = f"✅ {len(results.get('claims', []))} Graded Claims" if has_results else "⏳ Pending"
-    if has_results:
-        final_stat = (results.get('publish_res', {}).get('status') or results.get('status') or 'AUDITED').upper()
-        stat_icon = "⛔" if "BLOCK" in final_stat else "✅"
-        p4_status = f"{stat_icon} {final_stat}"
-    else:
-        p4_status = "⏳ Pending"
-
-    st.markdown(
-        f"""
-        <div class="sidebar-pod" style="border-left: 4px solid #2563EB;">
-            <div class="sidebar-pod-title" style="color: #1E40AF;">🧭 Stage Workflow & Phase Outputs</div>
-            <div style="font-size: 0.79rem; line-height: 1.45; color: #1E293B;">
-                <div style="padding: 0.4rem 0; border-bottom: 1px solid #F1F5F9;">
-                    <div style="display: flex; justify-content: space-between; font-weight: 700;">
-                        <span>Phase 1: Framing (Gate 1)</span>
-                        <span style="color: #2563EB; font-size: 0.72rem;">{p1_status}</span>
-                    </div>
-                    <div style="font-size: 0.72rem; color: #64748B;">Output: Approved Lens & Scope Boundary</div>
-                </div>
-                <div style="padding: 0.4rem 0; border-bottom: 1px solid #F1F5F9;">
-                    <div style="display: flex; justify-content: space-between; font-weight: 700;">
-                        <span>Phase 2: 3-Lane Harvesting</span>
-                        <span style="color: {'#059669' if has_results else '#64748B'}; font-size: 0.72rem;">{p2_status}</span>
-                    </div>
-                    <div style="font-size: 0.72rem; color: #64748B;">Output: Academic, Enterprise & Field Sources</div>
-                </div>
-                <div style="padding: 0.4rem 0; border-bottom: 1px solid #F1F5F9;">
-                    <div style="display: flex; justify-content: space-between; font-weight: 700;">
-                        <span>Phase 3: Claim Ledger & Gap</span>
-                        <span style="color: {'#059669' if has_results else '#64748B'}; font-size: 0.72rem;">{p3_status}</span>
-                    </div>
-                    <div style="font-size: 0.72rem; color: #64748B;">Output: Ledger Claims & Outcome 1–4 Matrix</div>
-                </div>
-                <div style="padding: 0.4rem 0;">
-                    <div style="display: flex; justify-content: space-between; font-weight: 700;">
-                        <span>Phase 4: Synthesis & G1–G6</span>
-                        <span style="color: {'#059669' if has_results else '#64748B'}; font-size: 0.72rem;">{p4_status}</span>
-                    </div>
-                    <div style="font-size: 0.72rem; color: #64748B;">Output: Traceable Brief, Scorecard & Exports</div>
-                </div>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    # 2. ITERATIVE FEEDBACK LOOPS
-    st.markdown(
-        """
-        <div class="sidebar-pod" style="background: #F8FAFC; border: 1px solid #CBD5E1;">
-            <div class="sidebar-pod-title" style="color: #0F172A;">🔄 Active Feedback Loops</div>
-            <div style="font-size: 0.74rem; color: #334155; line-height: 1.45;">
-                <div style="margin-bottom: 0.45rem;">
-                    <strong>↺ Loop 1 (Phase 4 ➔ Phase 2):</strong><br>
-                    Exclude weak/off-topic papers in Phase 2 and trigger instant re-synthesis.
-                </div>
-                <div style="margin-bottom: 0.45rem;">
-                    <strong>↺ Loop 2 (Phase 4 ➔ Phase 1):</strong><br>
-                    Refine question wording or switch framing lens in Phase 1 to re-scope retrieval.
-                </div>
-                <div>
-                    <strong>↺ Loop 3 (Phase 4 ➔ Phase 3):</strong><br>
-                    Inspect G1–G6 gate violations or claim grades in Phase 3 to resolve blocked exports.
-                </div>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    # Phase Switcher when results exist so user can focus on one phase or view all
-    if has_results:
-        st.markdown('<div class="sidebar-pod-title">📂 Jump to Phase Output</div>', unsafe_allow_html=True)
-        selected_phase_view = st.radio(
-            "Select Phase View",
-            options=[
-                "Phase 4: Executive Synthesis & Audit",
-                "Phase 2: Harvested 3-Lane Sources",
-                "Phase 3: Atomic Claim Ledger & Gap Matrix",
-                "Phase 1: Question Framing & New Run",
-            ],
-            index=0,
-            key="sidebar_phase_selector",
-            label_visibility="collapsed",
-        )
-    else:
-        selected_phase_view = "Phase 1: Question Framing & New Run"
+    # 1. STEPS: where this run is, the same states the status banner reports (S8)
+    st.markdown('<div class="sidebar-pod-title">Steps</div>', unsafe_allow_html=True)
+    st.markdown(step_rail_html(step_rail(results)), unsafe_allow_html=True)
 
     # 3. SYSTEM STATUS POD
     st.markdown(
@@ -953,7 +898,7 @@ with st.sidebar:
                 </span>
             </div>
             <div style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid #F1F5F9; font-size: 0.72rem; color: #64748B;">
-                Active Engine: <strong style="color: #334155;">{'Local Ollama' if ollama_online else ('Gemini 2.5 Flash' if has_gemini_key else 'Offline Extractive Engine')}</strong>
+                Active Engine: <strong style="color: #334155;">{'Test mode (synthetic data)' if is_stub_mode() else ('Local Ollama' if ollama_online else ('Gemini' if has_gemini_key else 'Offline Extractive Engine'))}</strong>
             </div>
         </div>
         """,
@@ -983,7 +928,7 @@ with st.sidebar:
 
     if st.session_state["research_results"] is not None:
         st.markdown("<div style='height: 0.5rem;'></div>", unsafe_allow_html=True)
-        if st.button("🗑️ Start Fresh Research Run", use_container_width=True):
+        if st.button("➕ Start new research", use_container_width=True):
             st.session_state["research_results"] = None
             st.session_state["current_question"] = ""
             st.rerun()
@@ -1018,12 +963,12 @@ if os.getenv("HOSTED_DEMO") == "1":
 # ==============================================================================
 is_stub_requested = is_stub_mode()
 
-# If results already exist and the user is viewing Phase 2, 3, or 4, collapse Phase 1 into a clean summary bar
-show_intake_expanded = (results is None) or (selected_phase_view == "Phase 1: Question Framing & New Run")
+# Once a run exists the question collapses to one line; open it to edit and run again.
+show_intake_expanded = results is None
 
 with st.expander(
-    "📍 Phase 1: Frame Your Question & Approve Scope"
-    + (f" — Active Question: {st.session_state.get('current_question', '')[:75]}" if results else " (Current Phase)"),
+    "1. Question"
+    + (f": {st.session_state.get('current_question', '')[:75]}" if results else ": frame it and approve the scope"),
     expanded=show_intake_expanded,
 ):
     # Reasoning runs on the engine chosen in the Inference Model selector (rendered further down;
@@ -1201,114 +1146,13 @@ if results:
     claims_by_id_map = {c["id"]: c for c in results.get("claims", [])}
     gap_info = results.get("gap_matrix") or {}
     status = (results.get("publish_res", {}).get("status") or results.get("quality_scorecard", {}).get("band") or "NOT_PUBLISHABLE").upper()
-    gates_passed = results.get("gates_audit", {}).get("passed", False)
 
-    # PHASE PROGRESS STEPPER HEADER (Shows outputs of every phase clearly)
-    st.markdown(
-        f"""
-        <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 0.9rem 1.2rem; margin: 1rem 0 1.25rem 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem;">
-            <div style="border-left: 3px solid #2563EB; padding-left: 0.65rem;">
-                <div style="font-size: 0.7rem; font-weight: 700; color: #2563EB; text-transform: uppercase;">Phase 1 • Complete</div>
-                <div style="font-size: 0.85rem; font-weight: 700; color: #0F172A;">Question Framed</div>
-                <div style="font-size: 0.75rem; color: #64748B;">Scope: {results.get('scope', 'enterprise')}</div>
-            </div>
-            <div style="border-left: 3px solid #2563EB; padding-left: 0.65rem;">
-                <div style="font-size: 0.7rem; font-weight: 700; color: #2563EB; text-transform: uppercase;">Phase 2 • Complete</div>
-                <div style="font-size: 0.85rem; font-weight: 700; color: #0F172A;">3-Lane Sources</div>
-                <div style="font-size: 0.75rem; color: #64748B;">{len(results.get('papers', []))} Papers • {len(results.get('enterprise_sources', []))} Enterprise</div>
-            </div>
-            <div style="border-left: 3px solid #2563EB; padding-left: 0.65rem;">
-                <div style="font-size: 0.7rem; font-weight: 700; color: #2563EB; text-transform: uppercase;">Phase 3 • Complete</div>
-                <div style="font-size: 0.85rem; font-weight: 700; color: #0F172A;">Claim Ledger & Gap</div>
-                <div style="font-size: 0.75rem; color: #64748B;">{len(results.get('claims', []))} Claims • {gap_info.get('outcome_label', 'Outcome 1')[:18]}</div>
-            </div>
-            <div style="border-left: 3px solid #059669; padding-left: 0.65rem;">
-                <div style="font-size: 0.7rem; font-weight: 700; color: #059669; text-transform: uppercase;">Phase 4 • Active Output</div>
-                <div style="font-size: 0.85rem; font-weight: 700; color: #0F172A;">Audited Synthesis</div>
-                <div style="font-size: 0.75rem; color: #64748B;">Status: {status} ({results.get('duration', '0s')})</div>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    # Check A: on-topic evidence (DEC-016)
-    check_a_info = results.get("check_a") or {}
-    if results.get("stopped_at") == "check_a":
-        st.error(f"**Run stopped: not enough on-topic evidence.** {results.get('stop_reason', '')}")
-    elif check_a_info:
-        st.caption(f"Check A passed: {check_a_info.get('reason', '')}")
-    if check_a_info.get("sources"):
-        with st.expander("Check A: which sources were judged on-topic", expanded=results.get("stopped_at") == "check_a"):
-            st.table([
-                {
-                    "Source": src.get("title", ""),
-                    "Lane": str(src.get("lane", "")).capitalize(),
-                    "Verdict": "On-topic" if src.get("verdict") == "on_topic" else "Off-topic",
-                    "Why": src.get("reason", ""),
-                }
-                for src in check_a_info["sources"]
-            ])
-
-    # Status / Fallback Banner
-    if results.get("is_fallback"):
-        blocking_msg = results.get(
-            "blocking_banner",
-            "EXTRACTIVE FALLBACK MODE • Primary model unavailable. Output contains verified extractive claims with full source traceability.",
-        )
-        st.warning(f"ℹ️ **{blocking_msg}**")
-        err_det = results.get("error_details") or {}
-        if err_det and err_det.get("error_class") not in (None, "OfflineEngine"):
-            with st.expander("Diagnostic Details (LLM Provider Status)", expanded=False):
-                st.code(
-                    f"Error Class: {err_det.get('error_class')}\n"
-                    f"Message: {err_det.get('error_message')}",
-                    language="text",
-                )
-    else:
-        if not gates_passed or status == "BLOCKED":
-            reasons = results.get("gates_audit", {}).get("reasons", []) or ["Gate audit blocked publication."]
-            reasons_html = "".join(f"<li>{r}</li>" for r in reasons)
-            st.markdown(
-                f"""
-                <div style="background: #FEF2F2; border: 1px solid #FCA5A5; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1.25rem; font-size: 0.88rem; color: #991B1B;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
-                        <strong>⛔ PUBLICATION BLOCKED (G1–G6 Violations Detected — Use Feedback Loop 3 in Phase 3/4 to inspect)</strong>
-                        <span style="background: #FEE2E2; color: #991B1B; padding: 0.2rem 0.6rem; border-radius: 6px; font-weight: 700; font-size: 0.78rem;">BLOCKED</span>
-                    </div>
-                    <ul style="margin: 0.25rem 0 0 1rem; padding: 0; font-size: 0.82rem;">
-                        {reasons_html}
-                    </ul>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-        elif status == "NOT_PUBLISHABLE":
-            st.markdown(
-                f"""
-                <div style="background: #FFFBEB; border: 1px solid #FCD34D; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1.25rem; font-size: 0.88rem; color: #92400E; display: flex; align-items: center; justify-content: space-between;">
-                    <div>
-                        <strong>⚠️ Draft Mode — Below Publication Threshold</strong> ({results.get('metrics', {}).get('quality', 'NOT_PUBLISHABLE')})
-                    </div>
-                    <span style="background: #FEF3C7; color: #92400E; padding: 0.2rem 0.6rem; border-radius: 6px; font-weight: 700; font-size: 0.78rem;">NOT_PUBLISHABLE</span>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-        else:
-            st.markdown(
-                f"""
-                <div style="background: #F0FDF4; border: 1px solid #86EFAC; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1.25rem; font-size: 0.88rem; color: #166534; display: flex; align-items: center; justify-content: space-between;">
-                    <div>
-                        <strong>✓ Multi-lane synthesis complete</strong> in {results['duration']} ({len(results.get('papers', []))} papers • {len(results.get('claims', []))} atomic ledger claims)
-                    </div>
-                    <div style="font-size: 0.78rem; background: #DCFCE7; padding: 0.2rem 0.6rem; border-radius: 6px; font-weight: 700;">
-                        {gates_summary(results.get("gates_audit") or {})}
-                    </div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+    # ONE STATUS BANNER (S8): where the run stopped, why, and what to do next
+    st.markdown(status_banner_html(run_status(results)), unsafe_allow_html=True)
+    err_det = results.get("error_details") or {}
+    if results.get("is_fallback") and err_det and err_det.get("error_class") not in (None, "OfflineEngine"):
+        with st.expander("Model connection details", expanded=False):
+            st.code(f"Error Class: {err_det.get('error_class')}\nMessage: {err_det.get('error_message')}", language="text")
 
     # Helper to render a single finding: click the sentence to see its cited quotes and hedges (S5)
     def _render_traceable_finding_card(item: Dict[str, Any], idx_num: int) -> None:
@@ -1319,10 +1163,10 @@ if results:
 
     # Phase-organized Tabs (4 Clear Phase Tabs instead of 7 overlapping tabs)
     phase_tab4, phase_tab2, phase_tab3, phase_tab_gov = st.tabs([
-        "📑 Phase 4: Executive Synthesis & Traceable Findings",
-        "🌐 Phase 2: Harvested 3-Lane Sources (Feedback Loop 1)",
-        "⚖️ Phase 3: Atomic Claim Ledger & Gap Matrix",
-        "🛡️ Phase 4B: Governance Audit (G1–G6) & Deliverables",
+        "Brief",
+        "Evidence",
+        "Claims & gaps",
+        "Checks & publish",
     ])
 
     # ==========================================================================
@@ -1340,89 +1184,34 @@ if results:
             <div class="verdict-banner">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
                     <div class="verdict-banner-title">
-                        <span>⚡ Phase 4 Output: Executive Verdict & Strategic Signal</span>
+                        <span>Bottom line</span>
                     </div>
                     <span style="background: #1E3A8A; color: white; padding: 0.25rem 0.75rem; border-radius: 6px; font-size: 0.78rem; font-weight: 700;">
-                        {gap_info.get('outcome_label', 'Outcome 1: Supported')}
+                        {plain_html(gap_info.get('outcome_label', 'Outcome 1: Supported'))}
                     </span>
                 </div>
                 <p class="verdict-banner-body">{verdict_formatted}</p>
                 <div style="margin-top: 0.65rem; padding-top: 0.65rem; border-top: 1px solid rgba(15,23,42,0.1); font-size: 0.85rem; color: #1E293B;">
-                    <strong>Cross-Lane Gap Rationale:</strong> {gap_info.get('rationale', 'Empirical academic research is corroborated by active enterprise practice.')}
+                    <strong>Research vs practice:</strong> {plain_html(gap_info.get('rationale', 'Empirical academic research is corroborated by active enterprise practice.'))}
                 </div>
             </div>
             """,
             unsafe_allow_html=True,
         )
 
-        # KPI Metrics Row
-        stat_cols = st.columns(4)
-        with stat_cols[0]:
+        st.markdown(f'<div class="brief-meta">{plain_html(brief_meta_line(results))}</div>', unsafe_allow_html=True)
+
+        # Signals that add something beyond the findings below (signals copied from findings are dropped)
+        extra_signals = distinct_signals(results.get("signals") or [], results.get("findings") or [])
+        if extra_signals:
+            st.markdown('<div class="section-title"><span>Key signals</span></div>', unsafe_allow_html=True)
             st.markdown(
-                f"""
-                <div class="stat-tile">
-                    <div class="stat-label">Multi-Lane Volume</div>
-                    <div class="stat-value" style="font-size: 1.15rem;">{results['metrics']['volume']}</div>
-                    <div class="stat-sub">Academic • Enterprise • Field</div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-        with stat_cols[1]:
-            st.markdown(
-                f"""
-                <div class="stat-tile">
-                    <div class="stat-label">Distinct Repositories</div>
-                    <div class="stat-value" style="font-size: 1.35rem;">{results['metrics']['sources']}</div>
-                    <div class="stat-sub">Cross-validated</div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-        with stat_cols[2]:
-            st.markdown(
-                f"""
-                <div class="stat-tile">
-                    <div class="stat-label">Publication Horizon</div>
-                    <div class="stat-value" style="font-size: 1.35rem;">{results['metrics']['horizon']}</div>
-                    <div class="stat-sub">Recency weighted</div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-        with stat_cols[3]:
-            st.markdown(
-                f"""
-                <div class="stat-tile">
-                    <div class="stat-label">Evidence Quality Score</div>
-                    <div class="stat-value" style="font-size: 1.35rem;">{results['metrics']['quality']}</div>
-                    <div class="stat-sub">S1–S7 Composite Audit</div>
-                </div>
-                """,
+                "<ul class=\"signal-list\">" + "".join(f"<li>{format_citation_pills(sig['text'], paper_map)}</li>" for sig in extra_signals[:3]) + "</ul>",
                 unsafe_allow_html=True,
             )
 
-        # Top Strategic Takeaways
-        if results.get("signals"):
-            st.markdown('<div class="section-title"><span>🚀 Key Strategic Signals</span></div>', unsafe_allow_html=True)
-            sig_cols = st.columns(min(len(results["signals"]), 3))
-            for idx, signal in enumerate(results["signals"][:3]):
-                with sig_cols[idx]:
-                    formatted_sig = format_citation_pills(signal["text"], paper_map)
-                    st.markdown(
-                        f"""
-                        <div class="signal-card">
-                            <div>
-                                <div class="signal-tag">{signal['tag']}</div>
-                                <p class="signal-text">{formatted_sig}</p>
-                            </div>
-                        </div>
-                        """,
-                        unsafe_allow_html=True,
-                    )
-
-        st.markdown('<div class="section-title"><span>🔍 Detailed Empirical Findings & Source Traceability</span></div>', unsafe_allow_html=True)
-        st.caption("Every finding below is rendered in full without truncation and linked directly to its underlying source paper, publication venue, deterministic grade, and verbatim abstract excerpt.")
+        st.markdown('<div class="section-title"><span>Findings</span></div>', unsafe_allow_html=True)
+        st.caption("Click a finding to see the quotes it rests on, their grade and any hedging.")
 
         if results.get("findings"):
             for idx_f, item in enumerate(results["findings"], start=1):
@@ -1433,7 +1222,7 @@ if results:
         # Risks & Negative Findings side by side
         r_col1, r_col2 = st.columns(2)
         with r_col1:
-            st.markdown("##### ⚠️ Delivery & Business Risks")
+            st.markdown("##### Risks")
             if results.get("risks"):
                 for risk in results["risks"]:
                     st.markdown(
@@ -1448,13 +1237,13 @@ if results:
                 st.caption("No specific delivery risk assertions recorded in the ledger for this run.")
 
         with r_col2:
-            st.markdown("##### 🚫 Evidence Boundaries & Negative Findings")
+            st.markdown("##### What the evidence does not show")
             if results.get("negative_findings"):
                 for nf in results["negative_findings"]:
                     st.markdown(
                         f"""
                         <div style="background: #F8FAFC; border: 1px solid #CBD5E1; border-left: 4px solid #64748B; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 0.6rem; font-size: 0.88rem; color: #334155;">
-                            {nf}
+                            {plain_html(nf)}
                         </div>
                         """,
                         unsafe_allow_html=True,
@@ -1463,31 +1252,33 @@ if results:
                 st.caption("No negative findings recorded.")
 
         if results.get("roadmap"):
-            st.markdown("##### 🗺️ Strategic Implementation Roadmap")
-            for step in results.get("roadmap", []):
-                st.markdown(
-                    f"""
-                    <div style="display: flex; gap: 1rem; align-items: flex-start; background: white; border: 1px solid #E2E8F0; border-radius: 10px; padding: 0.85rem 1.15rem; margin-bottom: 0.6rem;">
-                        <div style="background: #1E3A8A; color: white; border-radius: 6px; padding: 0.3rem 0.6rem; font-size: 0.76rem; font-weight: 700; white-space: nowrap;">
-                            {step['phase']}
-                        </div>
-                        <div>
-                            <div style="font-weight: 700; font-size: 0.92rem; color: #0F172A;">{step['action']}</div>
-                            <div style="font-size: 0.82rem; color: #059669; font-weight: 600; margin-top: 0.1rem;">Expected Outcome: {step['impact']}</div>
-                        </div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
+            st.markdown("##### Recommended next steps")
+            st.markdown(roadmap_html(results.get("roadmap", [])), unsafe_allow_html=True)
 
     # ==========================================================================
     # TAB 2 (PHASE 2): HARVESTED 3-LANE SOURCES & FEEDBACK LOOP 1
     # ==========================================================================
     with phase_tab2:
-        st.markdown("### 🌐 Phase 2 Output: Harvested Three-Lane Sources")
+        st.markdown("### Evidence")
+        # Check A: on-topic evidence (DEC-016)
+        check_a_info = results.get("check_a") or {}
+        if check_a_info and results.get("stopped_at") != "check_a":
+            st.caption(f"Check A passed: {check_a_info.get('reason', '')}")
+        if check_a_info.get("sources"):
+            with st.expander("Check A: which sources were judged on-topic", expanded=results.get("stopped_at") == "check_a"):
+                st.table([
+                    {
+                        "Source": src.get("title", ""),
+                        "Lane": str(src.get("lane", "")).capitalize(),
+                        "Verdict": "On-topic" if src.get("verdict") == "on_topic" else "Off-topic",
+                        "Why": src.get("reason", ""),
+                    }
+                    for src in check_a_info["sources"]
+                ])
+
         st.markdown(
-            "Inspect all Academic (Lane A), Enterprise (Lane B), and Local Practitioner (Lane C) sources harvested during Phase 2. "
-            "Use **Feedback Loop 1** at the bottom of this tab to exclude any off-topic papers and trigger a clean re-synthesis."
+            "The academic papers, enterprise sources and your field notes this run found. "
+            "To drop an off-topic paper, use **Exclude weak papers and re-draft** at the bottom of this tab."
         )
 
         st.markdown(f"#### 🎓 Lane A: Academic Papers Ingested ({len(results.get('papers', []))})")
@@ -1561,8 +1352,8 @@ if results:
 
         # FEEDBACK LOOP 1: Paper Exclusion & Re-Synthesis
         st.markdown("---")
-        st.markdown("#### 🔄 Feedback Loop 1 (Phase 4 ➔ Phase 2): Exclude Weak Papers & Re-Synthesize")
-        st.caption("Found an off-topic or low-relevance paper in Lane A? Exclude it below to re-run Phase 3 (Claim Grading) and Phase 4 (Synthesis).")
+        st.markdown("#### Exclude weak papers and re-draft")
+        st.caption("Found an off-topic or weak paper? Exclude it below to re-grade the claims and re-draft the brief.")
         paper_choices = [f"[{p['key']}] {p['title']}" for p in results.get("papers", [])]
         excluded_papers = st.multiselect("Select papers to exclude from synthesis:", options=paper_choices)
 
@@ -1601,7 +1392,7 @@ if results:
     # TAB 3 (PHASE 3): ATOMIC CLAIM LEDGER & STRATEGIC GAP MATRIX
     # ==========================================================================
     with phase_tab3:
-        st.markdown("### ⚖️ Phase 3 Output: Atomic Claim Ledger & Strategic Gap Matrix")
+        st.markdown("### Claims & gaps")
         st.markdown(
             "Every extracted claim is stored in the evidence ledger with its full untruncated assertion, "
             "verbatim source excerpt (≤ 25 words), deterministic evidence grade, and source paper link."
@@ -1729,7 +1520,7 @@ if results:
     # TAB 4 (PHASE 4B): GOVERNANCE AUDIT (G1–G6), SCORECARD & EXPORTS
     # ==========================================================================
     with phase_tab_gov:
-        st.markdown("### 🛡️ Phase 4B: Deterministic Governance Audit (Gates G1–G6 & S1–S7 Scorecard)")
+        st.markdown("### Checks & publish")
         audit_res = results.get("gates_audit", {})
         # A gate with no data counts as a fail (S6): only an audited PASS on all six is a pass.
         all_gates_pass = audit_res.get("passed", False)

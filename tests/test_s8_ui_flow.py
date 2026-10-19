@@ -100,7 +100,7 @@ def test_banner_and_rail_escape():
 def test_brief_meta_line():
     line = brief_meta_line(_res(metrics={"horizon": "2022–2024", "quality": "65.0/100 (BLOCKED)"},
                                 practitioner_observations=[]))
-    assert line == "2 papers · 0 enterprise sources · 0 field notes · 4 claims · 2022–2024 · Score 65.0/100 (BLOCKED)"
+    assert line == "2 papers · 0 enterprise sources · 0 field notes · 4 claims · 2022–2024 · Score 65.0/100"
 
 
 def test_signals_that_repeat_findings_are_dropped():
