@@ -213,8 +213,9 @@ def run_check_a(
     synonyms: Optional[Dict[str, List[str]]] = None,
     approval_ref: Optional[Dict[str, Any]] = None,
     package: Optional[Dict[str, Any]] = None,
+    prompt_path: Optional[str | Path] = None,
 ) -> CheckAResult:
-    prompt_path = Path(PROMPT_FILE_PATH)
+    prompt_path = Path(prompt_path or PROMPT_FILE_PATH)
     template = prompt_path.read_text(encoding="utf-8") if prompt_path.exists() else "{context}\n{items}"
     prompt_hash = get_prompt_hash(prompt_path)
     model_id = str(getattr(llm, "model", None) or type(llm).__name__) if llm is not None else None

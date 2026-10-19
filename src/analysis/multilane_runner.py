@@ -282,7 +282,9 @@ class MultiLaneResearchRunner:
         self._ephemeral_sources = {}
         self._ephemeral_claims = []
         self._ephemeral_search_logs = []
-        self._run_excluded_claims: List[Tuple[Claim, str]] = []
+        self._run_excluded_claims: List[Tuple[Claim, str, str]] = []
+        self._run_content_keys: Dict[str, str] = {}
+        self._source_cache: Dict[str, Optional[Source]] = {}
         self._check_llm_cache: Optional[Tuple[Any]] = None
         is_quick = "Fast" in depth
         max_academic_papers = 5 if is_quick else 10
@@ -440,20 +442,23 @@ class MultiLaneResearchRunner:
         # ----------------------------------------------------------------------
         # CHECK B: WELL-FORMED CLAIMS (rules only, no model)
         # ----------------------------------------------------------------------
-        from src.engine.check_b_wellformed import claim_content_key
+        from src.engine.check_b_wellformed import claim_content_keys
 
         # This run's claims only: all three lanes, including practitioner claims exported to the ledger.
         run_claims = _merge_by_key(list(academic_claims) + list(enterprise_claims) + list(practitioner_claims), self._ephemeral_claims, lambda c: c.id)
         run_claims = [c for c in run_claims if c.status != "rejected"]
+        self._run_content_keys = claim_content_keys(run_claims)
         excluded_keys = set(excluded_claim_keys or [])
-        operator_excluded = [c for c in run_claims if claim_content_key(c) in excluded_keys]
+        operator_excluded = [c for c in run_claims if self._run_content_keys[c.id] in excluded_keys]
         if operator_excluded:
-            run_claims = [c for c in run_claims if claim_content_key(c) not in excluded_keys]
+            run_claims = [c for c in run_claims if self._run_content_keys[c.id] not in excluded_keys]
             self._log_operator_exclusions(operator_excluded, run_id)
-        self._run_excluded_claims = [(c, "Excluded on the evidence board.") for c in operator_excluded]
+        if excluded_claim_keys is not None:
+            self._log_operator_reinclusions(run_claims, run_id)
+        self._run_excluded_claims = [(c, "Excluded on the evidence board.", "operator") for c in operator_excluded]
         report(4, "Check B: Confirming there are enough well-formed claims from enough sources...", 0.60)
         check_b = self._run_check_b(run_claims, run_id, excluded_count=len(operator_excluded))
-        self._run_excluded_claims += [(c, check_b.set_aside[c.id]) for c in run_claims if c.id in check_b.set_aside]
+        self._run_excluded_claims += [(c, check_b.set_aside[c.id], "set_aside") for c in run_claims if c.id in check_b.set_aside]
         if not check_b.passed:
             return self._stop_at_check_b(
                 topic=topic,
@@ -715,10 +720,7 @@ class MultiLaneResearchRunner:
         from src.engine.checks import record_verdicts
 
         cfg = ((self.config or {}).get("checks") or {}).get("check_b") or {}
-        lookup: Dict[str, Any] = {}
-        for c in run_claims:
-            if c.source_id not in lookup:
-                lookup[c.source_id] = self._ephemeral_sources.get(c.source_id) or self.repo.get_source(c.source_id)
+        lookup = {c.source_id: self._source(c.source_id) for c in run_claims}
         result = run_check_b(
             run_claims,
             {k: v for k, v in lookup.items() if v is not None},
@@ -734,23 +736,54 @@ class MultiLaneResearchRunner:
     def _check_summary(check: Any) -> Dict[str, Any]:
         return {"passed": check.passed, "reason": check.reason_plain}
 
+    def _source(self, source_id: str) -> Optional[Source]:
+        """This run's view of a source: the harvest's copy, else the ledger's, looked up once per run."""
+        if source_id in self._ephemeral_sources:
+            return self._ephemeral_sources[source_id]
+        cache = getattr(self, "_source_cache", None)
+        if cache is None:
+            cache = self._source_cache = {}
+        if source_id not in cache:
+            cache[source_id] = self.repo.get_source(source_id)
+        return cache[source_id]
+
     def _log_operator_exclusions(self, claims: List[Claim], run_id: str) -> None:
+        """Log each exclusion once: a claim whose latest evidence-board review is already
+        'exclude' was excluded on an earlier re-draft and is not logged again."""
         if os.getenv("HOSTED_DEMO") == "1":
             return
-        from src.engine.check_b_wellformed import claim_content_key
-
         reviewer = os.getenv("RESEARCH_USER") or "operator"
         for c in claims:
+            if self.repo.latest_review_action("evidence_board", c.id) == "exclude":
+                continue
             self.repo.insert_review(Review(
                 id=f"rev_{uuid.uuid4().hex[:10]}",
                 gate="evidence_board",
                 object_type="claim",
                 object_id=c.id,
                 action="exclude",
-                after_json={"run_id": run_id, "content_key": claim_content_key(c)},
+                after_json={"run_id": run_id, "content_key": self._run_content_keys.get(c.id)},
                 reason="Excluded on the evidence board before drafting.",
                 reviewer=reviewer,
             ))
+
+    def _log_operator_reinclusions(self, kept: List[Claim], run_id: str) -> None:
+        """A board re-draft that brings back a previously excluded claim logs an 'include'."""
+        if os.getenv("HOSTED_DEMO") == "1":
+            return
+        reviewer = os.getenv("RESEARCH_USER") or "operator"
+        for c in kept:
+            if self.repo.latest_review_action("evidence_board", c.id) == "exclude":
+                self.repo.insert_review(Review(
+                    id=f"rev_{uuid.uuid4().hex[:10]}",
+                    gate="evidence_board",
+                    object_type="claim",
+                    object_id=c.id,
+                    action="include",
+                    after_json={"run_id": run_id, "content_key": self._run_content_keys.get(c.id)},
+                    reason="Re-included on the evidence board.",
+                    reviewer=reviewer,
+                ))
 
     def _format_papers(self, academic_papers: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], Dict[str, Dict[str, Any]]]:
         papers_formatted: List[Dict[str, Any]] = []
@@ -770,7 +803,6 @@ class MultiLaneResearchRunner:
                 "url": p.get("url") or p.get("link") or "https://scholar.google.com",
                 "relevance_score": float(p.get("relevance_score", 0.0)),
                 "is_custom": bool(p.get("is_custom", False) or "[Custom User Source]" in p.get("title", "")),
-                "raw": p,  # the harvested record, so a re-draft reuses the same evidence
             }
             papers_formatted.append(p_entry)
             if p.get("id"):
@@ -780,11 +812,11 @@ class MultiLaneResearchRunner:
     def _format_claim(self, c: Claim, paper_by_id: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
         from src.engine.check_b_wellformed import claim_content_key
 
-        src = self._ephemeral_sources.get(c.source_id) or self.repo.get_source(c.source_id)
+        src = self._source(c.source_id)
         p_info = paper_by_id.get(str(c.source_id))
         return {
             "id": c.id,
-            "content_key": claim_content_key(c),
+            "content_key": getattr(self, "_run_content_keys", {}).get(c.id) or claim_content_key(c),
             "source_id": c.source_id,
             "lane": (src.lane if src else "academic").upper(),
             "assertion": c.text,
@@ -802,10 +834,27 @@ class MultiLaneResearchRunner:
             "is_custom": bool((src and "[Custom User Source]" in src.title) or (p_info and p_info.get("is_custom"))),
         }
 
+    def _format_enterprise_sources(self, claims: List[Claim]) -> List[Dict[str, Any]]:
+        out: List[Dict[str, Any]] = []
+        for sid in sorted({c.source_id for c in claims}):
+            s = self._source(sid)
+            if s and s.lane == "enterprise":
+                out.append({
+                    "id": s.id,
+                    "title": s.title,
+                    "url": s.url or "https://dora.dev",
+                    "venue": s.venue or s.org,
+                    "commercial_stake": s.commercial_stake,
+                    "source_type": s.source_type,
+                    "pub_date": s.pub_date,
+                    "is_custom": "[Custom User Source]" in s.title,
+                })
+        return out
+
     def _format_excluded_claims(self, paper_by_id: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:
         return [
-            {**self._format_claim(c, paper_by_id), "exclusion_reason": why}
-            for c, why in getattr(self, "_run_excluded_claims", [])
+            {**self._format_claim(c, paper_by_id), "exclusion_reason": why, "exclusion_kind": kind}
+            for c, why, kind in getattr(self, "_run_excluded_claims", [])
         ]
 
     def _safe_set_run_status(self, run_id: str, status: str, reason: Optional[str] = None) -> None:
@@ -965,7 +1014,10 @@ class MultiLaneResearchRunner:
             "doc_id": None,
             "signals": [], "findings": [], "risks": [], "roadmap": [], "negative_findings": [],
             "business_signal": "",
-            "papers": papers_formatted, "enterprise_sources": [], "practitioner_observations": [],
+            "papers": papers_formatted,
+            "harvested_papers": list(academic_papers),
+            "enterprise_sources": self._format_enterprise_sources(claims),
+            "practitioner_observations": [],
             "claims": claims_formatted,
             "excluded_claims": self._format_excluded_claims(paper_by_id),
             "sentence_traces": [],
@@ -1538,7 +1590,7 @@ class MultiLaneResearchRunner:
         """Persist academic claims in ledger.db and apply deterministic grading."""
         graded: List[Claim] = []
         for c in academic_claims:
-            src = self.repo.get_source(c.source_id) or self._ephemeral_sources.get(c.source_id)
+            src = self._source(c.source_id)
             if not src:
                 src = Source(
                     id=c.source_id,
@@ -1769,7 +1821,7 @@ class MultiLaneResearchRunner:
                 c_obj = claim_by_id.get(cid)
                 if not c_obj:
                     continue
-                src_obj = self.repo.get_source(c_obj.source_id) or self._ephemeral_sources.get(c_obj.source_id)
+                src_obj = self._source(c_obj.source_id)
                 p_info = paper_by_id.get(str(c_obj.source_id))
                 src_key = p_info["key"] if p_info else str(c_obj.source_id)
                 src_title = p_info["title"] if p_info else (src_obj.title if src_obj else c_obj.entity or "Verified Source")
@@ -1846,21 +1898,7 @@ class MultiLaneResearchRunner:
         ui_negative = [s.text for s in sentences if s.type == "negative_finding"]
 
         # Formatted enterprise sources (scoped strictly to claims for this question/run)
-        ent_sources_formatted = []
-        ent_source_ids = {c.source_id for c in enterprise_claims}
-        for sid in ent_source_ids:
-            s = self.repo.get_source(sid) or self._ephemeral_sources.get(sid)
-            if s and s.lane == "enterprise":
-                ent_sources_formatted.append({
-                    "id": s.id,
-                    "title": s.title,
-                    "url": s.url or "https://dora.dev",
-                    "venue": s.venue or s.org,
-                    "commercial_stake": s.commercial_stake,
-                    "source_type": s.source_type,
-                    "pub_date": s.pub_date,
-                    "is_custom": "[Custom User Source]" in s.title,
-                })
+        ent_sources_formatted = self._format_enterprise_sources(enterprise_claims)
 
         # Formatted practitioner observations (scoped strictly to this question)
         prac_obs_formatted = []
@@ -1948,6 +1986,7 @@ class MultiLaneResearchRunner:
             "enterprise_sources": ent_sources_formatted,
             "practitioner_observations": prac_obs_formatted,
             "claims": claims_formatted,
+            "harvested_papers": list(academic_papers),
             "excluded_claims": excluded_formatted,
             "sentence_traces": sentence_traces,
             "generation_mode": executive_synthesis.get("generation_mode", "model"),
