@@ -32,6 +32,8 @@ from src.ledger.repository import LedgerRepository
 
 logger = logging.getLogger(__name__)
 
+MAX_ITEMS_PER_FEED = 3
+
 
 class EnterpriseCollector:
     def __init__(
@@ -81,81 +83,16 @@ class EnterpriseCollector:
         return status == "active" and bool(note)
 
     def _is_item_relevant(self, item: Dict[str, Any], query: str, scope: Optional[str] = None) -> bool:
-        """Evaluate item relevance against query using weighted term overlap matching Lane A."""
-        title = item.get("title", "")
-        text = item.get("abstract", "") or item.get("text", "")
-        full_text = f"{title} {text}".lower()
+        """Check A's key-term rule: the item's own title and summary must share enough salient terms
+        with the question (check_a.floor_min_terms from config.yaml, as for Check A)."""
+        from src.engine.check_a_on_topic import _rule_floor, _term_alternates, salient_terms
 
-        stopwords = {
-            "a", "about", "above", "after", "again", "against", "all", "am", "an", "and", "any", "are",
-            "as", "at", "be", "because", "been", "before", "being", "below", "between", "both", "but",
-            "by", "could", "did", "do", "does", "doing", "down", "during", "each", "few", "for", "from",
-            "further", "had", "has", "have", "having", "he", "her", "here", "hers", "herself", "him",
-            "himself", "his", "how", "i", "if", "in", "into", "is", "it", "its", "itself", "just",
-            "me", "more", "most", "my", "myself", "no", "nor", "not", "now", "of", "off", "on", "once",
-            "only", "or", "other", "ought", "our", "ours", "ourselves", "out", "over", "own", "same",
-            "she", "should", "so", "some", "such", "than", "that", "the", "their", "theirs", "them",
-            "themselves", "then", "there", "these", "they", "this", "those", "through", "to", "too",
-            "under", "until", "up", "very", "was", "we", "were", "what", "when", "where", "which",
-            "while", "who", "whom", "why", "with", "would", "you", "your", "yours", "yourself",
-        }
-        generic_words_list = {
-            "productivity", "adoption", "gains", "evidence", "teams", "impact",
-            "empirical", "study", "analysis", "results", "evaluation", "insights",
-            "benchmark", "survey", "report", "outcomes", "metrics", "practices",
-            "trade-offs", "effects", "findings", "case", "investigation", "review",
-            "development",
-        }
-        COMPANY_NAMES = {"amazon", "google", "microsoft", "meta", "apple", "ibm", "oracle"}
-        AGENT_BARE_TERMS = {"agent", "agents", "agentic"}
-        CODE_SOFTWARE_DEV_TERMS = {
-            "code", "coding", "software", "developer", "developers", "engineering",
-            "programmer", "programming", "repository", "repositories", "ide", "commit",
-            "copilot", "kiro", "sdd", "spec-driven", "assistant", "assistants"
-        }
-        SOFTWARE_CONTEXT_TERMS = CODE_SOFTWARE_DEV_TERMS | {"cloud", "bedrock", "ai", "llm", "triage", "clinical"}
-
-        all_q_words = [w.lower() for w in re.findall(r"\b[a-zA-Z0-9-]{2,}\b", query)]
-        q_tokens = [w for w in all_q_words if w not in stopwords]
-        salient_q_terms = {w for w in q_tokens if w not in generic_words_list}
-
-        item_tokens = set(re.findall(r"\b[a-zA-Z0-9-]{2,}\b", full_text))
-
-        def stems_match(w1: str, w2: str) -> bool:
-            if w1 == w2:
-                return True
-            if len(w1) >= 4 and len(w2) >= 4:
-                return w1.startswith(w2[:4]) or w2.startswith(w1[:4])
-            return False
-
-        # Check salient / head terms match (with company and agent qualifications)
-        matched_salient = set()
-        for t in salient_q_terms:
-            for it in item_tokens:
-                if stems_match(t, it):
-                    if t in COMPANY_NAMES and not bool(item_tokens & SOFTWARE_CONTEXT_TERMS):
-                        continue
-                    if t in AGENT_BARE_TERMS and not bool(item_tokens & CODE_SOFTWARE_DEV_TERMS):
-                        continue
-                    matched_salient.add(t)
-                    break
-
-        matched_generic = {
-            w for w in q_tokens
-            if w in generic_words_list and any(stems_match(w, it) for it in item_tokens)
-        }
-
-        salient_weight = len(matched_salient) * 1.0
-        generic_weight = len(matched_generic) * 0.05
-        total_q_weight = len(salient_q_terms) * 1.0 + len(set(q_tokens) & generic_words_list) * 0.05
-        overlap_fraction = (salient_weight + generic_weight) / total_q_weight if total_q_weight > 0 else 0.0
-
-        if any(w in full_text for w in ("kiro", "spec-driven", "specification", "specification-driven", "coding assistant", "ai assistant", "autonomous coding", "automated testing", "devops")):
-            return True
-
-        if salient_q_terms:
-            return bool(matched_salient) and (overlap_fraction >= 0.25)
-        return overlap_fraction >= 0.25
+        text = f"{item.get('title', '')}. {item.get('abstract', '') or item.get('text', '')}"
+        # Two-letter terms ("ai") alone are not a topic match: any AI post would pass for any AI question.
+        terms = {t for t in salient_terms(query) if len(t) >= 3} or salient_terms(query)
+        alternates = _term_alternates(terms, self.config.get("research", {}).get("head_term_synonyms"))
+        min_terms = int(self.config.get("checks", {}).get("check_a", {}).get("floor_min_terms", 1))
+        return not _rule_floor(alternates, text, min_terms)["off_topic"]
 
     def search_and_ingest(
         self,
@@ -179,7 +116,8 @@ class EnterpriseCollector:
             )
 
         implemented_ids = set(self.get_implemented_fetcher_ids())
-        is_live_allowed = allow_live if allow_live is not None else (os.getenv("ALLOW_LIVE_ENTERPRISE") == "1")
+        # Blog feeds are fetched by default; ALLOW_LIVE_ENTERPRISE=0 switches fetching off (tests, offline runs).
+        is_live_allowed = allow_live if allow_live is not None else (os.getenv("ALLOW_LIVE_ENTERPRISE") != "0")
 
         for src_cfg in self.registry_sources:
             src_id = src_cfg["id"]
@@ -236,6 +174,7 @@ class EnterpriseCollector:
 
             # Filter items by question relevance
             items = [it for it in raw_items if self._is_item_relevant(it, query=query, scope=question.scope)]
+            items = items[:MAX_ITEMS_PER_FEED]
 
             # Log search attempt in search_log
             log_entry = SearchLog(
@@ -266,7 +205,7 @@ class EnterpriseCollector:
                         "id": src_id,
                         "title": title,
                         "abstract": clean_excerpt,
-                        "year": item.get("year", 2026),
+                        "year": item.get("year") or (int(item["pub_date"][:4]) if str(item.get("pub_date", ""))[:4].isdigit() else None),
                     },
                     question_id=question.id,
                     target_entity=question.scope or "Amazon Kiro",
@@ -280,6 +219,7 @@ class EnterpriseCollector:
                     claim.source_excerpt = strip_html_and_truncate(claim.source_excerpt or clean_excerpt, max_words=25)
                     claim.context_json = claim.context_json or {}
                     claim.context_json["speaker"] = speaker_type
+                    claim.context_json["url"] = item.get("url")
                     claim.context_json["source_stake"] = src_cfg["commercial_stake"]
 
                     # Grade with Grader
