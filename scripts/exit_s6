@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ==============================================================================
+# Exit Script for Slice S6: no data counts as FAIL, and only a human publishes
+# ==============================================================================
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$REPO_ROOT"
+PY="${PY:-.venv/bin/python}"
+
+echo "======================================================================"
+echo "Executing Slice S6 Exit Verification Script"
+echo "======================================================================"
+
+export RESEARCH_USER="exit-script-s6"
+
+PYTHONPATH=. "$PY" - << 'EOF'
+import os
+import tempfile
+from pathlib import Path
+
+from src.score.checker import NO_DATA, GateChecker
+from src.ui.publish_view import publish_eligibility
+
+tmp = Path(tempfile.mkdtemp())
+
+print("--- 1. Empty draft: every gate has no data, and that is not a pass ---")
+os.environ["RESEARCH_DENYLIST"] = str(tmp / "denylist.txt")
+(tmp / "denylist.txt").write_text("# empty\n", encoding="utf-8")
+res = GateChecker().check_output(sentences=[], ledger_claims={})
+assert set(res.states().values()) == {NO_DATA} and not res.passed
+print(f"States: {res.states()} -> passed={res.passed}")
+
+print("--- 2. Missing denylist: G5 cannot pass ---")
+os.environ["RESEARCH_DENYLIST"] = str(tmp / "absent.txt")
+res = GateChecker().check_output(sentences=[], ledger_claims={})
+print(f"G5: {res.state('G5')} - {res.reason_plain('G5')}")
+assert res.state("G5") == NO_DATA
+
+print("--- 3. Publishing is a human decision ---")
+for status in ("PUBLISH_READY", "REVISE", "BLOCKED", "NOT_PUBLISHABLE"):
+    eligible, needs_reason, why = publish_eligibility({"status": status, "doc_id": "out"})
+    print(f"{status:<16} eligible={eligible!s:<5} needs_reason={needs_reason!s:<5} {why}")
+assert publish_eligibility({"status": "BLOCKED", "doc_id": "out"})[0] is False
+EOF
+
+echo ""
+echo -n "[1/3] Running Slice S6 tests... "
+PYTHONPATH=. "$PY" -m pytest tests/test_s6_gates_and_publish.py -q
+echo "OK (all S6 tests passed)"
+
+echo -n "[2/3] Running canary suite... "
+PYTHONPATH=. "$PY" -m pytest evals/canary/ -q
+echo "OK (canaries passed)"
+
+echo -n "[3/3] Running full regression test suite... "
+PYTHONPATH=. "$PY" -m pytest tests/ evals/ -q
+echo "OK (full repository tests passed)"
+
+echo ""
+echo "======================================================================"
+echo "Slice S6 Exit Verification: ALL CHECKS PASSED (EXIT 0)"
+echo "======================================================================"
+exit 0

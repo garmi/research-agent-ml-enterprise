@@ -65,5 +65,26 @@ You review and publish
 
   The rules figure is after removing "can", "about" and "around" from the hedge list (they are usually capability or topic words); it now misses two claims whose only hedge was "can". Neither judge catches a sentence that keeps a hedge word but overstates elsewhere. The pairs set is small and partly built by deleting hedges, which favours the rules judge, so Check C stays unwired until a larger and less biased set (and the Gemini run) confirms the hold-or-warn decision.
 
+### S6: no data counts as FAIL, and only a human publishes
+- **Gate states:** each gate G1–G6 is `PASS`, `FAIL` or `NO_DATA`, with a plain-words reason. `NO_DATA` is not a pass: a draft passes only when all six are `PASS`. Readers that only know `pass` see `False`.
+- **What has no data:**
+  - **G1:** no finding, signal or risk.
+  - **G2–G4:** no sentence cites a valid claim.
+  - **G3:** no approved question, or no source text for a cited claim.
+  - **G5:** no `denylist.txt`. Copy `denylist.example.txt`; an empty file is fine.
+  - **G6:** no sentences.
+- **What G1–G4 check:** findings, signals and risks must cite evidence. Roadmap steps are recommendations; they are checked only for confidentiality and copyright.
+- **Scoring:** missing data earns no credit. Freshness and contradiction credit are 0 when nothing is cited, and reproducibility with nothing to re-run is "not measured", which caps the band at REVISE.
+- **Statuses:** a run never publishes itself.
+  - Any gate not `PASS` → `BLOCKED`.
+  - Otherwise the score band: `PUBLISH_READY`, `REVISE` or `NOT_PUBLISHABLE`.
+  - Extractive-fallback drafts are never publishable.
+  - The status and its reasons are written to `runs.status`.
+- **Publishing:**
+  - A named reviewer publishes from the Phase 4B Publish step.
+  - `PUBLISH_READY` publishes; `REVISE` needs a sign-off reason; `BLOCKED` and `NOT_PUBLISHABLE` never publish.
+  - The publisher re-checks the gates with the run's question and sources, and uses the band the run audited.
+  - The sign-off goes to `reviews`, and `runs.status` becomes `PUBLISHED`.
+
 ### Open risk
 Check C is the least certain. A hedge check on a small local model may be unreliable, so the bake-off (`evals/bakeoff_check_c.py`, S5) runs before C is allowed to hold sentences. If it falls short, C ships warn-only, like D.

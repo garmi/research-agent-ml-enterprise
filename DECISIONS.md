@@ -111,6 +111,7 @@ This log records all design choices, trade-offs, and deviations where prompt ass
 | DEC-016 | 2026-10-18 | Pipeline | Handoff Checks A–D, Verdict Ledger, and No-Data-Is-FAIL Gates | Proposed |
 | DEC-017 | 2026-10-18 | Evidence | Run-Scoped Evidence, Check B Thresholds, and Evidence Board Exclusions | Proposed |
 | DEC-018 | 2026-10-18 | Synthesis | Hedge Terms on Claims, Honest Citation Binding, Check C Bake-off Baseline | Proposed |
+| DEC-019 | 2026-10-19 | Governance | No Data Counts as FAIL; Human-Only Publishing | Proposed |
 
 ---
 
@@ -191,4 +192,19 @@ This log records all design choices, trade-offs, and deviations where prompt ass
   3. Ship the Check C rules and model judges, the bake-off harness and 29 hand-labelled pairs, without wiring Check C into runs.
 - **Baseline:** rules reach 1.00 precision and 0.71 recall on "dropped" (after dropping "can", "about", "around" from the hedge list in the PR #4 review; 0.92 / 0.86 before); qwen2.5:3b reaches 0.90 and 0.64. Neither judge catches overstatement that keeps a hedge word. The pairs set is small and favours the rules judge, so the hold-or-warn decision is deferred to a larger set and a Gemini run (blocked: the key's project rejects generativelanguage.googleapis.com).
 - **Rationale:** Honest binding and recorded hedges are useful on their own and are prerequisites for Check C. Wiring a judge that misses a third of overstatements, or that has not been measured on representative data, would give false assurance.
+
+---
+
+### DEC-019: No Data Counts as FAIL; Human-Only Publishing (S6)
+- **Context:** Every gate started as PASS, so a draft with nothing to check passed all six. The UI and runner filled missing gate data with PASS, the scorer gave credit for missing data, and every run called the publisher with an automated reviewer, publishing itself whenever the band allowed.
+- **Decision:**
+  1. Gates have three states (`PASS` / `FAIL` / `NO_DATA`), and only all-`PASS` passes.
+  2. G1–G4 cover findings, signals and risks; roadmap steps are exempt as recommendations.
+  3. G5 is `NO_DATA` without a `denylist.txt` (an empty file is fine; `denylist.example.txt` is tracked).
+  4. The scorer gives no credit for missing data.
+  5. Every `.get("pass"/"passed", True)` default is removed, and a test guards against reintroducing one.
+  6. Runs end at a gated status and never publish.
+  7. A named reviewer publishes `PUBLISH_READY`, or `REVISE` with a logged reason. `BLOCKED` and `NOT_PUBLISHABLE` are refused.
+  8. The publisher uses the run's question and audited band, and records `PUBLISHED` on the run.
+- **Rationale:** The topography's Stage 7 ("a gate with no data counts as FAIL") and its final step ("You review and publish"). A pass now always means something was checked, and publishing is always a recorded human decision.
 

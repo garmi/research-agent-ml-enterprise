@@ -46,6 +46,11 @@ This guide will help you set up the research agent on your Mac.
    DEFAULT_TOPIC=AI adoption in enterprise software delivery
    MAX_PAPERS=12
 
+3. Create the confidentiality denylist (required, it can stay empty):
+   cp denylist.example.txt denylist.txt
+   Add one client, vendor, programme or person name per line. denylist.txt is git-ignored.
+   Without it, Gate G5 has no data and every draft is blocked from publishing.
+
 ## Step 4: Run Your First Research
 
 1. Make sure Ollama server is running (step 1.2)
