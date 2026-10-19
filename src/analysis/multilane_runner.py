@@ -150,6 +150,21 @@ def resolve_honest_venue_and_type(p: Dict[str, Any]) -> Tuple[str, str]:
     return v, s_type
 
 
+def labelled_venue(p: Dict[str, Any], grader: Any) -> Tuple[str, str, str]:
+    """(venue, label, tier) for a paper (S14). A journal or conference whose venue is not verified says
+    so, instead of passing as peer-reviewed; the venue name is unescaped (APIs send '&amp;')."""
+    import html as _html
+
+    venue, s_type = resolve_honest_venue_and_type(p)
+    venue = _html.unescape(venue or "")
+    tier = grader.resolve_venue_tier(venue, s_type)
+    if tier != "verified" and s_type == "Peer-Reviewed Journal":
+        s_type = "Journal (venue not verified)"
+    elif tier != "verified" and s_type == "Conference":
+        s_type = "Conference (venue not verified)"
+    return venue, s_type, tier
+
+
 def _merge_by_key(first: List[Any], second: List[Any], key: Callable[[Any], str]) -> List[Any]:
     """Concatenate two harvests, keeping the first occurrence of each key."""
     seen = {key(x) for x in first}
@@ -821,7 +836,7 @@ class MultiLaneResearchRunner:
         papers_formatted: List[Dict[str, Any]] = []
         paper_by_id: Dict[str, Dict[str, Any]] = {}
         for i, p in enumerate(academic_papers, start=1):
-            v, t = resolve_honest_venue_and_type(p)
+            v, t, _tier = labelled_venue(p, self.grader)
             yr = p.get("year")
             yr_str = "Date unknown" if (yr is None or str(yr).lower() in ("none", "null", "", "date unknown")) else str(yr)
             p_entry = {
@@ -1207,7 +1222,11 @@ class MultiLaneResearchRunner:
             valid, set_aside = fill_abstracts([p for p in all_papers if p.get("title")], [openalex, semantic])
             self._papers_without_abstract.extend(set_aside)
 
-            ranked = rank_papers(valid, topic)
+            # S14: relevance weighed by venue tier, so verified venues lead among equally relevant papers.
+            from src.analysis.relevance import rank_papers_by_tier
+
+            weights = ((self.config or {}).get("research") or {}).get("venue_tier_weights") or {}
+            ranked = rank_papers_by_tier(valid, topic, lambda paper: labelled_venue(paper, self.grader)[2], weights)
             selected = ranked[:max_papers] if ranked else valid[:max_papers]
 
         # Ingest custom user URLs for Academic Lane
@@ -1434,10 +1453,9 @@ class MultiLaneResearchRunner:
             doi = p.get("doi") or p.get("url") or p.get("link")
             src_id = p.get("id") or hashlib.sha256(f"{doi or title}".encode()).hexdigest()[:16]
             p["id"] = src_id
-            venue, s_type = resolve_honest_venue_and_type(p)
+            venue, s_type, venue_tier = labelled_venue(p, self.grader)
             p["venue"] = venue
             p["source_type"] = s_type
-            venue_tier = self.grader.resolve_venue_tier(venue, s_type)
 
             yr = p.get("year")
             pub_date_str = str(yr) if (yr is not None and str(yr).lower() not in ("none", "null", "")) else "Date unknown"
@@ -1447,7 +1465,8 @@ class MultiLaneResearchRunner:
             source = Source(
                 id=src_id,
                 lane="academic",
-                source_type="peer_reviewed" if s_type in ("Peer-Reviewed Journal", "Conference") else "preprint",
+                # S14: peer_reviewed only for a verified venue; an unverified journal is not known to referee.
+                source_type="peer_reviewed" if venue_tier == "verified" else "preprint",
                 org=p.get("authors", ["Academic Authors"])[0] if isinstance(p.get("authors"), list) and p.get("authors") else "Academic Researcher",
                 title=title,
                 url=p.get("url") or p.get("link"),

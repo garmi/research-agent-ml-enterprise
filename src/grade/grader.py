@@ -12,6 +12,7 @@ Implements rules defined in grade/rules.yaml and venue tiers from grade/venue_ti
 from __future__ import annotations
 
 import logging
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 import yaml
@@ -19,6 +20,19 @@ import yaml
 from src.ledger.models import Claim, ClaimGrade, Source, VenueTier
 
 logger = logging.getLogger(__name__)
+
+
+
+def _norm_venue(text: str) -> str:
+    return " ".join(re.sub(r"[^a-z0-9]+", " ", str(text or "").lower()).split())
+
+
+def _venue_matches(norm_venue: str, pattern: str) -> bool:
+    """'=x' must equal the whole venue; otherwise the pattern must appear as whole words."""
+    if pattern.startswith("="):
+        return norm_venue == _norm_venue(pattern[1:])
+    pat = _norm_venue(pattern)
+    return bool(pat) and f" {pat} " in f" {norm_venue} "
 
 
 class Grader:
@@ -38,7 +52,7 @@ class Grader:
             self.venue_tiers = yaml.safe_load(f)
 
     def resolve_venue_tier(self, venue: Optional[str], source_type: Optional[str] = None) -> VenueTier:
-        """Resolve venue tier deterministically using substring matching."""
+        """Resolve venue tier deterministically by whole-word matching (S14)."""
         if not venue:
             if source_type == "preprint":
                 return "reputable_preprint"
@@ -48,29 +62,11 @@ class Grader:
                 return "n/a"
             return "unverified"
 
-        norm = venue.strip().lower()
-
-        # Check verified tier
-        for pattern in self.venue_tiers["tiers"]["verified"]["matches"]:
-            if pattern in norm:
-                return "verified"
-
-        # Check reputable preprint
-        for pattern in self.venue_tiers["tiers"]["reputable_preprint"]["matches"]:
-            if pattern in norm:
-                return "reputable_preprint"
-
-        # Check unverified tier
-        for pattern in self.venue_tiers["tiers"]["unverified"]["matches"]:
-            if pattern in norm:
-                return "unverified"
-
-        # Check vendor tier
-        for pattern in self.venue_tiers["tiers"]["vendor"]["matches"]:
-            if pattern in norm:
-                return "vendor"
-
-        # Default to unverified for unknown venues
+        norm = _norm_venue(venue)
+        # Named low-tier venues first, so a known mill never matches a broad verified pattern.
+        for tier in ("unverified", "vendor", "reputable_preprint", "verified"):
+            if any(_venue_matches(norm, p) for p in self.venue_tiers["tiers"][tier]["matches"]):
+                return tier
         return "unverified"
 
     def grade_claim(

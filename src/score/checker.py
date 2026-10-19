@@ -143,8 +143,10 @@ class GateChecker:
             with open(self.verbs_path, "r", encoding="utf-8") as f:
                 data = yaml.safe_load(f)
                 self.verbs_cfg = data.get("levels", {})
+                self.intensifiers = [str(w).lower() for w in data.get("intensifiers") or []]
         else:
             self.verbs_cfg = {}
+            self.intensifiers = []
 
     def _load_denylist(self) -> Set[str]:
         """Load the denylist (RESEARCH_DENYLIST overrides the configured path). A missing file
@@ -390,6 +392,18 @@ class GateChecker:
                     result.violations["G4"].append(
                         f"Sentence [{s.id}] (ordinal {s.ordinal}) uses verb '{verb}' (level {verb_rank}) exceeding weakest claim {weakest_claim.id} grade '{weakest_claim.grade}' (max level {min_allowed})"
                     )
+
+            # G4 (S14): an intensifier overstates unless a cited quote uses the same word stem.
+            quotes = " ".join(normalize_text(c.source_excerpt or c.text or "") for c in cited_claims)
+            for word in self.intensifiers:
+                if re.search(rf"\b{re.escape(word)}\b", s_text, re.IGNORECASE):
+                    # "dramatically" -> "dramatic", "significantly" -> "significant"
+                    stem = word[:-4] if word.endswith("ically") else (word[:-2] if word.endswith("ly") else word)
+                    if not re.search(rf"\b{re.escape(stem)}", quotes):
+                        result.g4_pass = False
+                        result.violations["G4"].append(
+                            f"Sentence [{s.id}] (ordinal {s.ordinal}) says '{word}', but none of its cited quotes does"
+                        )
 
             # G5: Confidentiality
             self._check_confidentiality(s_text, result)

@@ -1,5 +1,8 @@
 # Venue Tiers for Academic and Enterprise Literature
 # Maps publication venues and publishers to authoritative tiers.
+# Matching (S14): a pattern matches whole words of the venue name ("chi" does not match "machine");
+# a pattern starting with "=" must equal the whole venue name. Tiers are checked in the order
+# unverified, vendor, reputable_preprint, verified, so a named low-tier venue always wins.
 
 tiers:
   verified:
@@ -10,7 +13,8 @@ tiers:
       - "springer"
       - "elsevier"
       - "nature"
-      - "science"
+      - "=science"
+      - "science advances"
       - "usenix"
       - "icse"
       - "fse"
