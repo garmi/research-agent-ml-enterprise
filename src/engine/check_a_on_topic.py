@@ -221,7 +221,10 @@ def run_check_a(
     terms = salient_terms(question)
     alternates = _term_alternates(terms, synonyms)
 
-    judged = _judge_with_model(llm, question, build_question_context(question, package, alternates), items, template)
+    # Practitioner notes never go to the check model (DEC-013: they never reach a remote model,
+    # and the check model may be remote). They are never removed by Check A; the rule floor decides.
+    model_items = [it for it in items if it.lane != "practitioner"]
+    judged = _judge_with_model(llm, question, build_question_context(question, package, alternates), model_items, template)
     verdicts: List[CheckVerdict] = []
     on_topic: Set[str] = set()
     for item in items:

@@ -1,6 +1,8 @@
 -- Forward-only migration 006: Handoff-check verdicts and persisted run status (DEC-016)
 ALTER TABLE runs ADD COLUMN status TEXT DEFAULT 'RUNNING';
 ALTER TABLE runs ADD COLUMN status_reason TEXT;
+-- Runs recorded before this migration have no known outcome; do not let the default call them RUNNING.
+UPDATE runs SET status = 'UNKNOWN', status_reason = 'Run recorded before run status was tracked (migration 006).';
 
 CREATE TABLE IF NOT EXISTS check_verdicts (
     id TEXT PRIMARY KEY,

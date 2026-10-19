@@ -11,7 +11,7 @@ import datetime
 import os
 import uuid
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 MAX_ATTEMPT = 1
 ABSTAIN = "abstain"
@@ -56,12 +56,25 @@ class CheckVerdict:
         return asdict(self)
 
 
-def record_verdict(repo: Any, verdict: CheckVerdict) -> CheckVerdict:
-    """Validate and persist a verdict. In hosted demo mode the verdict is returned unpersisted."""
+def _check_attempt(verdict: CheckVerdict) -> None:
     if verdict.attempt > MAX_ATTEMPT:
         raise CheckLoopError(
             f"Check {verdict.check_id} attempted pass {verdict.attempt}; at most {MAX_ATTEMPT} retry is allowed."
         )
+
+
+def record_verdicts(repo: Any, verdicts: List[CheckVerdict]) -> List[CheckVerdict]:
+    """Validate every verdict first, then persist them in one batch (all or nothing)."""
+    for v in verdicts:
+        _check_attempt(v)
+    if repo is not None and verdicts and os.getenv("HOSTED_DEMO") != "1":
+        repo.insert_check_verdicts([v.to_dict() for v in verdicts])
+    return verdicts
+
+
+def record_verdict(repo: Any, verdict: CheckVerdict) -> CheckVerdict:
+    """Validate and persist a verdict. In hosted demo mode the verdict is returned unpersisted."""
+    _check_attempt(verdict)
     if repo is not None and os.getenv("HOSTED_DEMO") != "1":
         repo.insert_check_verdict(verdict.to_dict())
     return verdict
