@@ -1,0 +1,713 @@
+{
+ "version": 2,
+ "created": "2026-10-19",
+ "labeller": "Claude (needs owner review)",
+ "how_built": "Real academic harvest at the Check A retry width for four questions; labels by hand using config.yaml head_term_synonyms. v2 adds the 26 sources of Cloud Run job_3cd226217fd8 (platform-teams question, 0/26 on-topic under prompt v1 with Gemini); text is title plus the OpenAlex abstract where found. on_topic = about AI in software development or AI systems built by development platforms.",
+ "items": [
+  {
+   "question_key": "kiro",
+   "question": "What empirical evidence exists regarding Amazon Kiro adoption, productivity gains, and delivery trade-offs in engineering teams?",
+   "source_id": "e19e0e1510673f60",
+   "lane": "academic",
+   "title": "Human-AI Collaboration in Software Engineering: Enhancing Developer Productivity through Intelligent Assistants",
+   "text": "Human-AI Collaboration in Software Engineering: Enhancing Developer Productivity through Intelligent Assistants. Enterprise software teams report a frustrating inconsistency: the same AI coding assistants producing compelling results in controlled studies return uneven outcomes in production. The problem is architectural, not technological. A capable AI coding assistant deployed without adequate codebase context, integrated at only one SDLC touchpoint, and missing any mechanism through which developers calibrate their trust in its suggestions will underperform relative to its documented potent",
+   "label": "on_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "kiro",
+   "question": "What empirical evidence exists regarding Amazon Kiro adoption, productivity gains, and delivery trade-offs in engineering teams?",
+   "source_id": "6924b27bdb92b85b",
+   "lane": "academic",
+   "title": "SDAD: Spec-Driven Agentic Development for the AI-Native SDLC",
+   "text": "SDAD: Spec-Driven Agentic Development for the AI-Native SDLC. Frontier coding agents backed by large language models with context windows from hundreds of thousands to millions of tokens are restructuring the Software Development Life Cycle (SDLC). Rich context handling and multi-step reasoning now allow substantial Functional Requirement Documents (FRDs) and repository context to be ingested in a single workflow, making specification quality the execution fuel for autonomous delivery. This report formalises Spec-Driven Agentic Development (SDAD) as a synthesis of disciplined up-front formalis",
+   "label": "on_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "kiro",
+   "question": "What empirical evidence exists regarding Amazon Kiro adoption, productivity gains, and delivery trade-offs in engineering teams?",
+   "source_id": "8c012d3b4563a315",
+   "lane": "academic",
+   "title": "SPEC-DRIVEN DEVELOPMENT FOR ENTERPRISE AGENTIC SOFTWARE ENGINEERING: A GOVERNANCE FRAMEWORK FOR RELIABLE AI-GENERATED SOFTWARE",
+   "text": "SPEC-DRIVEN DEVELOPMENT FOR ENTERPRISE AGENTIC SOFTWARE ENGINEERING: A GOVERNANCE FRAMEWORK FOR RELIABLE AI-GENERATED SOFTWARE. AI coding assistants are evolving into agents that can plan, edit repositories, run tools, test software, and prepare deployable changes. Natural-language prompts are useful for expressing intent, but they rarely encode the complete set of enterprise requirements that govern architecture, cybersecurity, reliability, and operations. This study proposes the Specification Governance and Validation Framework (SGVF), a design-science artifact that treats structured specifi",
+   "label": "on_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "kiro",
+   "question": "What empirical evidence exists regarding Amazon Kiro adoption, productivity gains, and delivery trade-offs in engineering teams?",
+   "source_id": "a9c24d46182c54a2",
+   "lane": "academic",
+   "title": "Productivity vs. Compliance: The New Engineering Challenge of AI Coding Assistants in Regulated Codebases",
+   "text": "Productivity vs. Compliance: The New Engineering Challenge of AI Coding Assistants in Regulated Codebases. Background: Large language model (LLM)-based coding assistants have moved from experimental developer utilities into everyday software engineering practice. Contemporary studies show that these tools can improve task completion, code comprehension, and routine implementation speed, while also introducing verification costs, usability limits, and security uncertainty. In regulated industries, the relevant question is not only whether AI assistance improves productivity, but whether AI-assi",
+   "label": "on_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "kiro",
+   "question": "What empirical evidence exists regarding Amazon Kiro adoption, productivity gains, and delivery trade-offs in engineering teams?",
+   "source_id": "fd023bde5dcdce6c",
+   "lane": "academic",
+   "title": "Developer productivity in AI-driven engineering teams",
+   "text": "Developer productivity in AI-driven engineering teams. Artificial Intelligence (AI) is transforming the software engineering practice of the modern days, and it directly affects how development teams are organized and how the productivity of the developer is gauged. Artificially intelligent applications are becoming common place, in the form of code completion tools or assistants, automated testing suites, and intelligent project management systems, to automate workflows, lessen human effort and enable decision-making on the basis of data. This paper discusses how AI may affect the productivit",
+   "label": "on_topic",
+   "borderline": true,
+   "note": "general AI in engineering teams, not assistants specifically"
+  },
+  {
+   "question_key": "kiro",
+   "question": "What empirical evidence exists regarding Amazon Kiro adoption, productivity gains, and delivery trade-offs in engineering teams?",
+   "source_id": "e7f664fe1fbb32d2",
+   "lane": "academic",
+   "title": "Spec-Driven Development for Agentic Software Engineering: Harnessing Human-Agent Teamwork",
+   "text": "Spec-Driven Development for Agentic Software Engineering: Harnessing Human-Agent Teamwork. Context: Software engineering is moving from AI-assisted practices like vibe coding, in which assistants accelerate individual developers, towards Agentic Software Engineering (ASE), in which autonomous agents are delegated goal-level tasks. However, industry reports a productivity paradox: as individual productivity increases, team throughput, review capacity, and stability degrade because team-scale software engineering discipline is neglected. Objective: This paper aims to establish the conceptual and",
+   "label": "on_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "kiro",
+   "question": "What empirical evidence exists regarding Amazon Kiro adoption, productivity gains, and delivery trade-offs in engineering teams?",
+   "source_id": "23b0b0755ca5f0c7",
+   "lane": "academic",
+   "title": "The Vibe Shift in Software Engineering: Evaluating AI-Led Conversational Programming for Performance, Cognition, and Responsible Adoption",
+   "text": "The Vibe Shift in Software Engineering: Evaluating AI-Led Conversational Programming for Performance, Cognition, and Responsible Adoption. This study evaluates Vibe Coding, an emerging AI-led conversational programming paradigm that enables developers to generate software through natural-language interaction with large language models. Using a mixed-methods design, the study assessed performance efficiency, cognitive implications, and responsible adoption in comparison with traditional and AI-assisted coding environments. Thirty participants, including professional developers and advanced comp",
+   "label": "on_topic",
+   "borderline": true,
+   "note": "vibe coding: conversational AI programming"
+  },
+  {
+   "question_key": "kiro",
+   "question": "What empirical evidence exists regarding Amazon Kiro adoption, productivity gains, and delivery trade-offs in engineering teams?",
+   "source_id": "7ae3b66bd9c76580",
+   "lane": "academic",
+   "title": "Generative AI Assistants in Software Development: Productivity Gains, Code Quality, and Security Trade-offs",
+   "text": "Generative AI Assistants in Software Development: Productivity Gains, Code Quality, and Security Trade-offs. Generative artificial intelligence (AI) coding assistants promise to shorten software-development tasks, yet task speed alone cannot establish an improvement in engineering productivity. This critical narrative review asks whether assistants help developers complete work faster without increasing functional defects, maintenance burden, or security weaknesses. The final analytical corpus comprises 20 principal sources available through September 27, 2026, including experiments, field tri",
+   "label": "on_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "kiro",
+   "question": "What empirical evidence exists regarding Amazon Kiro adoption, productivity gains, and delivery trade-offs in engineering teams?",
+   "source_id": "fdcc0727cedcd1da",
+   "lane": "academic",
+   "title": "Skill-Augmented AI Coding Agents: A Two-Layer Framework for SKILL.md Design and Developer Productivity",
+   "text": "Skill-Augmented AI Coding Agents: A Two-Layer Framework for SKILL.md Design and Developer Productivity. AI coding agents are in widespread professional use, yet developer productivity gains remain inconsistent. Controlled studies report speedups of 21–56% in some settings and slowdowns of up to 19% in others. We argue that this variance is not attributable to model capability but to the absence of structured, project-specific knowledge made available to the agent. This paper addresses that gap by introducing SKILL.md files as a first-class design artifact for AI-augmented coding workflows and ",
+   "label": "on_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "kiro",
+   "question": "What empirical evidence exists regarding Amazon Kiro adoption, productivity gains, and delivery trade-offs in engineering teams?",
+   "source_id": "9a6cd60664eef893",
+   "lane": "academic",
+   "title": "Methods and Techniques of Agentic Software Engineering: A Systematic Literature Review",
+   "text": "Methods and Techniques of Agentic Software Engineering: A Systematic Literature Review. The development of agentic software engineering (ASE) is shifting the software development process, specifically by adopting autonomous agents into the fundamental software development process, where autonomous agents using large language models (LLMs) and artificial intelligence (AI) make decisions, write code, and collaborate across the entire software development lifecycle. The systematic review is a summary of literature on the agentic software engineering methodologies, frameworks, and techniques publi",
+   "label": "on_topic",
+   "borderline": true,
+   "note": "agentic SE literature review"
+  },
+  {
+   "question_key": "kiro",
+   "question": "What empirical evidence exists regarding Amazon Kiro adoption, productivity gains, and delivery trade-offs in engineering teams?",
+   "source_id": "6b40bbb61c548c9a",
+   "lane": "academic",
+   "title": "Does AI Policy Adoption Matter? Evidence on Productivity and ICT Trade Competitiveness",
+   "text": "Does AI Policy Adoption Matter? Evidence on Productivity and ICT Trade Competitiveness. Does AI Policy Adoption Matter? Evidence on Productivity and ICT Trade Competitiveness. Research publication from Elsevier BV. Evaluates empirical impact, metrics, and technology findings.",
+   "label": "off_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "kiro",
+   "question": "What empirical evidence exists regarding Amazon Kiro adoption, productivity gains, and delivery trade-offs in engineering teams?",
+   "source_id": "6282ae9273c20488",
+   "lane": "academic",
+   "title": "Adoption and Effects of Software Engineering Best Practices in Machine Learning",
+   "text": "Adoption and Effects of Software Engineering Best Practices in Machine Learning. The increasing reliance on applications with machine learning (ML) components calls for mature engineering techniques that ensure these are built in a robust and future-proof manner. We aim to empirically determine the state of the art in how teams develop, deploy and maintain software with ML components. We mined both academic and grey literature and identified 29 engineering best practices for ML applications. We conducted a survey among 313 practitioners to determine the degree of adoption for these practices a",
+   "label": "off_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "hospital",
+   "question": "How are hospitals governing clinical AI triage tools to manage patient safety and regulatory compliance?",
+   "source_id": "414b988e895d5717",
+   "lane": "academic",
+   "title": "From Siloed Algorithms to Compliance‑First Agentic Platforms: A Multi‑Layered Architecture for Hospital AI Systems",
+   "text": "From Siloed Algorithms to Compliance‑First Agentic Platforms: A Multi‑Layered Architecture for Hospital AI Systems. Hospitals are rapidly adopting artificial intelligence for triage, imaging, scheduling etc., yet most deployments remain isolated point solutions locked inside departmental silos, resulting in duplicated effort, hidden risks, and unrealised enterprise value. Despite explosive growth of AI in healthcare market and accelerating investment, an estimated 70–80% of healthcare AI pilots fail to scale, largely due to governance gaps, fragmented data, and missing integration blueprints. ",
+   "label": "on_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "hospital",
+   "question": "How are hospitals governing clinical AI triage tools to manage patient safety and regulatory compliance?",
+   "source_id": "f502d729c8a20e45",
+   "lane": "academic",
+   "title": "The EU AI Act: implications and compliance guidance for healthcare facilities",
+   "text": "The EU AI Act: implications and compliance guidance for healthcare facilities. Background: The European Union AI Act [Regulation (EU) 2024/1689] establishes the first comprehensive legal framework for artificial intelligence. While AI offers transformative potential in healthcare, its deployment introduces risks regarding safety, bias, and accountability. There is currently a lack of practical operational frameworks to help healthcare facilities transition from legal theory to clinical compliance. Methods: We performed a qualitative regulatory analysis of the EU AI Act, specifically focusing o",
+   "label": "on_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "hospital",
+   "question": "How are hospitals governing clinical AI triage tools to manage patient safety and regulatory compliance?",
+   "source_id": "3d8485bf6926e2e3",
+   "lane": "academic",
+   "title": "AI-Driven Data Governance and Compliance: Building Trustworthy Enterprise Intelligence Systems",
+   "text": "AI-Driven Data Governance and Compliance: Building Trustworthy Enterprise Intelligence Systems. Enterprise AI adoption has grown faster than the systems designed to manage it. By early 2024, 65% of organizations were using generative AI in at least one core business function, yet only 18% had an enterprise-wide council with authority over AI risk decisions. This gap creates real exposure. An example of the quantification of AI risk within the economy includes the increase in public data breaches, liability lawsuits against chatbots, and regulatory fines. Based on findings from the 2024 IBM Cos",
+   "label": "off_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "hospital",
+   "question": "How are hospitals governing clinical AI triage tools to manage patient safety and regulatory compliance?",
+   "source_id": "4431dddb110a9b0e",
+   "lane": "academic",
+   "title": "Governing medical AI under the EU AI Act: an integrated compliance-by-design framework",
+   "text": "Governing medical AI under the EU AI Act: an integrated compliance-by-design framework. Artificial intelligence (AI) is becoming an increasingly important component of healthcare, supporting diagnosis, clinical decision-making, medical imaging, triage, and patient-facing services. While these technologies offer significant opportunities to improve healthcare delivery, they also raise important questions about patient safety, fairness, privacy, transparency, cybersecurity, and accountability. This paper examines the regulatory framework governing medical AI in the European Union, focusing on th",
+   "label": "on_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "hospital",
+   "question": "How are hospitals governing clinical AI triage tools to manage patient safety and regulatory compliance?",
+   "source_id": "4eefa708e99bf544",
+   "lane": "academic",
+   "title": "Governing Healthcare AI in the Real World: How Fairness, Transparency, and Human Oversight Can Coexist: A Narrative Review",
+   "text": "Governing Healthcare AI in the Real World: How Fairness, Transparency, and Human Oversight Can Coexist: A Narrative Review. Artificial intelligence (AI) is rapidly shifting from experimental pilots to mainstream clinical infrastructure, redefining how evidence, accountability, and ethics intersect in healthcare. This narrative review integrates insights from peer-reviewed studies and policy frameworks to examine seven cross-cutting aspects: bias and fairness, explainability, safety and quality, privacy and data protection, accountability and liability, human oversight, and procurement and depl",
+   "label": "on_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "hospital",
+   "question": "How are hospitals governing clinical AI triage tools to manage patient safety and regulatory compliance?",
+   "source_id": "03ea807e2408713c",
+   "lane": "academic",
+   "title": "A Self-Governing AI-Driven Agent for Advanced Patient Data Structuring",
+   "text": "A Self-Governing AI-Driven Agent for Advanced Patient Data Structuring. Abstract modern healthcare environments produce large amounts of various data, including structured EHR fields, narratives in clinical documentation, transcripts of telemedicine sessions, diagnostic imaging reports, and wearables and remote monitoring devices. A large fraction of this data is unstructured or semi-structured or inconsistently encoded, further contributing to documentation burden, impeding interoperability, and limiting the provision of timely and datadriven decision support. This paper presents a self-direc",
+   "label": "off_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "hospital",
+   "question": "How are hospitals governing clinical AI triage tools to manage patient safety and regulatory compliance?",
+   "source_id": "ea401aaf549348dd",
+   "lane": "academic",
+   "title": "Cloud-Based Data Governance Architectures for Pharmacovigilance: Ensuring Security, Privacy, Compliance, And Patient Safety in Healthcare Systems",
+   "text": "Cloud-Based Data Governance Architectures for Pharmacovigilance: Ensuring Security, Privacy, Compliance, And Patient Safety in Healthcare Systems. Cloud-based data governance frameworks are increasingly recognized as critical infrastructure for modern pharmacovigilance systems, enabling scalable, secure, and compliant management of real-world safety data. This paper explores the architecture, regulatory alignment, and operational advantages of cloud-integrated pharmacovigilance (PV) models, especially those augmented by artificial intelligence (AI) tools for signal detection and decision suppo",
+   "label": "off_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "hospital",
+   "question": "How are hospitals governing clinical AI triage tools to manage patient safety and regulatory compliance?",
+   "source_id": "66c09148db3ad3a8",
+   "lane": "academic",
+   "title": "AI and Big Data Security, Governance, and Regulatory Compliance in Enterprise Cloud Platforms: A Regulatory Document Analysis for the Saudi Public Sector",
+   "text": "AI and Big Data Security, Governance, and Regulatory Compliance in Enterprise Cloud Platforms: A Regulatory Document Analysis for the Saudi Public Sector. &amp;nbsp;Saudi Arabia's digital transformation agenda has produced a regulatory environment that is comprehensive in its ambition but uneven in its operational specificity when applied to artificial intelligence and big data workloads. Public-sector enterprises in the Kingdom are deploying AI capabilities at scale, embedding machine learning into enterprise resource planning processes, integrating cloud-native data platforms with SAP and ad",
+   "label": "off_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "hospital",
+   "question": "How are hospitals governing clinical AI triage tools to manage patient safety and regulatory compliance?",
+   "source_id": "9b68d1d8af3f8e7d",
+   "lane": "academic",
+   "title": "AI-based Clinical Decision Support for Primary Care: A Real-World Study",
+   "text": "AI-based Clinical Decision Support for Primary Care: A Real-World Study. We evaluate the impact of large language model-based clinical decision support in live care. In partnership with Penda Health, a network of primary care clinics in Nairobi, Kenya, we studied AI Consult, a tool that serves as a safety net for clinicians by identifying potential documentation and clinical decision-making errors. AI Consult integrates into clinician workflows, activating only when needed and preserving clinician autonomy. We conducted a quality improvement study, comparing outcomes for 39,849 patient visits ",
+   "label": "off_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "hospital",
+   "question": "How are hospitals governing clinical AI triage tools to manage patient safety and regulatory compliance?",
+   "source_id": "1ca43b122ad70b53",
+   "lane": "academic",
+   "title": "Blockchain-Enhanced Clinical Risk Management for AI Healthcare Systems : Privacy-Preserving Incident Response and Compliance Monitoring",
+   "text": "Blockchain-Enhanced Clinical Risk Management for AI Healthcare Systems : Privacy-Preserving Incident Response and Compliance Monitoring. The rapid integration of artificial intelligence (AI) into healthcare systems has revolutionized clinical workflows, diagnostics, and decision support mechanisms. However, this transformation introduces significant challenges in clinical risk management, particularly concerning data privacy, incident traceability, and regulatory compliance. Traditional risk management frameworks struggle to provide tamper-resistant audit trails and privacy-preserving incident",
+   "label": "on_topic",
+   "borderline": true,
+   "note": "clinical AI risk management via blockchain"
+  },
+  {
+   "question_key": "hospital",
+   "question": "How are hospitals governing clinical AI triage tools to manage patient safety and regulatory compliance?",
+   "source_id": "29f720876cb9a429",
+   "lane": "academic",
+   "title": "Engineering AI Agents for Clinical Workflows: A Case Study in Architecture,MLOps, and Governance",
+   "text": "Engineering AI Agents for Clinical Workflows: A Case Study in Architecture,MLOps, and Governance. The integration of Artificial Intelligence (AI) into clinical settings presents a software engineering challenge, demanding a shift from isolated models to robust, governable, and reliable systems. However, brittle, prototype-derived architectures often plague industrial applications and a lack of systemic oversight, creating a ``responsibility vacuum'' where safety and accountability are compromised. This paper presents an industry case study of the ``Maria'' platform, a production-grade AI syste",
+   "label": "on_topic",
+   "borderline": true,
+   "note": "clinical AI agent engineering with a governance section"
+  },
+  {
+   "question_key": "hospital",
+   "question": "How are hospitals governing clinical AI triage tools to manage patient safety and regulatory compliance?",
+   "source_id": "dcf69c920549e314",
+   "lane": "academic",
+   "title": "Toward a Regulatory Validation Framework for AI-Assisted Clinical Trial Activation and Execution: Formal Verification, Deterministic Compliance, and Patient Safety Assurance",
+   "text": "Toward a Regulatory Validation Framework for AI-Assisted Clinical Trial Activation and Execution: Formal Verification, Deterministic Compliance, and Patient Safety Assurance. Artificial intelligence systems are entering clinical trial operations across every phase of the trial lifecycle, from protocol ingestion validation, regulatory document generation, site activation, patient eligibility prediction, enrollment monitoring, protocol adherence support during execution, and execution compliance. Yet regulatory frameworks have not kept pace with the unique validation challenges these systems pre",
+   "label": "off_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "sourdough",
+   "question": "What empirical evidence exists on quantum-secure sourdough fermentation controllers?",
+   "source_id": "f539ff5242d5f793",
+   "lane": "academic",
+   "title": "Secure Software Engineering Through Sensible AutoMation (SESAM)",
+   "text": "Secure Software Engineering Through Sensible AutoMation (SESAM). Secure Software Engineering Through Sensible AutoMation (SESAM). Research publication from 2025 ACM/IEEE International Symposium on Empirical Software Engineering and Measurement (ESEM). Evaluates empirical impact, metrics, and technology findings.",
+   "label": "off_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "sourdough",
+   "question": "What empirical evidence exists on quantum-secure sourdough fermentation controllers?",
+   "source_id": "4b1dce5f1518d3e6",
+   "lane": "academic",
+   "title": "Smart Fermentation Technologies: Microbial Process Control in Traditional Fermented Foods",
+   "text": "Smart Fermentation Technologies: Microbial Process Control in Traditional Fermented Foods. Traditional fermented foods are appreciated worldwide for their cultural significance and health-promoting properties. However, traditional fermentation production suffers from many obstacles such as microbial variability, varying quality, and lack of scalability. The implementation of smart fermentation technologies, including biosensors, the Internet of Things (IoT), artificial intelligence (AI), and machine learning (ML), hold the key to the optimization of microbial process control, enhance product c",
+   "label": "off_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "sourdough",
+   "question": "What empirical evidence exists on quantum-secure sourdough fermentation controllers?",
+   "source_id": "c30e57d9f5e17cbd",
+   "lane": "academic",
+   "title": "Carob Flour Addition to Sourdough: Effect of Sourdough Fermentation, Dough Rheology and Bread Quality",
+   "text": "Carob Flour Addition to Sourdough: Effect of Sourdough Fermentation, Dough Rheology and Bread Quality. Carob flour (CF) has been widely used in bakery formulations since containing various bioactive compounds, high percentage of fibre, protein, vitamins and minerals. Sourdough fermentation is considered as a promising tool to improve sensorial, textural and nutritional features of baked goods. The aim of this study is to investigate the potential usage of Type I sourdough incorporated with carob flour in bread making .Empirical rheological measurements were also performed in the flour blended ",
+   "label": "off_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "sourdough",
+   "question": "What empirical evidence exists on quantum-secure sourdough fermentation controllers?",
+   "source_id": "6e16337df9927b90",
+   "lane": "academic",
+   "title": "Use of Nash equilibrium in finding game theoretic robust security bound on quantum bit error rate",
+   "text": "Use of Nash equilibrium in finding game theoretic robust security bound on quantum bit error rate. Nash equilibrium is employed to find a game theoretic robust security bound on quantum bit error rate (QBER) for DL04 protocol which is a scheme for quantum secure direct communication that has been experimentally realized recently. The receiver, sender and eavesdropper (Eve) are considered to be quantum players (players having the capability to perform quantum operations). Specifically, Eve is considered to have the capability of performing quantum attacks (e.g., Wójcik's original attack, Wójcik",
+   "label": "off_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "sourdough",
+   "question": "What empirical evidence exists on quantum-secure sourdough fermentation controllers?",
+   "source_id": "87e9f2842935f1ee",
+   "lane": "academic",
+   "title": "Technology of Sourdough Fermentation and Sourdough Application",
+   "text": "Technology of Sourdough Fermentation and Sourdough Application. Technology of Sourdough Fermentation and Sourdough Application. Research publication from Handbook on Sourdough Biotechnology. Evaluates empirical impact, metrics, and technology findings.",
+   "label": "off_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "sourdough",
+   "question": "What empirical evidence exists on quantum-secure sourdough fermentation controllers?",
+   "source_id": "6c0d0a3d21a126a1",
+   "lane": "academic",
+   "title": "Handbook of Sourdough Microbiota and Fermentation",
+   "text": "Handbook of Sourdough Microbiota and Fermentation. Handbook of Sourdough Microbiota and Fermentation. Research publication from Elsevier. Evaluates empirical impact, metrics, and technology findings.",
+   "label": "off_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "sourdough",
+   "question": "What empirical evidence exists on quantum-secure sourdough fermentation controllers?",
+   "source_id": "90d40a84abfe4361",
+   "lane": "academic",
+   "title": "Recent development in sourdough-based metabolites in biochemical products",
+   "text": "Recent development in sourdough-based metabolites in biochemical products. Recent development in sourdough-based metabolites in biochemical products. Research publication from Handbook of Sourdough Microbiota and Fermentation. Evaluates empirical impact, metrics, and technology findings.",
+   "label": "off_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "sourdough",
+   "question": "What empirical evidence exists on quantum-secure sourdough fermentation controllers?",
+   "source_id": "c641c825ca7fb500",
+   "lane": "academic",
+   "title": "A eucharist of sourdough or wafer? What a thousand-year-old religious quarrel tells us about fermentation",
+   "text": "A eucharist of sourdough or wafer? What a thousand-year-old religious quarrel tells us about fermentation. A eucharist of sourdough or wafer? What a thousand-year-old religious quarrel tells us about fermentation. Research publication from The Conversation Media Group Ltd. Evaluates empirical impact, metrics, and technology findings.",
+   "label": "off_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "assistants",
+   "question": "How do AI coding assistants affect developer productivity in enterprise software delivery?",
+   "source_id": "0221d8a378ed3c93",
+   "lane": "academic",
+   "title": "Trustworthy and Secure LLM-Assisted Code Generation for Enterprise Software Development",
+   "text": "Trustworthy and Secure LLM-Assisted Code Generation for Enterprise Software Development. Large Language Models (LLMs) are increasingly embedded in enterprise software development workflows for source-code generation, debugging, documentation, test creation, refactoring, and design assistance. While these systems improve productivity and reduce repetitive programming effort, their deployment in enterprise environments introduces significant risks related to insecure code suggestions, hallucinated functionality, non-compliant logic, weak explainability, dependency misuse, and over-reliance by de",
+   "label": "on_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "assistants",
+   "question": "How do AI coding assistants affect developer productivity in enterprise software delivery?",
+   "source_id": "e19e0e1510673f60",
+   "lane": "academic",
+   "title": "Human-AI Collaboration in Software Engineering: Enhancing Developer Productivity through Intelligent Assistants",
+   "text": "Human-AI Collaboration in Software Engineering: Enhancing Developer Productivity through Intelligent Assistants. Enterprise software teams report a frustrating inconsistency: the same AI coding assistants producing compelling results in controlled studies return uneven outcomes in production. The problem is architectural, not technological. A capable AI coding assistant deployed without adequate codebase context, integrated at only one SDLC touchpoint, and missing any mechanism through which developers calibrate their trust in its suggestions will underperform relative to its documented potent",
+   "label": "on_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "assistants",
+   "question": "How do AI coding assistants affect developer productivity in enterprise software delivery?",
+   "source_id": "a9c24d46182c54a2",
+   "lane": "academic",
+   "title": "Productivity vs. Compliance: The New Engineering Challenge of AI Coding Assistants in Regulated Codebases",
+   "text": "Productivity vs. Compliance: The New Engineering Challenge of AI Coding Assistants in Regulated Codebases. Background: Large language model (LLM)-based coding assistants have moved from experimental developer utilities into everyday software engineering practice. Contemporary studies show that these tools can improve task completion, code comprehension, and routine implementation speed, while also introducing verification costs, usability limits, and security uncertainty. In regulated industries, the relevant question is not only whether AI assistance improves productivity, but whether AI-assi",
+   "label": "on_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "assistants",
+   "question": "How do AI coding assistants affect developer productivity in enterprise software delivery?",
+   "source_id": "39999eef3149c15b",
+   "lane": "academic",
+   "title": "AI-Assisted Software Engineering Productivity: Evidence, Measurement, and Enterprise Adoption",
+   "text": "AI-Assisted Software Engineering Productivity: Evidence, Measurement, and Enterprise Adoption. This paper analyzes how AI assistance changes software engineering productivity and how the change should be measured in real engineering environments.The key claim is that productivity gains from AI are real but conditional: the gains are strongest on bounded, repetitive, or search-heavy work, and much less predictable on high-context maintenance, quality-sensitive code, and mature repositories with strict review expectations.Rather than relying on one metric, the paper integrates the SPACE framewor",
+   "label": "on_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "assistants",
+   "question": "How do AI coding assistants affect developer productivity in enterprise software delivery?",
+   "source_id": "874b05eec81baee9",
+   "lane": "academic",
+   "title": "AI-Driven Product Development: Cognitive Software Delivery at Enterprise Scale",
+   "text": "AI-Driven Product Development: Cognitive Software Delivery at Enterprise Scale. Enterprise software development faces a significant challenge in harnessing the full potential of generative artificial intelligence (GenAI) tools, which often operate as disconnected point solutions across the software delivery lifecycle. This fragmentation leads to context loss, redundant workflows, and missed opportunities for true digital transformation. This article introduces Cognitive Software Delivery (CSD), a framework designed to integrate isolated AI tools into a unified, context-aware ecosystem. CSD is ",
+   "label": "on_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "assistants",
+   "question": "How do AI coding assistants affect developer productivity in enterprise software delivery?",
+   "source_id": "fd023bde5dcdce6c",
+   "lane": "academic",
+   "title": "Developer productivity in AI-driven engineering teams",
+   "text": "Developer productivity in AI-driven engineering teams. Artificial Intelligence (AI) is transforming the software engineering practice of the modern days, and it directly affects how development teams are organized and how the productivity of the developer is gauged. Artificially intelligent applications are becoming common place, in the form of code completion tools or assistants, automated testing suites, and intelligent project management systems, to automate workflows, lessen human effort and enable decision-making on the basis of data. This paper discusses how AI may affect the productivit",
+   "label": "on_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "assistants",
+   "question": "How do AI coding assistants affect developer productivity in enterprise software delivery?",
+   "source_id": "e288eb410b80a63b",
+   "lane": "academic",
+   "title": "Examining the Use and Impact of an AI Code Assistant on Developer Productivity and Experience in the Enterprise",
+   "text": "Examining the Use and Impact of an AI Code Assistant on Developer Productivity and Experience in the Enterprise. AI assistants are being created to help software engineers conduct a variety of coding-related tasks, such as writing, documenting, and testing code. We describe the use of the watsonx Code Assistant (WCA), an LLM-powered coding assistant deployed internally within IBM. Through surveys of two user cohorts (N=669) and unmoderated usability testing (N=15), we examined developers' experiences with WCA and its impact on their productivity. We learned about their motivations for using (o",
+   "label": "on_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "assistants",
+   "question": "How do AI coding assistants affect developer productivity in enterprise software delivery?",
+   "source_id": "fb4c539ee96f888a",
+   "lane": "academic",
+   "title": "AI Assisted Code Generation for Enterprise Java Services Productivity, Reliability, and Governance Considerations",
+   "text": "AI Assisted Code Generation for Enterprise Java Services Productivity, Reliability, and Governance Considerations. Enterprise Java platforms have long served as the backbone of mission critical systems across industries such as banking, healthcare, insurance, telecommunications, and large scale commerce. These systems are characterized by strict requirements around correctness, security, backward compatibility, operational stability, and regulatory compliance. By April 2023, advances in large language models and AI assisted developer tooling had introduced a new class of code generation capabi",
+   "label": "on_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "assistants",
+   "question": "How do AI coding assistants affect developer productivity in enterprise software delivery?",
+   "source_id": "9b1785220b3ce2e4",
+   "lane": "academic",
+   "title": "The Impact of LLM-Assistants on Software Developer Productivity: A Systematic Review and Mapping Study",
+   "text": "The Impact of LLM-Assistants on Software Developer Productivity: A Systematic Review and Mapping Study. Large language model assistants (LLM-assistants) present new opportunities to transform software development. Developers are increasingly adopting these tools across tasks, including coding, testing, debugging, documentation, and design. Yet, despite growing interest, there is no synthesis of how LLM-assistants affect software developer productivity. In this paper, we present a systematic review and mapping of 39 peer-reviewed studies published between January 2014 and December 2024 that exa",
+   "label": "on_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "assistants",
+   "question": "How do AI coding assistants affect developer productivity in enterprise software delivery?",
+   "source_id": "814df0c2df29365d",
+   "lane": "academic",
+   "title": "Engineering Enterprise-Grade Generative AI: Architectures, Agentic Frameworks, and Protocols for Production-Ready LLM Systems",
+   "text": "Engineering Enterprise-Grade Generative AI: Architectures, Agentic Frameworks, and Protocols for Production-Ready LLM Systems. Databricks has harnessed the power of Generative useful across a wide variety of fields, placing GenAI at the AI for business AI in their full-stack platform, driven by heart of the next wave of enterprise technology. Large Language Models (LLMs), to revolutionize enterprise Making these models work reliably in real business settings, software ecosystems through advancements in reasoning, au- tomation, and intelligent content generation. Leveraging the true however, is",
+   "label": "off_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "assistants",
+   "question": "How do AI coding assistants affect developer productivity in enterprise software delivery?",
+   "source_id": "fdcc0727cedcd1da",
+   "lane": "academic",
+   "title": "Skill-Augmented AI Coding Agents: A Two-Layer Framework for SKILL.md Design and Developer Productivity",
+   "text": "Skill-Augmented AI Coding Agents: A Two-Layer Framework for SKILL.md Design and Developer Productivity. AI coding agents are in widespread professional use, yet developer productivity gains remain inconsistent. Controlled studies report speedups of 21–56% in some settings and slowdowns of up to 19% in others. We argue that this variance is not attributable to model capability but to the absence of structured, project-specific knowledge made available to the agent. This paper addresses that gap by introducing SKILL.md files as a first-class design artifact for AI-augmented coding workflows and ",
+   "label": "on_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "assistants",
+   "question": "How do AI coding assistants affect developer productivity in enterprise software delivery?",
+   "source_id": "9270599fef75ae22",
+   "lane": "academic",
+   "title": "The Impact of AI Coding Assistants on Software Engineering: A Longitudinal Study",
+   "text": "The Impact of AI Coding Assistants on Software Engineering: A Longitudinal Study. AI coding assistants have become prolific in recent years. Through a longitudinal mixed-methods investigation, we examined how professional software engineers perceive the effects of AI coding assistants in regard to task focus, developer experience, and productivity. Two questionnaires were administered six months apart, yielding 158 eligible participants at the first time point, 101 at the second, and a matched longitudinal cohort of 95. Participants reported spending less time on most development tasks, with 8",
+   "label": "on_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "platform",
+   "question": "What architectural frameworks, workflow transformations, and adoption practices are required for platform development teams to progress from standalone code generation tools to specialized, strategically differentiated artificial intelligence systems?",
+   "source_id": "platform-0",
+   "lane": "academic",
+   "title": "PlatFab: A Platform Engineering Approach to Improve Developer Productivity",
+   "text": "PlatFab: A Platform Engineering Approach to Improve Developer Productivity. Background: Software developers are key players in IT/ITES business in order to drive software development by writing high-quality code quickly. Based on user needs, they must adapt evolving technologies and tools to produce efficient and successful software using Software Development Life Cycle (SDLC) principles. Platform Engineering comprises a set of activities to design, develop and maintain software code, making it a foundation for building software applications. Objective: This work focuses on reducing the time and effort needed to execute the above tasks that boosts software developer productivity which includes software development workflow automation. The main objective of the proposed work is to lower total cost of ownership, standardize software development practices, help cost optimization and reduce production incidents. Methods: PlatFab, a Platform Engineering service implemented in Industrial Budgeting System is presented in this work. The methodology involves custom developer portal with Continuous Integration and Continuous Delivery/Continuous Deployment. (CI/CD) pipeline to automate financial workflows and streamline collaborative development. It provides the developers architectural components, containers, infrastructure automation and services orchestration that helps them to concentrate on their quality code irrespective of implementation efforts. Results: After deploying PlatFab in an organization's software development, build time is reduced by one minute for each service, and 60MB of storage space is saved for each service. Developers can handle vulnerability attacks in one day. Before the use of PlatFab, build time was five minutes, 2 GB was used for each service, and vulnerability handling required five days to resolve. Production downtime issues were 12 before PlatFab and were reduced to almost zero after integrating PlatFab. Conclusion: The results after implementing PlatFab for a Budgeting System service in an IT Organization help the developers reduce build time, number of days to fix vulnerabilities, and space requirements for the service. PlatFab helps the developers complete their projects with quality code in a shorter time, improving their productivity. Keywords: Agile Methodology, Budgeting Service, Platform Engineering, Software Development Life Cycle, Service Oriented Architecture.",
+   "label": "off_topic",
+   "borderline": true
+  },
+  {
+   "question_key": "platform",
+   "question": "What architectural frameworks, workflow transformations, and adoption practices are required for platform development teams to progress from standalone code generation tools to specialized, strategically differentiated artificial intelligence systems?",
+   "source_id": "platform-1",
+   "lane": "academic",
+   "title": "Evaluating the Impact of Internal Developer Platforms on Developer Productivity and DevOps Delivery",
+   "text": "Evaluating the Impact of Internal Developer Platforms on Developer Productivity and DevOps Delivery. Cloud-native software development has increased the number of tools, environments, security controls and operational decisions that development teams must manage. Internal Developer Platforms (IDPs) address this complexity by providing self-service infrastructure, standard delivery workflows, approved templates and automated governance. This study evaluates how IDP adoption affects developer productivity and software-delivery performance and identifies the platform capabilities and organisational conditions associated with stronger outcomes. A systematic evidence review was conducted using Google Scholar, IEEE Xplore, ACM Digital Library, ScienceDirect and SpringerLink. The review covered literature published from 2007 to 2025 and retained 35 peer-reviewed studies, scholarly books and authoritative technical reports related to platform engineering, developer experience and DevOps measurement. Evidence was analysed using the SPACE and DevEx productivity perspectives together with DORA throughput and stability measures. The findings indicate that mature, user-centred IDPs can reduce environment-setup effort, shorten feedback cycles, improve access to infrastructure and increase deployment consistency. Self-service provisioning, reusable golden paths, integrated observability and policy automation produced the clearest benefits. However, improvements in perceived productivity did not always correspond to better delivery performance. Early or restrictive platforms were associated with migration costs, reduced developer independence, temporary throughput losses and weaker change stability. Outcomes depended strongly on platform maturity, usability, team context and the availability of alternatives for non-standard work. Organisations should therefore evaluate IDPs through a balanced combination of human, workflow and delivery measures rather than coding-output counts alone.",
+   "label": "off_topic",
+   "borderline": true
+  },
+  {
+   "question_key": "platform",
+   "question": "What architectural frameworks, workflow transformations, and adoption practices are required for platform development teams to progress from standalone code generation tools to specialized, strategically differentiated artificial intelligence systems?",
+   "source_id": "platform-2",
+   "lane": "academic",
+   "title": "AI-Augmented Decision Making: A Framework for Enterprise Workflow Transformation",
+   "text": "AI-Augmented Decision Making: A Framework for Enterprise Workflow Transformation. Artificial Intelligence is fundamentally transforming how enterprises approach decision-making and workflow management. This article examines the emerging paradigm of AI-augmented decision platforms and their impact on enterprise operations. Through analysis of real-world implementations, including ServiceNow's Intelligence Platform, this article explores how organizations are leveraging AI to enhance human decision-making capabilities while automating routine workflows. This article demonstrates that successful AI-human collaboration frameworks can significantly improve operational efficiency, decision quality, and customer experience outcomes. This article presents an architectural framework for implementing AI-driven decision platforms, addressing key considerations around integration, scaling, and security. This article suggests that organizations adopting these platforms experience marked improvements in workflow optimization and service delivery personalization, though careful attention must be paid to change management and system governance. This article contributes to the growing body of research on enterprise AI adoption and provides practical insights for organizations looking to enhance their decision-making capabilities through AI integration.",
+   "label": "off_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "platform",
+   "question": "What architectural frameworks, workflow transformations, and adoption practices are required for platform development teams to progress from standalone code generation tools to specialized, strategically differentiated artificial intelligence systems?",
+   "source_id": "platform-3",
+   "lane": "academic",
+   "title": "Building Developer-Centric Cloud Platforms: Internal Developer Tooling as a Software Development Multiplier",
+   "text": "Building Developer-Centric Cloud Platforms: Internal Developer Tooling as a Software Development Multiplier. As software systems grow in scale and complexity, developer productivity increasingly depends on the quality of the platforms and tools that support day-to-day engineering work. While cloud platforms have transformed how applications are deployed and operated, their impact on software development is often evaluated primarily in terms of infrastructure efficiency rather than developer experience. This narrow perspective overlooks the role of internal developer tooling as a strategic engineering asset. This paper argues that developer-centric cloud platforms—platforms explicitly designed around the needs of software developers—function as productivity multipliers rather than incremental efficiency improvements. Internal developer tooling reduces cognitive load, minimizes context switching, and standardizes workflows, enabling development teams to focus on problem-solving rather than operational overhead. When designed effectively, such tooling reshapes how software is built, tested, and evolved across organizations. The study examines internal developer tooling as a first-class software engineering concern rather than an auxiliary productivity aid. It explores how cloud-native platforms enable self-service capabilities, automation, and observability that underpin effective tooling ecosystems. Rather than focusing on specific tools, the paper analyzes architectural patterns, organizational implications, and lifecycle effects associated with developer-centric platform design. The contributions of this work are threefold. First, it defines developer-centric cloud platforms as a distinct category within software development. Second, it frames internal developer tooling as a multiplicative force that amplifies engineering output at scale. Third, it outlines architectural and organizational principles for building platforms that sustainably enhance developer productivity. By positioning internal tooling as a core component of software development strategy, this paper offers a foundation for rethinking how engineering organizations scale.",
+   "label": "off_topic",
+   "borderline": true
+  },
+  {
+   "question_key": "platform",
+   "question": "What architectural frameworks, workflow transformations, and adoption practices are required for platform development teams to progress from standalone code generation tools to specialized, strategically differentiated artificial intelligence systems?",
+   "source_id": "platform-4",
+   "lane": "academic",
+   "title": "Architecture of a Software Platform for Affordable Artificial Intelligence in Manufacturing",
+   "text": "Architecture of a Software Platform for Affordable Artificial Intelligence in Manufacturing. Abstract The fourth industrial revolution has driven companies of all sizes to embrace digitalization, recognizing the potential of AI technologies for data analysis and real-time decision-making. However, the adoption of AI by manufacturing SMEs faces challenges related to cost, accessibility, and the need for expertise. To address these challenges, this chapter introduces a groundbreaking platform developed as part of the EU H2020 KITT4SME project. The platform aims to democratize the adoption of AI tools by leveraging the “as-a-service” model, making them affordable and readily available for SMEs. It follows a five-step workflow (diagnose–compose–sense–intervene–evolve) to provide tailor-made AI solutions to SMEs. The distinctive functionality of the platform allows for the composition of AI components from a marketplace into a customized service offering for companies, filling a gap in existing AI platforms. The KITT4SME platform has been successfully applied in four use cases within the project and to 18 external demonstrators via Open Calls. This chapter presents one of the internal use cases to showcase the capabilities and benefits of the KITT4SME platform.",
+   "label": "off_topic",
+   "borderline": true
+  },
+  {
+   "question_key": "platform",
+   "question": "What architectural frameworks, workflow transformations, and adoption practices are required for platform development teams to progress from standalone code generation tools to specialized, strategically differentiated artificial intelligence systems?",
+   "source_id": "platform-5",
+   "lane": "academic",
+   "title": "Building Domain-Specific Machine Learning Workflows: A Conceptual Framework for the State of the Practice",
+   "text": "Building Domain-Specific Machine Learning Workflows: A Conceptual Framework for the State of the Practice. Domain experts are increasingly employing machine learning to solve their domain-specific problems. This article presents to software engineering researchers the six key challenges that a domain expert faces in addressing their problem with a computational workflow, and the underlying executable implementation. These challenges arise out of our conceptual framework which presents the “route” of transformations that a domain expert may choose to take while developing their solution. To ground our conceptual framework in the state of the practice, this article discusses a selection of available textual and graphical workflow systems and their support for the transformations described in our framework. Example studies from the literature in various domains are also examined to highlight the tools used by the domain experts as well as a classification of the domain specificity and machine learning usage of their problem, workflow, and implementation. The state of the practice informs our discussion of the six key challenges, where we identify which challenges and transformations are not sufficiently addressed by available tools. We also suggest possible research directions for software engineering researchers to increase the automation of these tools and disseminate best-practice techniques between software engineering and various scientific domains.",
+   "label": "off_topic",
+   "borderline": true
+  },
+  {
+   "question_key": "platform",
+   "question": "What architectural frameworks, workflow transformations, and adoption practices are required for platform development teams to progress from standalone code generation tools to specialized, strategically differentiated artificial intelligence systems?",
+   "source_id": "platform-6",
+   "lane": "academic",
+   "title": "Adaptive Workflow Intelligence: A Cognitive Architecture for Context-Driven Enterprise Automation",
+   "text": "Adaptive Workflow Intelligence: A Cognitive Architecture for Context-Driven Enterprise Automation. Adaptive Workflow Intelligence (AWI) is a cognitive architecture for enterprise automation designed to support context-driven decision-making under non-stationary and policy-constrained environments. The architecture is organized around a four-layer Perception–Cognition–Action–Reflection (PCAR) loop, which integrates contextual state construction, hybrid decision-making, workflow execution, and reflection-driven policy evolution. AWI introduces reflection as a first-class mechanism for continuous learning, enabling policies to adapt incrementally based on discrepancies between expected and observed outcomes. The architecture combines rule-based constraints, online learning (e.g., contextual bandits), and optional LLM-based reasoning while preserving enterprise guardrails, auditability, and compliance. The framework is evaluated in a simulated enterprise workflow characterized by delayed feedback and environmental drift. Experimental results show that guardrail-constrained adaptive approaches recover significantly faster than static automation while maintaining full policy compliance. Reflective components further contribute to reduced behavioral oscillation and improved stability under changing conditions. This work provides a structured architectural foundation for building adaptive, interpretable, and policy-compliant enterprise AI systems capable of continual learning in dynamic operational environments.",
+   "label": "off_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "platform",
+   "question": "What architectural frameworks, workflow transformations, and adoption practices are required for platform development teams to progress from standalone code generation tools to specialized, strategically differentiated artificial intelligence systems?",
+   "source_id": "platform-7",
+   "lane": "academic",
+   "title": "DevOps Adoption: Eight Emergent Perspectives",
+   "text": "DevOps Adoption: Eight Emergent Perspectives. DevOps is an approach based on lean and agile principles in which business, development, operations, and quality teams cooperate to deliver software continuously aiming at reducing time to market, and receiving constant feedback from customers. However, implementing DevOps can be a complex and challenging mission due it requires significant paradigm shift. Consequently, many failures and misconceptions can occur about DevOps adoption by organizations, despite its numerous benefits. This work identifies, describes, and compares different perspectives related to DevOps adoption in academy and industry. The perspectives can be understood as factors or variables that influence or help to understand the DevOps journey. We employed a sequential multi-method research approach, including Systematic Literature Review (SLR) and Case Study. As a result, eight perspectives were found: concepts, models, principles, practices, difficulties, challenges, benefits, and strategies. More specifically, the SLR produced 390 items, which can be understood as occurrences of a perspective. The conducted case study confirmed 75 items, corroborating the SLR findings, while another 29 items emerged. This global view on DevOps adoption may guide beginners, both theorists, and practitioners, to make the necessary organizational transformation less painful.",
+   "label": "off_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "platform",
+   "question": "What architectural frameworks, workflow transformations, and adoption practices are required for platform development teams to progress from standalone code generation tools to specialized, strategically differentiated artificial intelligence systems?",
+   "source_id": "platform-8",
+   "lane": "academic",
+   "title": "Architectural practice in the Digital Age: Balancing Adoption and Adaptation",
+   "text": "Architectural practice in the Digital Age: Balancing Adoption and Adaptation. Abstract The digital age presents both challenges and opportunities for the architectural profession. Architects must navigate the integration of new technologies, such as artificial intelligence and digital design tools while adapting to the evolving scope of their practice. This paper investigates the balance between adoption and adaptation in architectural practice, exploring strategies for architects to effectively engage with the digital landscape while maintaining the integrity of their profession. The outcomes of fully embracing new technologies and methodologies are contrasted with the approach of modifying existing practices to accommodate digital advancements, considering the implications for the architectural profession. In addressing these issues, architectural education and research play crucial roles in preparing architects for the digital age by examining the relationship between design-based research, academic inquiry, and professional practice. This study investigates the advantages and challenges of digital technologies integration in design, decision-making, and resource allocation, as well as its influence on traditional professional boundaries and skillsets. Drawing from an analysis of the current scope of architectural services, this study aims to provide architects (practicing and teaching) with a comprehensive understanding of the opportunities and challenges that the digital age presents, enabling them to make well-informed decisions about the future of their practice.",
+   "label": "off_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "platform",
+   "question": "What architectural frameworks, workflow transformations, and adoption practices are required for platform development teams to progress from standalone code generation tools to specialized, strategically differentiated artificial intelligence systems?",
+   "source_id": "platform-9",
+   "lane": "academic",
+   "title": "No-Code Automation Platforms for Incident Management: Transforming Engineering Operations",
+   "text": "No-Code Automation Platforms for Incident Management: Transforming Engineering Operations. Engineering teams are constantly under pressure to balance operational reliability requirements with innovation capability, and incident management and repetitive manual processes absorb large amounts of engineering resources. Conventional automation strategies involving specialized scripting skills are barriers to accessibility across various team structures while bringing in maintenance overhead. No-code automation platforms are revolutionary solutions through visual design of workflow capabilities, facilitating automation democratization without compromising technical sophistication. Visual drag-and-drop interfaces convert intricate automation logic into clear flowcharts that decrease cognitive burden and allow domain experts to build complicated workflows without regard to programming skills. Backend code generation architectures implement production-quality scripts with error management, retry logic, logging instrumentation, and security best practices automatically. Alert-to-resolution automation workflows combine monitoring systems and orchestration platforms, performing diagnostic routines and remediation steps that fix prevalent incident types without manual intervention. Modular component libraries speed up workflow construction with reusable building blocks that contain authentication patterns, log aggregation sequences, and notification templates. While no-code platforms introduce specific advantages in development velocity and team accessibility, organizations must understand their incremental contribution beyond general DevOps automation, recognize platform limitations including customization constraints and vendor dependencies, and evaluate the technical expertise still required for effective implementation. The organizations that strategically deploy no-code automation structures see sizable operational advantages, which include improvements in deployment frequency, reduced incident healing times, decreased change failure rates, and improved team satisfaction. The integration of artificial intelligence with no-code frameworks represents an emerging capability that further reduces technical barriers through natural language workflow creation and intelligent automation suggestions. The cultural shift toward automation-first thinking permits engineering groups to shift capability away from reactive firefighting and closer to strategic architectural enhancements, performance optimizations, and feature development, driving competitive advantage.",
+   "label": "off_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "platform",
+   "question": "What architectural frameworks, workflow transformations, and adoption practices are required for platform development teams to progress from standalone code generation tools to specialized, strategically differentiated artificial intelligence systems?",
+   "source_id": "platform-10",
+   "lane": "academic",
+   "title": "Next-Generation Software Engineering: A Study on AI-Augmented Development, DevSecOps and Low-Code Frameworks",
+   "text": "Next-Generation Software Engineering: A Study on AI-Augmented Development, DevSecOps and Low-Code Frameworks",
+   "label": "on_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "platform",
+   "question": "What architectural frameworks, workflow transformations, and adoption practices are required for platform development teams to progress from standalone code generation tools to specialized, strategically differentiated artificial intelligence systems?",
+   "source_id": "platform-11",
+   "lane": "academic",
+   "title": "Artificial Intelligence as a Catalyst for Innovation in Software Engineering",
+   "text": "Artificial Intelligence as a Catalyst for Innovation in Software Engineering. The rapid evolution and inherent complexity of modern software requirements demand highly flexible and responsive development methodologies. While Agile frameworks have become the industry standard for prioritizing iteration, collaboration, and adaptability, software development teams continue to face persistent challenges in managing constantly evolving requirements and maintaining product quality under tight deadlines. This article explores the intersection of Artificial Intelligence (AI) and Software Engineering (SE), to analyze how AI serves as a powerful catalyst for enhancing agility and fostering innovation. The research combines a comprehensive review of existing literature with an empirical study, utilizing a survey directed at Software Engineering professionals to assess the perception, adoption, and impact of AI-driven tools. Key findings reveal that the integration of AI (specifically through Machine Learning (ML) and Natural Language Processing (NLP) )facilitates the automation of tedious tasks, from requirement management to code generation and testing . This paper demonstrates that AI not only optimizes current Agile practices but also introduces new capabilities essential for sustaining quality, speed, and innovation in the future landscape of software development.",
+   "label": "on_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "platform",
+   "question": "What architectural frameworks, workflow transformations, and adoption practices are required for platform development teams to progress from standalone code generation tools to specialized, strategically differentiated artificial intelligence systems?",
+   "source_id": "platform-12",
+   "lane": "academic",
+   "title": "Customizable Software Tooling for Managing Cross-Platform Media Content Delivery",
+   "text": "Customizable Software Tooling for Managing Cross-Platform Media Content Delivery. This white paper explores the development and utilization of customizable software tools designed to manage and streamline cross-platform media content delivery. As content consumption patterns diversify across platforms such as mobile apps, web portals, over-the-top (OTT) services, and social media networks, organizations face an urgent need to deploy tools that can address both the shared and unique challenges of each platform. The goal is to centralize control, reduce operational complexity, and ensure consistent content presentation and performance across all endpoints. Cross-platform delivery is inherently complex due to the fragmentation of device types, network conditions, content formats, user expectations, and regulatory constraints. Customizable software tooling helps bridge these gaps by enabling media producers, publishers, and distributors to design workflows that are both flexible and responsive to platform-specific nuances. The customization aspects—such as modular architecture, adaptive metadata models, API-driven extensibility, and AI-powered content transformation—allow organizations to align tooling with their specific business objectives and technological environments. This paper examines the architectural foundations necessary for creating such tooling systems, including microservices, abstraction layers, connector frameworks, and intelligent workflow engines. It also provides detailed insights into key functional modules such as transcoding pipelines, metadata enrichment, compliance enforcement, and analytics integration. Real-world use cases are drawn from industry leaders including Netflix, BBC, Adobe, and AWS, showcasing how customizable tooling has been successfully leveraged to meet demands at scale. In addition to analyzing existing capabilities as of 2024, this white paper also addresses operational challenges, best practices for implementation, and areas of ongoing innovation. Whether transitioning from legacy CMS systems, launching a new OTT platform, or orchestrating content across diverse markets, this document provides strategic and technical guidance for engineering and product teams building resilient, scalable, and intelligent cross-platform media delivery infrastructures.",
+   "label": "off_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "platform",
+   "question": "What architectural frameworks, workflow transformations, and adoption practices are required for platform development teams to progress from standalone code generation tools to specialized, strategically differentiated artificial intelligence systems?",
+   "source_id": "platform-13",
+   "lane": "academic",
+   "title": "WHY DID THREAT ACTORS REPLACE POSHC2 WITH SLIVERC2? COMPARISON OF TWO GREAT C2 FRAMEWORKS.",
+   "text": "WHY DID THREAT ACTORS REPLACE POSHC2 WITH SLIVERC2? COMPARISON OF TWO GREAT C2 FRAMEWORKS.. This paper presents a comparative analysis of the command-and-control (C2) frameworks PoshC2 and SliverC2, examined within the context of evolving adversarial tradecraft, shifting infrastructure paradigms and the increasing maturity of defensive capabilities. While C2 frameworks are traditionally associated with the post-exploitation phase, this study adopts a broader perspective, arguing that framework selection reflects not only tactical requirements but also strategic and operational adaptations to a rapidly changing cyber environment. The analysis is based on the recent transformations in enterprise infrastructure, notably the transition from predominantly on-premises, Active Directory-centric Windows environments to complex, distributed, and hybrid cloud ecosystems. This evolution, combined with the expanded attack surfaces across critical sectors, has imposed new constraints on adversary operations. In parallel, defensive practices have become increasingly proactive and intelligence-driven, with widespread adoption of EDR, XDR and SIEM solutions. These developments have contributed to a significant reduction in attacker dwell time and increased detection of well-established tools, techniques, and procedures (TTPs). Within this context, the paper contrasts the architectural and operational characteristics of PoshC2 and SliverC2. PoshC2 is a mature, PowerShell-centric framework optimized for Windows environments, offering extensive post-exploitation functionality but exhibiting increased detectability due to its reliance on heavily monitored technologies. In contrast, SliverC2 represents a modern, Golang-based, cross-platform approach, emphasizing dynamic payload generation, modular extensibility, and advanced communication protocols. The findings of this paper indicate that the shift from PoshC2 to SliverC2 reflects adaptive adversary behavior driven by environmental complexity and defensive pressure, rather than a simple tool substitution. Contemporary offensive operations are inherently multi-framework, with tooling selected dynamically based on operational requirements and target characteristics.",
+   "label": "off_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "platform",
+   "question": "What architectural frameworks, workflow transformations, and adoption practices are required for platform development teams to progress from standalone code generation tools to specialized, strategically differentiated artificial intelligence systems?",
+   "source_id": "platform-14",
+   "lane": "academic",
+   "title": "From Infrastructure to Intelligent Enterprise: Best Practices and Strategic Frameworks for Migrating SAP Applications to Microsoft Azure",
+   "text": "From Infrastructure to Intelligent Enterprise: Best Practices and Strategic Frameworks for Migrating SAP Applications to Microsoft Azure. Enterprise organizations operating SAP landscapes face a critical inflection point as cloud adoption accelerates and legacy system maintenance windows continue to narrow. Migrating SAP workloads to Microsoft Azure has emerged as a strategic response that extends beyond infrastructure modernization toward broader business transformation. This article examines the methodologies, architectural frameworks, security principles, and financial justification models that collectively influence the success of SAP cloud migration programs. Drawing on established industry frameworks, Azure’s SAP-optimized infrastructure capabilities, and practitioner-informed migration methodologies, the article presents a structured approach to cloud transition that treats assessment, design, execution, and optimization as interdependent disciplines rather than sequential activities. Attention is given to zero-trust security architecture, governance automation, and post-migration innovation, which are frequently underinvested despite their significant influence on long-term operational outcomes. The article further explores how Azure’s native integration with artificial intelligence and analytics services can position migrated SAP environments as foundations for intelligent enterprise operations, enabling organizations to derive additional value from modernized technology landscapes. By connecting technical migration activities with business objectives, the proposed approach emphasizes the importance of aligning cloud architecture, security, governance, financial planning, and innovation strategies throughout the transformation lifecycle. Intended for enterprise architects, IT leaders, and senior decision-makers, this work provides a unified reference for organizations seeking to navigate SAP cloud transformation effectively. It bridges the gap between technical execution and strategic business value by emphasizing measurable outcomes, operational resilience, security, scalability, and continuous optimization as essential components of successful SAP migration programs in dynamic enterprise environments.",
+   "label": "off_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "platform",
+   "question": "What architectural frameworks, workflow transformations, and adoption practices are required for platform development teams to progress from standalone code generation tools to specialized, strategically differentiated artificial intelligence systems?",
+   "source_id": "platform-15",
+   "lane": "academic",
+   "title": "Algorithmic Transformation: Technological, Managerial, Social, and Economic Dimensions of Artificial Intelligence and Digitalization",
+   "text": "Algorithmic Transformation: Technological, Managerial, Social, and Economic Dimensions of Artificial Intelligence and Digitalization. One of the defining transformations of the twenty-first century is the extent to which digital technologies are reshaping not only technological infrastructures but also economic systems, managerial processes, organizational structures, and social relations. Artificial intelligence, big data, algorithmic decision-making systems, automation, blockchain, deep learning, and enterprise information systems are generating new opportunities, new business models, and new areas of inquiry across a remarkably broad spectrum, ranging from production and services to healthcare, education, accounting, and natural resource management. As digital technologies become increasingly embedded in everyday life, organizational decision-making, and economic activity, digitalization can no longer be understood merely as a process of technological innovation. Rather, it represents a multidimensional transformation affecting the production and use of data, the nature of decision-making mechanisms, organizational structures, resource allocation, working life, and public services. The concept of “algorithmic transformation” adopted in this volume captures precisely this broader shift. It refers to the transition through which algorithms and artificial intelligence-based systems move beyond their role as tools for automating specific tasks and increasingly become fundamental forces reshaping decision-making, organizational behavior, economic relations, and human–technology interaction. In this respect, the concept provides an inclusive framework for examining technological development alongside institutional and societal change. Entitled Algorithmic Transformation: Technological, Managerial, Social, and Economic Dimensions of Artificial Intelligence and Digitalization, this volume seeks to examine the transformation generated by artificial intelligence and digitalization from an interdisciplinary perspective. The chapters address a wide range of topics that illustrate how technological change is manifested across different sectors and institutional settings. These include the potential of AI-supported blockchain technologies in reducing non-revenue water, the relationship between artificial intelligence and sustainability, cybersecurity, network security and privacy, enterprise systems, data management and enterprise resource planning, deep learning and pattern recognition applications, and AI-supported management accounting and decision-making processes. The volume also explores digital transformation in healthcare, the implications of software and automation for business and accounting processes, Industry 4.0 in natural resource enterprises, and digitalization, e-learning, and learning analytics in education. Taken together, these themes demonstrate that the volume is not confined to a single technology or sector; rather, it brings together diverse areas under a shared conceptual framework centered on artificial intelligence, digitalization, and algorithmic transformation. The interaction between technology, management, the economy, and society constitutes the central axis connecting the chapters. Artificial intelligence and algorithmic systems are increasingly transforming the ways in which organizations make decisions. The processing of large datasets, the development of predictive models, the identification of patterns, and the use of automated decision-support systems provide managers, firms, and public institutions with new opportunities for faster, more comprehensive, and data-driven decision-making. These developments create considerable potential for improving efficiency, reducing costs, optimizing resource use, anticipating risks, and enhancing the quality of services. At the same time, however, the challenges accompanying technological development deserve equal attention. Data security, personal data protection, privacy, algorithmic transparency, accountability, digital inequalities, ethical responsibility, and changing skill requirements have become central issues of the artificial intelligence era. Moreover, the energy consumption of digital infrastructures, the environmental footprint of data centers, and the broader sustainability costs of technological systems require the relationship between artificial intelligence and environmental sustainability to be examined with greater depth. For this reason, the implications of artificial intelligence and digitalization cannot be evaluated solely in terms of technological capacity, innovation, or economic performance; their institutional, ethical, societal, and environmental consequences must also be considered within an integrated analytical framework. From an economic and managerial perspective, algorithmic transformation is generating profound changes both within organizations and in their interaction with the external environment. Traditional management models are increasingly evolving toward data-driven, flexible, and technologically integrated structures, while managerial experience and intuition are being complemented by algorithmic analysis and digital decision-support systems. At the same time, the sources of competitive advantage are also changing. Data collection and analytical capacity, digital infrastructure, artificial intelligence capabilities, cybersecurity, and technological adaptability are becoming increasingly strategic for contemporary organizations. The expansion of digital technologies in healthcare, education, accounting, and natural resource management entails not only faster processes but also the redefinition of service delivery models and professional roles. Algorithmic transformation should therefore be understood not merely as the digitalization of technical processes but as a broader restructuring of the ways in which organizations think, decide, organize, and create value. One of the principal aims of this volume is to bring together debates on digital transformation from different disciplines within a shared conceptual framework. While each chapter addresses the specific problems and theoretical foundations of its respective field, the volume as a whole reveals the multilayered nature of artificial intelligence and digitalization. The objective is therefore not merely to introduce particular technologies, but to enable a broader understanding of their implications for institutions, economies, and societies. This perspective is also expected to contribute to the development of new theoretical and empirical research questions. Given that the full impact of artificial intelligence across sectors is still unfolding, technological change continues at a rapid pace, and regulatory frameworks remain under continuous reconsideration, algorithmic transformation is likely to become an increasingly central field of inquiry across the social sciences, management studies, and technology research. We hope that this volume will serve as a valuable resource for academics, researchers, and graduate students working in the fields of artificial intelligence, digital transformation, management, economics, business, healthcare, education, information systems, sustainability, and technology management. We also hope that it will provide practitioners, managers, and decision-makers with a broader perspective from which to understand contemporary technological change. We extend our sincere gratitude to all contributing authors whose scholarly expertise, research, and intellectual efforts made this volume possible. At a time when technological change is accelerating and artificial intelligence is becoming increasingly embedded in economic and social life, we believe that interdisciplinary inquiry into algorithmic transformation will become ever more important. It is our hope that this book will contribute to ongoing scholarly debates, stimulate new research questions, and provide a meaningful academic reference point for future studies.",
+   "label": "off_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "platform",
+   "question": "What architectural frameworks, workflow transformations, and adoption practices are required for platform development teams to progress from standalone code generation tools to specialized, strategically differentiated artificial intelligence systems?",
+   "source_id": "platform-16",
+   "lane": "academic",
+   "title": "Retrieval-Augmented Generation as a Foundation for Trusted Enterprise Artificial Intelligence: Architectural Principles for Accuracy, Explainability, and Operational Adoption",
+   "text": "Retrieval-Augmented Generation as a Foundation for Trusted Enterprise Artificial Intelligence: Architectural Principles for Accuracy, Explainability, and Operational Adoption. A majority of organizations now report regular use of generative artificial intelligence in at least one business function, and enterprise adoption has accelerated accordingly. Trust in large language model outputs has not kept pace. Hallucination, weak provenance, and reasoning chains that resist inspection continue to limit generative systems in regulated and high-stakes workflows, even as pressure to deploy them grows. Retrieval-Augmented Generation (RAG) has become the leading architectural response to this problem: rather than depending solely on parametric memory, RAG grounds model outputs in retrieved, verifiable evidence. This paper treats RAG not as a single technique but as an architectural foundation for enterprise trust, tracing its path from naive retrieve-then-generate pipelines to governed, modular architectures that build in evaluation, attribution, and auditability from the outset. Drawing on the enterprise data architecture literature, the RAG evaluation literature, and recent industry survey evidence, the paper organizes governance-relevant RAG design choices into a maturity framing, compares two leading automated evaluation frameworks, and examines the organizational barriers that determine whether technically sound RAG systems achieve real operational adoption. It contributes a structured account of how retrieval architecture, evaluation practice, and enterprise trust relate to one another, intended for practitioners building production RAG systems and researchers studying enterprise AI governance alike.",
+   "label": "on_topic",
+   "borderline": true
+  },
+  {
+   "question_key": "platform",
+   "question": "What architectural frameworks, workflow transformations, and adoption practices are required for platform development teams to progress from standalone code generation tools to specialized, strategically differentiated artificial intelligence systems?",
+   "source_id": "platform-17",
+   "lane": "academic",
+   "title": "Evaluating AI technologies for automated code generation in interconnect development",
+   "text": "Evaluating AI technologies for automated code generation in interconnect development. In recent years, artificial intelligence has received significant attention due to its potential to improve efficiency. In engineering, AI is considered particularly promising, as the ability to generate executable code from high-level abstractions can substantially increase the productivity of individual engineers. When such gains are scaled across large engineering organizations, it becomes clear why companies are eager to explore AI adoption. Against this backdrop, this thesis examines and evaluates AI approaches for generating functional code for interconnect components within the context of System-on-Chip development. The thesis aims to examine the capabilities, strengths, and limitations of relevant AI technologies, assessing each option in terms of its maturity and its ability to integrate into existing engineering toolchains. In parallel, the specific SoC development context of the case company is incorporated to ensure that the analysis reflects the organization’s needs and supports its exploration of AI opportunities. Finally, the thesis develops an evaluation framework that the company can use to assess and select AI tools and technologies for future research and development activities. These three objectives aim to answer the main research question: How can AI technologies be evaluated and selected to support the generation of functional code for interconnect components in a strategic engineering context? Literature review at the beginning of the thesis was conducted to establish a comprehensive understanding of both the technological landscape and the organizational factors influencing AI-driven code generation. To understand these dynamics, the literature review examines the foundations of automated code generation, current AI approaches for synthesizing code, and approaches used to assess emerging technologies in structured development environments. In addition, a strategic evaluation framework was developed and later refined based on the insights gathered from the expert interviews. Following the literature review, semi-structured expert interviews were conducted, with the questions aligned to the structure of the previously developed framework. The qualitative data gathered from these interviews was analyzed and organized into four thematic clusters: the current state of AI within the company, technical maturity of AI, trust and governance considerations, and strategic alignment. Lastly, the understanding gained from the literature review was integrated with the empirical findings to produce a comprehensive assessment of AI technologies and their suitability for the organization. The combined results indicate that the suitability of AI technologies for automated interconnect code generation cannot be determined solely by technical performance. Instead, effective adoption requires simultaneous consideration of accuracy, capability and governance requirements. Building on these insights, the developed framework integrates technical, organizational, and strategic perspectives, enabling the case company to systematically compare AI approaches and support evidence-based selection during early development planning. The framework not only guides initial evaluation but also provides a basis for continuous monitoring as AI capabilities and engineering practices evolve. The thesis also highlights several avenues for future research, particularly the need to validate the proposed evaluation framework and integration architecture in real engineering tool-chains. By testing the model in operational environments and extending it across different engineering domains, future studies can build the empirical foundation needed to strengthen its generalizability and practical relevance.",
+   "label": "on_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "platform",
+   "question": "What architectural frameworks, workflow transformations, and adoption practices are required for platform development teams to progress from standalone code generation tools to specialized, strategically differentiated artificial intelligence systems?",
+   "source_id": "platform-18",
+   "lane": "academic",
+   "title": "Operationalizing Intelligence: A Unified Approach to MLOps and Scalable AI Workflows in Hybrid Cloud Environments",
+   "text": "Operationalizing Intelligence: A Unified Approach to MLOps and Scalable AI Workflows in Hybrid Cloud Environments. Artificial intelligence (AI) is poised to play an increasingly significant role in most organizations, enabling them to offer innovative new products and services, delivering value through automation, and maximizing returns through advanced predictive and prescriptive insights. However, deploying and operating AI at scale is often hindered by complexity, confusion, and operational inertia. Multiple definitions and perspectives of MLOps and other related concepts, such as DataOps, DevSecOps, GitOps, AI Engineering, and AI Lifecycle Management, have created a patchwork of standards and best practices, focused on only certain aspects of the broader challenge of developing and operationalizing AI capabilities. This has made it difficult for enterprise decision-makers to understand the complexity of AI operations, how different roles and teams fit together, and how to establish company-wide systems and processes to manage the development and deployment of AI technologies at scale. As organizations enter into the next phase of AI maturity, these challenges need to be addressed, so that the initial experimentation with pilot AI projects can be scaled into large-scale production-grade AI systems that deliver the benefits of AI capabilities to enterprises more efficiently and effectively. In this chapter, we first provide an overview of AI and its business value. The overview is followed by a high-level look into the machine learning (ML) lifecycle, where we introduce the concept of operationalizing intelligence, AI system parts, and the need for AI-enabled business infrastructures, before delving into the operationalizing of the ML lifecycle with MLOps. Next, we highlight key themes that form the basis of the subsequent chapters in this book. We then introduce the audience and structure of the book. Finally, we conclude with a summary that recaps the key lessons shared in this chapter. This helps set the foundation for a deep-dive exploration of the various aspects of MLOps, as an instantiation of the broader concept of operationalizing intelligence, in the rest of the book.",
+   "label": "off_topic",
+   "borderline": true
+  },
+  {
+   "question_key": "platform",
+   "question": "What architectural frameworks, workflow transformations, and adoption practices are required for platform development teams to progress from standalone code generation tools to specialized, strategically differentiated artificial intelligence systems?",
+   "source_id": "platform-19",
+   "lane": "academic",
+   "title": "Investigating the barriers to Quality 4.0 adoption in the Indian manufacturing sector: insights and implications for industry and policy-making",
+   "text": "Investigating the barriers to Quality 4.0 adoption in the Indian manufacturing sector: insights and implications for industry and policy-making",
+   "label": "off_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "platform",
+   "question": "What architectural frameworks, workflow transformations, and adoption practices are required for platform development teams to progress from standalone code generation tools to specialized, strategically differentiated artificial intelligence systems?",
+   "source_id": "platform-20",
+   "lane": "academic",
+   "title": "Proceedings of the 2nd International Workshop on Multi-Agent Systems using Generative Artificial INtelligence for Automated Software Engineering",
+   "text": "Proceedings of the 2nd International Workshop on Multi-Agent Systems using Generative Artificial INtelligence for Automated Software Engineering. Welcome from the ChairsWelcome to MAS-GAIN 2026, the 2nd International Workshop on Multi-Agent Systems using Generative Artificial INtelligence for Automated Software Engineering.Following the successful first edition of the workshop, MAS-GAIN 2026 continues to bring together researchers and practitioners interested in the convergence of Multi-Agent Systems (MAS), Generative Artificial Intelligence (GAIN), and Automated Software Engineering.This second edition was held in Munich, Germany, in conjunction with the 41st IEEE/ACM International Conference on Automated Software Engineering (ASE 2026).MAS-GAIN 2026 focuses on the engineering and application of multi-agent systems enhanced by generative AI for supporting and automating software engineering activities.As software systems continue to grow in complexity and scale, multi-agent architectures offer established mechanisms for distributed intelligence, collaboration, and autonomous problem solving, while recent advances in generative AI, particularly Large Language Models (LLMs), provide new capabilities for reasoning, generation, and interaction.Their convergence opens new opportunities for addressing software engineering challenges through collaborative problemsolving automated generation, intelligent validation, and continuous evolution of software artifacts.The primary goal of MAS-GAIN 2026 is to provide a forum for researchers and practitioners to exchange ideas, methodologies, empirical results, experiences, and emerging research directions concerning the integration of multi-agent systems and generative AI in software engineering.The workshop encourages discussion of both theoretical foundations and practical implementations, with the broader objective of advancing the state of the art in agent-based software automation and identifying the opportunities and challenges that will shape the next generation of intelligent and autonomous software engineering solutions.The scope of this second edition encompasses a broad range of topics, including architectures and orchestration mechanisms for multi-agent systems, code synthesis and system modeling, integration of heterogeneous models, human-agent collaboration, verification and validation of AI-generated software artifacts, integration with development environments and software engineering tools, software maintenance and evolution, resource-efficient and local deployment of agentic systems, as well as industrial applications and empirical evaluations.At the same time, the contributions to this edition reflect an increasing emphasis on the software engineering of agentic systems themselves.As generative agents become capable of performing increasingly complex and autonomous tasks, iii members for their time, expertise, and careful and constructive reviews.We also thank the ASE 2026 organizers and the broader ASE community for hosting the second edition of MAS-GAIN within the long-standing tradition of the IEEE/ACM International Conference on Automated Software Engineering.We invite all participants to engage actively with the program, exchange ideas with colleagues, and continue these discussions beyond the workshop.Further information about MAS-GAIN 2026 is available on the official workshop website (https://masgain.github.io/masgain/masgain2026/). We hope that MAS-GAIN 2026 provides an inspiring scientific forum, fosters new collaborations, and contributes to the continued development of the community around multi-agent generative AI for automated software engineering.",
+   "label": "on_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "platform",
+   "question": "What architectural frameworks, workflow transformations, and adoption practices are required for platform development teams to progress from standalone code generation tools to specialized, strategically differentiated artificial intelligence systems?",
+   "source_id": "platform-21",
+   "lane": "academic",
+   "title": "Artificial intelligence in mechanical engineering: foundations, opportunities, challenges, and responsibilities",
+   "text": "Artificial intelligence in mechanical engineering: foundations, opportunities, challenges, and responsibilities. Abstract Artificial intelligence (AI) is rapidly transforming mechanical engineering (ME) practice, influencing activities that range from modeling and simulation to optimization, diagnostics, design, and technical communication. This article consolidates perspectives discussed at a dedicated round-table during the 28th ABCM International Congress on Mechanical Engineering—COBEM 2025—and offers a structured reflection for the Brazilian and international ME communities. Rather than providing an exhaustive survey, the paper develops a coherent narrative around the conditions under which AI can strengthen—rather than dilute—engineering rigor. The article begins by clarifying how contemporary AI systems operate, distinguishing statistical learning from human cognition and outlining their capabilities, limitations, and emerging agentic AI systems. It then examines industrial adoption, workforce transformation, and the growing role of AI in scientific discovery and engineering workflows. Particular attention is devoted to the energy and infrastructure demands of AI-driven computation and their implications for sustainability, power systems, and thermal management. Building on these constraints, the paper discusses integrating physical knowledge, structured reasoning, and domain expertise into AI systems for safety-relevant engineering applications. Emphasis is placed on representative ME applications, physics-informed and hybrid learning frameworks, model development under physical constraints, validation, uncertainty quantification, and certification challenges. The paper also addresses the educational, epistemological, and ethical implications of AI, including curriculum modernization, human-agent collaboration, professional accountability, and the long-term sustainability of engineering knowledge. It concludes with a synthesis of principles for the responsible adoption of AI in ME, encompassing physical consistency, validation, awareness of uncertainty, energy sustainability, human oversight, and ethical responsibility. Our central message is that AI should be viewed not as a substitute for engineering judgment, but as a powerful tool whose value depends on disciplined integration with physical reasoning, scientific rigor, and professional responsibility.",
+   "label": "off_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "platform",
+   "question": "What architectural frameworks, workflow transformations, and adoption practices are required for platform development teams to progress from standalone code generation tools to specialized, strategically differentiated artificial intelligence systems?",
+   "source_id": "platform-22",
+   "lane": "academic",
+   "title": "Engineering Digital Real Estate Platforms: Integrating Cloud Computing, AI, and Enterprise Software in PropTech",
+   "text": "Engineering Digital Real Estate Platforms: Integrating Cloud Computing, AI, and Enterprise Software in PropTech. The digital transformation of the real estate industry has entered a new phase in which software platforms, rather than individual applications, define organizational competitiveness. Traditional PropTech solutions have largely focused on digitizing isolated business processes such as property listings, leasing, customer management, and facility operations. However, increasing technological complexity has created a growing need for integrated enterprise platforms capable of coordinating cloud infrastructure, artificial intelligence, enterprise software, data engineering, and intelligent business processes within a unified digital ecosystem. This article argues that future PropTech organizations should be engineered as cloud-native software platforms rather than collections of independent technology products. The study proposes an engineering-oriented framework that integrates scalable cloud computing architectures, enterprise software integration, AI-as-a-Service, intelligent workflow orchestration, modern data platforms, and governance mechanisms into a cohesive reference architecture for next-generation PropTech ecosystems. Unlike conventional studies that primarily emphasize smart buildings or digital twins, this research approaches PropTech from the perspective of enterprise software engineering, highlighting platform scalability, interoperability, modularity, automation, and operational intelligence as the principal drivers of digital transformation. The proposed framework demonstrates how cloud-native infrastructure, API-first integration, artificial intelligence services, and enterprise orchestration collectively establish the technological foundation required for autonomous, adaptive, and continuously evolving real estate platforms capable of supporting the future digital economy.",
+   "label": "off_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "platform",
+   "question": "What architectural frameworks, workflow transformations, and adoption practices are required for platform development teams to progress from standalone code generation tools to specialized, strategically differentiated artificial intelligence systems?",
+   "source_id": "platform-23",
+   "lane": "academic",
+   "title": "Navigating Enterprise Transformations: TPM Strategies for Large-Scale Technology Migrations",
+   "text": "Navigating Enterprise Transformations: TPM Strategies for Large-Scale Technology Migrations. Large-scale technology migrations represent strategic imperatives that fundamentally transform enterprise operational capabilities through complex system modernization, cloud adoption, and architectural restructuring initiatives. These transformations present multifaceted challenges encompassing technical interdependencies, regulatory compliance frameworks, and organizational change management requirements that exceed traditional project management capabilities. Technical Program Managers have established themselves as critical enablers of successful technology transitions through specialized methodologies that integrate engineering rigor with business strategy alignment and comprehensive risk governance. This article analyzes Technical Program Manager contributions to migration success through examination of proven frameworks, implementation strategies, and organizational impact metrics derived from enterprise transformation initiatives. The article establishes a systematic four-phase Technical Program Management methodology incorporating discovery protocols, strategic planning mechanisms, orchestrated execution processes, and optimization frameworks that collectively improve transformation predictability and value realization. Empirical evidence demonstrates that Technical Program Manager-guided migrations achieve superior outcomes, including accelerated delivery timelines, reduced operational risks, enhanced compliance readiness, and measurable efficiency improvements across critical business processes. This article advances understanding of enterprise transformation management by providing structured approaches and validated best practices that enable organizations to navigate complex technology migrations while maintaining operational excellence and achieving strategic modernization objectives.",
+   "label": "off_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "platform",
+   "question": "What architectural frameworks, workflow transformations, and adoption practices are required for platform development teams to progress from standalone code generation tools to specialized, strategically differentiated artificial intelligence systems?",
+   "source_id": "platform-24",
+   "lane": "academic",
+   "title": "An AI Development Platform Utilizing HITL Verification: From Source Data to Tailored Domain Assistants",
+   "text": "An AI Development Platform Utilizing HITL Verification: From Source Data to Tailored Domain Assistants. This paper introduces the Human-Enabled Learning & Evaluation Network for Assistants (HELENA), an end-to-end, locally deployable artificial intelligence (AI) development platform designed to transform proprietary or non-proprietary source data into specialized, tailored AI assistants. The HELENA framework integrates retrieval-augmented generation (RAG) to ground models and low-rank adaptation (LoRA) to instill response characteristics and formatting. The platform employs reinforcement supervised fine tuning (SFT) through a slow-burn human verification process that converts AI-generated synthetic data into verified training sets to ensure the highest level of accuracy and alignment. A critical advantage of the HELENA architecture is its portability; the system is designed to be deployed entirely behind secure firewalls, ensuring stringent data protection and eliminating external vendor vulnerabilities. Finally, this paper reviews the preliminary training progress of current assistants and details future capabilities, including knowledge graph integration, active knowledge elicitation, multi-agent collaboration, and the development of tool-using tailored assistants. Ultimately, HELENA serves as a secure and scalable blueprint for capturing institutional knowledge and deploying specialized AI.",
+   "label": "on_topic",
+   "borderline": false
+  },
+  {
+   "question_key": "platform",
+   "question": "What architectural frameworks, workflow transformations, and adoption practices are required for platform development teams to progress from standalone code generation tools to specialized, strategically differentiated artificial intelligence systems?",
+   "source_id": "platform-25",
+   "lane": "academic",
+   "title": "DIZEST: A low-code platform for workflow-driven artificial intelligence and data analysis",
+   "text": "DIZEST: A low-code platform for workflow-driven artificial intelligence and data analysis. While artificial intelligence (AI) and data science offer unprecedented potential, technology entry barriers often hinder widespread adoption and limit the rapid development of tailored applications. Existing low-code development platforms (LCDPs) partially address these challenges, but frequently lack the capabilities needed for complex AI and data analysis workflows. To this end, this paper presents DIZEST, a novel LCDP designed to accelerate AI application development and enhance data analysis for code-free workflow construction, while simultaneously providing professional developers with advanced customization functionalities. In particular, a reusable node-based architecture enables efficient development so that resultant applications are scalable, high-performing, and portable across diverse deployments.",
+   "label": "off_topic",
+   "borderline": true
+  }
+ ]
+}

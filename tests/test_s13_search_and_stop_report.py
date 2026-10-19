@@ -108,3 +108,39 @@ def test_web_app_uses_stop_report_for_stopped_runs():
     assert "stopped_run_markdown(results)" in src
     block = src[src.index("stopped_run_markdown(results)") - 400:src.index("stopped_run_markdown(results)")]
     assert 'results.get("stopped_at")' in block
+
+
+# ------------------------------------------------------------------------------
+# Tests 6-8: Check A judges relevance to the subject, not a full answer
+# ------------------------------------------------------------------------------
+# Requirements (added after reading run job_3cd226217fd8's Check A table):
+# 6. Check A's live prompt (v3) asks whether a source is about the question's subject and could inform
+#    at least one part or sub-question; it does not have to answer the whole question. It keeps the
+#    compound-subject rule (the sourdough canary) and the out-of-scope rule.
+# 7. The labelled bake-off set (v2) includes that run's 26 sources, and the bake-off expects the
+#    platform-teams question to pass and the sourdough canary to stop.
+# 8. The run's own reasons read "not the transition to specialized ... systems": a source that covers one
+#    part of a compound question is the case the prompt names as on_topic.
+def test_check_a_live_prompt_is_v3():
+    import src.engine.check_a_on_topic as check_a
+
+    assert check_a.PROMPT_FILE_PATH == "prompts/check_a_on_topic_v3.md"
+    text = Path(check_a.PROMPT_FILE_PATH).read_text(encoding="utf-8")
+    for needed in ("{context}", "{items}", "at least one part", "does not need to answer the whole question",
+                   "solar-powered irrigation pumps", "out of scope"):
+        assert needed in text, needed
+
+
+def test_bakeoff_set_v2_has_the_failing_run():
+    import json
+    import sys
+
+    data = json.loads(Path("evals/data/check_a_labelled_v2.json").read_text(encoding="utf-8"))
+    platform = [i for i in data["items"] if i["question_key"] == "platform"]
+    assert len(platform) == 26 and sum(i["label"] == "on_topic" for i in platform) >= 5
+    assert {i["question_key"] for i in data["items"]} >= {"kiro", "hospital", "assistants", "sourdough", "platform"}
+    sys.path.insert(0, "evals")
+    import bakeoff_check_a
+
+    assert bakeoff_check_a.DATA.name == "check_a_labelled_v2.json"
+    assert bakeoff_check_a.EXPECTED_RUN_PASS["platform"] is True and bakeoff_check_a.EXPECTED_RUN_PASS["sourdough"] is False
