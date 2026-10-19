@@ -197,11 +197,12 @@ class GateChecker:
 
         if not any(s.type in GROUNDED_TYPES for s in sentences):
             result.mark_no_data("G1", "No grounded sentences to audit: the draft has no findings, signals or risks.")
+        # The denylist reason comes first: it is the one the operator can act on.
+        if not self.denylist_configured:
+            result.mark_no_data("G5", "Add denylist.txt (an empty file is fine) so confidentiality can be checked.")
         if not sentences:
             for g in ("G5", "G6"):
                 result.mark_no_data(g, "The draft has no sentences to check.")
-        if not self.denylist_configured:
-            result.mark_no_data("G5", "Add denylist.txt (an empty file is fine) so confidentiality can be checked.")
         if question is None:
             result.mark_no_data("G3", "No approved question was given, so topic fit could not be checked.")
 
