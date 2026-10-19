@@ -34,17 +34,21 @@ def search_log_negative_findings(slogs: List[Any]) -> List[Tuple[str, Dict[str, 
     searched_zero = [s for s in slogs if getattr(s, "status", "searched_ok") == "searched_ok" and s.result_count == 0]
     unsearched = [s for s in slogs if getattr(s, "status", "searched_ok") in ("not_implemented", "not_searched", "skipped_by_scope")]
     out: List[Tuple[str, Dict[str, Any]]] = []
+    seen: Set[str] = set()
+
+    def add(text: str, slog: Any) -> None:
+        # A retried harvest logs the same search twice; state each boundary once (first row cited).
+        if text not in seen:
+            seen.add(text)
+            out.append((text, {"search_log_id": slog.id}))
+
     for slog in searched_zero:
-        out.append((
-            f"Literature search in {slog.lane} lane ({slog.source_api}) for '{slog.query}' returned 0 matching records in evidence ledger.",
-            {"search_log_id": slog.id},
-        ))
+        add((
+            f"Literature search in {slog.lane} lane ({slog.source_api}) for '{slog.query}' returned 0 matching records in evidence ledger."
+        ), slog)
     for slog in unsearched:
         reason = "no fetcher" if getattr(slog, "status", "") == "not_implemented" else "no observations recorded"
-        out.append((
-            f"{slog.lane.capitalize()} source '{slog.source_api}' not searched for '{slog.query}': {reason}.",
-            {"search_log_id": slog.id},
-        ))
+        add(f"{slog.lane.capitalize()} source '{slog.source_api}' not searched for '{slog.query}': {reason}.", slog)
     return out
 
 

@@ -166,7 +166,10 @@ def _judge_with_model(llm: Any, question: str, items: List[SourceItem], template
         except Exception as exc:  # unavailable or unparseable model abstains
             logger.info("Check A model abstained on batch %d: %s", start // BATCH_SIZE, exc)
             continue
-        for entry in data.get("verdicts", []) if isinstance(data, dict) else []:
+        entries = data.get("verdicts", []) if isinstance(data, dict) else []
+        for entry in entries if isinstance(entries, list) else []:
+            if not isinstance(entry, dict):
+                continue  # malformed entry: that source stays unjudged (abstain)
             item = keys.get(str(entry.get("id", "")).strip())
             verdict = str(entry.get("verdict", "")).strip().lower()
             if item and verdict in ("on_topic", "off_topic"):
@@ -193,7 +196,9 @@ def run_check_a(
     terms = salient_terms(question)
     alternates = _term_alternates(terms, synonyms)
 
-    judged = _judge_with_model(llm, question, items, template)
+    # Practitioner notes never go to the check model (DEC-013: they never reach a remote model,
+    # and the check model may be remote). They are never removed by Check A; the rule floor decides.
+    judged = _judge_with_model(llm, question, [it for it in items if it.lane != "practitioner"], template)
     verdicts: List[CheckVerdict] = []
     on_topic: Set[str] = set()
     for item in items:

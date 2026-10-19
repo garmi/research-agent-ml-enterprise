@@ -17,6 +17,7 @@ Executes the formal 8-stage research pipeline:
 from __future__ import annotations
 
 import datetime
+import functools
 import hashlib
 import json
 import logging
@@ -40,7 +41,7 @@ from src.gaps.matrix_builder import GapMatrixBuilder
 from src.grade.grader import Grader
 from src.ledger.db import DEFAULT_LEDGER_PATH, default_ledger_path, default_practitioner_path
 from src.ledger.migrations import apply_migrations
-from src.ledger.models import Claim, OutputDoc, OutputSentence, Question, Run, SearchLog, Source
+from src.ledger.models import Claim, OutputDoc, OutputSentence, Question, Review, Run, SearchLog, Source
 from src.ledger.repository import LedgerRepository
 from src.ledger.service import LedgerService
 from src.publish.publisher import Publisher
@@ -131,6 +132,25 @@ def _merge_by_key(first: List[Any], second: List[Any], key: Callable[[Any], str]
             seen.add(k)
             merged.append(x)
     return merged
+
+
+def _mark_failed_runs(fn: Callable[..., Dict[str, Any]]) -> Callable[..., Dict[str, Any]]:
+    """If a run raises after it was registered, record runs.status = FAILED with the error."""
+
+    @functools.wraps(fn)
+    def wrapper(self: "MultiLaneResearchRunner", *args: Any, **kwargs: Any) -> Dict[str, Any]:
+        self._current_run_id = None
+        try:
+            return fn(self, *args, **kwargs)
+        except Exception as exc:
+            if self._current_run_id:
+                try:
+                    self._safe_set_run_status(self._current_run_id, "FAILED", f"{type(exc).__name__}: {exc}"[:500])
+                except Exception:
+                    logger.exception("Could not mark run %s as FAILED", self._current_run_id)
+            raise
+
+    return wrapper
 
 
 def get_default_local_provider() -> str:
@@ -232,6 +252,7 @@ class MultiLaneResearchRunner:
         if os.getenv("HOSTED_DEMO") != "1":
             self.repo.insert_output(doc)
 
+    @_mark_failed_runs
     def run_workflow(
         self,
         topic: str,
@@ -258,6 +279,7 @@ class MultiLaneResearchRunner:
         self._ephemeral_sources = {}
         self._ephemeral_claims = []
         self._ephemeral_search_logs = []
+        self._check_llm_cache: Optional[Tuple[Any]] = None
         is_quick = "Fast" in depth
         max_academic_papers = 5 if is_quick else 10
         query_limit = 2 if is_quick else 4
@@ -308,6 +330,7 @@ class MultiLaneResearchRunner:
             config_json={"approval_ref": approval_ref or {}},
         )
         self._safe_insert_run(run_record)
+        self._current_run_id = run_id
         self._safe_set_run_status(run_id, "RUNNING")
 
         # ----------------------------------------------------------------------
@@ -368,15 +391,9 @@ class MultiLaneResearchRunner:
                 run_id=run_id,
                 custom_urls=lane_urls.get("academic", []),
             )
-            retry_enterprise = self._harvest_enterprise_lane(
-                topic=topic,
-                question_obj=question_obj,
-                run_id=run_id,
-                custom_urls=lane_urls.get("enterprise", []),
-                enterprise_feed_override=enterprise_feed_override,
-            )
+            # Only the academic lane can be widened (more queries, more results per query). Enterprise
+            # feeds take no query width and are cached, so re-harvesting them would repeat the same items.
             academic_papers = _merge_by_key(academic_papers, retry_papers, paper_source_id)
-            enterprise_claims = _merge_by_key(enterprise_claims, retry_enterprise, lambda c: c.id)
             check_a = self._run_check_a(
                 check_question, academic_papers, enterprise_claims, practitioner_claims,
                 map_provider=map_provider, run_id=run_id, attempt=1, approval_ref=approval_ref,
@@ -398,7 +415,9 @@ class MultiLaneResearchRunner:
         if off_ids:
             enterprise_claims = [c for c in enterprise_claims if c.id not in off_ids]
             self._ephemeral_claims = [c for c in self._ephemeral_claims if c.id not in off_ids]
-            self._safe_reject_claims(list(off_ids))
+            self._safe_reject_claims(
+                list(off_ids), run_id=run_id, reason="Check A: its source was judged off-topic for the approved question.",
+            )
 
         # ----------------------------------------------------------------------
         # STAGE 3: ATOMIC CLAIM EXTRACTION
@@ -581,7 +600,12 @@ class MultiLaneResearchRunner:
     # Handoff checks (DEC-016)
     # ------------------------------------------------------------------
     def _build_check_llm(self, provider: Optional[str]) -> Any:
-        """Model used by the handoff checks. None (abstain) if it cannot be built."""
+        """Model used by the handoff checks, built once per run. None (abstain) if it cannot be built."""
+        if getattr(self, "_check_llm_cache", None) is None:
+            self._check_llm_cache = (self._make_check_llm(provider),)
+        return self._check_llm_cache[0]
+
+    def _make_check_llm(self, provider: Optional[str]) -> Any:
         from src.llm.factory import build_llm
 
         try:
@@ -603,7 +627,7 @@ class MultiLaneResearchRunner:
         approval_ref: Optional[Dict[str, Any]],
     ) -> Any:
         from src.engine.check_a_on_topic import build_source_items, run_check_a
-        from src.engine.checks import record_verdict
+        from src.engine.checks import record_verdicts
 
         cfg = ((self.config or {}).get("checks") or {}).get("check_a") or {}
         research_cfg = (self.config or {}).get("research") or {}
@@ -621,8 +645,7 @@ class MultiLaneResearchRunner:
             synonyms=research_cfg.get("head_term_synonyms"),
             approval_ref=approval_ref,
         )
-        for v in result.verdicts:
-            record_verdict(self.repo, v)
+        record_verdicts(self.repo, result.verdicts)
         return result
 
     @staticmethod
@@ -648,9 +671,23 @@ class MultiLaneResearchRunner:
         if os.getenv("HOSTED_DEMO") != "1":
             self.repo.set_run_status(run_id, status, reason)
 
-    def _safe_reject_claims(self, claim_ids: List[str]) -> None:
-        if os.getenv("HOSTED_DEMO") != "1":
-            self.repo.reject_claims(claim_ids)
+    def _safe_reject_claims(self, claim_ids: List[str], run_id: str, reason: str) -> None:
+        """Reject claims Check A dropped, with a reviews row so the ledger shows it was Check A
+        (not an operator) and why; the per-source verdicts are in check_verdicts."""
+        if os.getenv("HOSTED_DEMO") == "1" or not claim_ids:
+            return
+        self.repo.reject_claims(claim_ids)
+        for cid in claim_ids:
+            self.repo.insert_review(Review(
+                id=f"rev_{uuid.uuid4().hex[:10]}",
+                gate="check_a",
+                object_type="claim",
+                object_id=cid,
+                action="reject",
+                after_json={"run_id": run_id, "status": "rejected"},
+                reason=reason,
+                reviewer="check_a",
+            ))
 
     def _stop_at_check_a(
         self,
@@ -679,7 +716,10 @@ class MultiLaneResearchRunner:
             status = "BLOCKED"
             reasons.insert(0, "Gate 6: Practitioner abstraction not confirmed by operator.")
         self._ephemeral_claims = [c for c in self._ephemeral_claims if c.id not in {h.id for h in harvested_claims}]
-        self._safe_reject_claims([c.id for c in harvested_claims])
+        self._safe_reject_claims(
+            [c.id for c in harvested_claims], run_id=run_id,
+            reason="Check A stopped the run: too little on-topic evidence, nothing drafted.",
+        )
         gap_entry = self.gap_builder.evaluate_question_lanes(
             question_obj.id,
             run_id=run_id,
