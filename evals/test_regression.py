@@ -15,7 +15,7 @@ import tempfile
 import pytest
 
 from src.grade.grader import Grader
-from src.ledger.models import Claim, OutputSentence, Source
+from src.ledger.models import Question, Claim, OutputSentence, Source
 from src.score.checker import GateChecker
 
 
@@ -263,13 +263,16 @@ def test_compliant_draft_passes_all_gates(test_env):
         claim_ids_json=["c_exact_kiro"],
     )
 
+    # G3 needs the approved question to check topic fit; without one it has no data (S6).
+    question = Question(id="q-kiro", text="How does Amazon Kiro adoption affect developer throughput in enterprise engineering teams?")
     result = checker.check_output(
         sentences=[sentence],
         ledger_claims={"c_exact_kiro": claim},
         source_texts={"src_kiro_paper": "Preliminary study on Amazon Kiro workflows in enterprise software engineering."},
+        question=question,
     )
 
-    assert result.passed, f"Expected all gates to pass, got violations: {result.violations}"
+    assert result.passed, f"Expected all gates to pass, got violations: {result.violations} states: {result.states()}"
     assert result.g1_pass
     assert result.g2_pass
     assert result.g3_pass
@@ -321,7 +324,8 @@ def test_r8_stale_source_outside_time_window():
     from src.ledger.models import Question
 
     scorer = QualityScorer()
-    gate_ok = GateCheckResult()
+    # An explicit all-PASS result: an empty GateCheckResult() is NO_DATA on every gate (S6).
+    gate_ok = GateCheckResult.all_passed()
 
     question = Question(
         id="q-freshness-test",
@@ -386,7 +390,8 @@ def test_r9_known_contradiction_omitted():
     from src.ledger.models import Question
 
     scorer = QualityScorer()
-    gate_ok = GateCheckResult()
+    # An explicit all-PASS result: an empty GateCheckResult() is NO_DATA on every gate (S6).
+    gate_ok = GateCheckResult.all_passed()
     question = Question(id="q-test", text="Test Question")
 
     # Output with full gap disclosure and contradiction recall

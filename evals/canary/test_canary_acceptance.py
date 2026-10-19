@@ -326,3 +326,43 @@ def test_canary_no_egress_of_practitioner_text():
         assert len(connected_remote_hosts) == 0, (
             f"Privacy violation: non-localhost socket connections attempted during practitioner synthesis: {connected_remote_hosts}"
         )
+
+
+def test_canary_runs_end_in_gated_status():
+    """10. gated_status (S6): every canary run ends in one of the four statuses, recorded on the run,
+    with plain reasons; Q1 and Q2 share no claims; Q3 ends NOT_PUBLISHABLE with no live claims."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        runner = _create_runner(tmpdir)
+        repo = LedgerRepository(db_path=runner.db_path)
+        results = {}
+        for name, topic, cassette in (("q1", Q1_TOPIC, "q1_kiro"), ("q2", Q2_TOPIC, "q2_hospitals"), ("q3", Q3_TOPIC, None)):
+            results[name] = runner.run_workflow(
+                topic=topic, depth="Fast", tone="Executive", map_provider="stub", reduce_provider="stub",
+                academic_papers_override=_load_cassette(cassette) if cassette else [],
+            )
+        for name, res in results.items():
+            assert res["status"] in ("PUBLISH_READY", "REVISE", "BLOCKED", "NOT_PUBLISHABLE"), (name, res["status"])
+            assert repo.get_run_status(res["run_id"])[0] == res["status"], name
+            assert res["publish_res"].get("reasons"), name
+        q1_claims = {c["id"] for c in results["q1"]["claims"]}
+        q2_claims = {c["id"] for c in results["q2"]["claims"]}
+        assert not (q1_claims & q2_claims)
+        assert results["q3"]["status"] == "NOT_PUBLISHABLE"
+        live_q3 = [c for c in repo.list_claims(question_id=results["q3"]["question_id"]) if c.status != "rejected"]
+        assert live_q3 == []
+
+
+def test_canary_never_published_without_signoff():
+    """11. no_self_publish (S6): a run never reaches PUBLISHED by itself; only a reviewer's sign-off does."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        runner = _create_runner(tmpdir)
+        res = runner.run_workflow(
+            topic=Q1_TOPIC, depth="Fast", tone="Executive", map_provider="stub", reduce_provider="stub",
+            academic_papers_override=_load_cassette("q1_kiro"),
+        )
+        repo = LedgerRepository(db_path=runner.db_path)
+        assert repo.get_run_status(res["run_id"])[0] != "PUBLISHED"
+        with repo._conn() as conn:
+            assert conn.execute("SELECT COUNT(*) FROM outputs WHERE status = 'published';").fetchone()[0] == 0
+            assert conn.execute("SELECT COUNT(*) FROM reviews WHERE action = 'publish';").fetchone()[0] == 0
+

@@ -167,4 +167,8 @@ def isolate_test_ledger_and_outputs(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     monkeypatch.setenv("OUTPUT_DIR", str(test_outputs))
     monkeypatch.setenv("RESEARCH_LEDGER_DB", str(tmp_path / "ledger" / "ledger.db"))
     monkeypatch.setenv("RESEARCH_PRACTITIONER_DB", str(tmp_path / "ledger" / "practitioner.db"))
+    # An empty denylist that exists: confidentiality is checked (G5) without naming anyone.
+    denylist = tmp_path / "denylist.txt"
+    denylist.write_text("# test denylist (empty)\n", encoding="utf-8")
+    monkeypatch.setenv("RESEARCH_DENYLIST", str(denylist))
 
