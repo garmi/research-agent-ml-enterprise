@@ -8,6 +8,8 @@ Replaces fixed static framings with a model-guided reasoning step:
 
 from __future__ import annotations
 
+import hashlib
+
 import streamlit as st
 from typing import Any, Dict, List, Optional
 
@@ -26,7 +28,9 @@ from src.engine.reasoner import (
     find_unlisted_terms,
     get_prompt_file_hash,
     reason_question,
+    resolve_model_name,
     split_user_sentences,
+    validate_reasoned_package,
 )
 from src.ui.theme import (
     COLOR_BG_CARD,
@@ -53,6 +57,39 @@ def render_s2_proposal_card_text(pkg: Dict[str, Any]) -> str:
     premises = "\n".join(f"- {p}" for p in pkg.get("premises_to_test", []))
     scope = ", ".join(pkg.get("in_scope", []))
     return f"Refined Question:\n{refined}\n\nSub-Questions:\n{sub_qs}\n\nPremises:\n{premises}\n\nScope:\n{scope}"
+
+
+PROPOSAL_FIELD_KEYS = (
+    "input_s2_refined_question",
+    "input_s2_sub_questions",
+    "input_s2_premises",
+    "input_s2_in_scope",
+    "input_s2_out_scope",
+)
+
+
+def _load_proposal(pkg: Dict[str, Any]) -> None:
+    """Make `pkg` the active proposal. A keyed widget keeps its stored value and ignores a new
+    value=, so the edit fields' stored values are dropped and rebuilt from the new proposal."""
+    for k in PROPOSAL_FIELD_KEYS:
+        st.session_state.pop(k, None)
+    st.session_state["s2_active_package"] = pkg
+    st.session_state["_last_approved_id"] = None
+    st.session_state["_last_approved_package_sha256"] = None
+
+
+def effective_provider(selected: str, has_gemini_key: bool, ollama_ok: bool) -> str:
+    """The engine that will really run: Gemini without a key falls back to Ollama, then the stub."""
+    p = str(selected or "").strip().lower()
+    if p == "gemini" and not has_gemini_key:
+        return "ollama" if ollama_ok else "stub"
+    return p or ("ollama" if ollama_ok else "stub")
+
+
+def approval_blockers(package: Dict[str, Any], raw_user_text: str = "") -> List[str]:
+    """Schema and findings-guard errors that make an (edited) package unfit to approve."""
+    _, errors = validate_reasoned_package(package, raw_user_text)
+    return [e for e in errors if e.startswith(("Schema error", "Findings guard"))]
 
 
 def approved_question_text(package: Optional[Dict[str, Any]], results: Optional[Dict[str, Any]]) -> str:
@@ -159,9 +196,7 @@ def render_intake_view() -> Dict[str, Any]:
                     )
                     st.session_state["s2_raw_text"] = clean_text
                     st.session_state["s2_proposals"] = [pkg]
-                    st.session_state["s2_active_package"] = pkg
-                    st.session_state["_last_approved_id"] = None
-                    st.session_state["_last_approved_package_sha256"] = None
+                    _load_proposal(pkg)
                     st.rerun()
             except QuestionReasoningError as q_err:
                 st.error(f"**Reasoning Error:** {q_err}")
@@ -276,9 +311,7 @@ def render_intake_view() -> Dict[str, Any]:
                         )
                         proposals_history.append(v2_pkg)
                         st.session_state["s2_proposals"] = proposals_history
-                        st.session_state["s2_active_package"] = v2_pkg
-                        st.session_state["_last_approved_id"] = None
-                        st.session_state["_last_approved_package_sha256"] = None
+                        _load_proposal(v2_pkg)
                         st.rerun()
                 except Exception as exc:
                     st.error(f"Re-reasoning error: {exc}")
@@ -292,7 +325,8 @@ def render_intake_view() -> Dict[str, Any]:
             st.warning(f"⚠️ **Model-introduced terms:** The proposal introduces terms not present in your input: {terms_str}")
             terms_confirmed = st.checkbox(
                 f"I acknowledge and confirm these terms introduced by the model: {terms_str}",
-                key="chk_confirm_unlisted_terms",
+                # Scoped to this exact set of terms, so a confirmation never carries over to new terms.
+                key="chk_confirm_unlisted_terms_" + hashlib.sha256(terms_str.encode("utf-8")).hexdigest()[:12],
             )
 
         # Approval button
@@ -300,8 +334,12 @@ def render_intake_view() -> Dict[str, Any]:
         curr_pkg_hash = compute_package_sha256(current_package)
         last_approved_hash = st.session_state.get("_last_approved_package_sha256")
 
+        blockers = approval_blockers(current_package, raw_user_input)
+        for b in blockers:
+            st.error(b.replace("Schema error: ", "Fix before approving: "))
+
         st.markdown("<div style='height: 0.5rem;'></div>", unsafe_allow_html=True)
-        approve_disabled = not terms_confirmed
+        approve_disabled = not terms_confirmed or bool(blockers)
         if st.button("✅ Approve this reasoned question", key="btn_approve_reasoned_package", type="primary", disabled=approve_disabled):
             prompt_hash = get_prompt_file_hash()
             save_gate1_approval(
@@ -310,7 +348,7 @@ def render_intake_view() -> Dict[str, Any]:
                 proposals=proposals_history,
                 final_package=current_package,
                 provider=active_provider,
-                model_name=active_provider,
+                model_name=resolve_model_name(active_provider),
                 prompt_file_hash=prompt_hash,
             )
             st.session_state["_last_approved_id"] = q_id
