@@ -5,6 +5,13 @@ project:
 research:
   # S13: technology terms that name a question's subject. Search queries always keep them, and each
   # sub-question query gets the main question's, so every query searches the same subject.
+  # S14: relevance is multiplied by these when ranking harvested papers, so verified venues lead
+  # among equally relevant papers.
+  venue_tier_weights:
+    verified: 1.0
+    reputable_preprint: 0.9
+    unverified: 0.6
+    vendor: 0.5
   query_anchor_terms:
     - ai
     - genai

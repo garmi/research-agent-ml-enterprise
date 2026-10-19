@@ -55,3 +55,21 @@ levels:
       - "in an observed instance"
       - "practitioners report"
       - "informally noted"
+
+# S14: intensifiers overstate unless the cited source itself says so. G4 fails a sentence that uses one
+# when none of its cited quotes uses the same word stem (e.g. "significantly" needs "significant").
+intensifiers:
+  - "significantly"
+  - "substantially"
+  - "dramatically"
+  - "drastically"
+  - "greatly"
+  - "vastly"
+  - "massively"
+  - "profoundly"
+  - "radically"
+  - "markedly"
+  - "considerably"
+  - "enormously"
+  - "exponentially"
+  - "remarkably"

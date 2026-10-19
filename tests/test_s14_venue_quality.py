@@ -114,5 +114,6 @@ def test_unsupported_intensifier_fails_g4():
                "a statistically significant improvement in test generation")[0] == "PASS"
     assert _g4("Pipelines substantially reduce rework [P1].", "pipelines reduce rework")[0] == "FAIL"
     assert _g4("Pipelines reduce rework [P1].", "pipelines reduce rework")[0] == "PASS"
+    assert _g4("Pipelines dramatically reduce rework [P1].", "a dramatic reduction in rework")[0] == "PASS"
     cfg = yaml.safe_load(Path("synth/strength_verbs.yaml").read_text(encoding="utf-8"))
     assert {"significantly", "substantially", "dramatically"} <= set(cfg["intensifiers"])

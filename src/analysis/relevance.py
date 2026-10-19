@@ -97,6 +97,23 @@ def score_paper(paper: Dict[str, Any], topic: str) -> float:
     return round(score, 2)
 
 
+def rank_papers_by_tier(
+    papers: Iterable[Dict[str, Any]],
+    topic: str,
+    tier_of: Any,
+    weights: Dict[str, float],
+) -> List[Dict[str, Any]]:
+    """Relevance times the venue tier's weight (S14). Weights only reorder relevant papers: a verified
+    venue does not make an irrelevant paper relevant. Unknown tiers weigh 1.0."""
+    scored = []
+    for p in rank_papers(papers, topic):
+        tier = tier_of(p)
+        weight = float((weights or {}).get(tier, 1.0))
+        scored.append({**p, "venue_tier": tier, "tier_weight": weight})
+    scored.sort(key=lambda item: item.get("relevance_score", 0) * item["tier_weight"], reverse=True)
+    return scored
+
+
 def rank_papers(papers: Iterable[Dict[str, Any]], topic: str) -> List[Dict[str, Any]]:
     scored: List[Dict[str, Any]] = []
     for paper in papers:
