@@ -3,6 +3,25 @@ project:
   environment: mac
 
 research:
+  # S13: technology terms that name a question's subject. Search queries always keep them, and each
+  # sub-question query gets the main question's, so every query searches the same subject.
+  query_anchor_terms:
+    - ai
+    - genai
+    - llm
+    - ml
+    - code generation
+    - code
+    - coding
+    - software
+    - agent
+    - agents
+    - agentic
+    - copilot
+    - assistant
+    - assistants
+    - devops
+    - devsecops
   default_topic: "AI adoption in enterprise software delivery"
   max_papers: 12
   min_relevance_score: 0.5

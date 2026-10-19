@@ -58,7 +58,7 @@ from src.ui.intake_view import approved_question_text, effective_provider, rende
 from src.ui.rerun import board_editor_key, export_view, papers_for_rerun
 from src.ui.publish_view import gate_rows, gates_summary, publish_eligibility
 from src.ui.run_status import run_status, status_banner_html, status_code, step_rail, step_rail_html
-from src.ui.brief_view import brief_meta_line, distinct_signals, plain_html, roadmap_html
+from src.ui.brief_view import brief_meta_line, distinct_signals, plain_html, roadmap_html, stopped_run_markdown
 from src.ui.run_jobs import RunJobs
 from src.llm.model_names import gemini_model_name
 
@@ -1649,6 +1649,11 @@ if results:
     if perm.can_download_full:
         brief_content = builder.build_markdown(topic_str, syn_raw) if syn_raw else f"# Executive Research Brief\n\n**Topic:** {topic_str}\n\n## Verdict\n{results.get('verdict', '')}\n"
         json_content = json.dumps(syn_raw or export_view(results), indent=2)
+    elif perm.can_download_draft and results.get("stopped_at"):
+        # S13: nothing was drafted, so the download says why the run stopped instead of an empty template.
+        brief_content = stopped_run_markdown(results)
+        json_content = json.dumps({"watermark": "DRAFT, NOT FOR PUBLICATION", "status": status,
+                                   "failing_gates": perm.failing_gates, **export_view(results)}, indent=2)
     elif perm.can_download_draft:
         brief_content = builder.build_draft_markdown(topic_str, syn_raw, failing_gates=perm.failing_gates, status=status)
         draft_json_obj = {

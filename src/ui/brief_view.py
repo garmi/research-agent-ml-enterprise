@@ -59,3 +59,46 @@ def roadmap_html(roadmap: List[Dict[str, Any]]) -> str:
         for s in roadmap or []
     )
     return f'<div class="roadmap-note">Recommendations, not evidence: these steps are not checked against sources.</div>{items}'
+
+
+_STOP_TITLE = {
+    "check_a": ("Run stopped: not enough on-topic evidence",
+                "Rephrase or widen the question in Step 1 (name the subject plainly, e.g. AI code generation), then run again."),
+    "check_b": ("Run stopped: too few usable claims",
+                "Add sources, or re-include claims on the Evidence tab, then re-draft."),
+}
+
+
+def _md_cell(value: Any) -> str:
+    return " ".join(str(value or "").split()).replace("|", "\\|")
+
+
+def stopped_run_markdown(results: Dict[str, Any]) -> str:
+    """The download for a run a handoff check stopped (S13): why it stopped and what was judged,
+    instead of an empty brief template. Nothing was drafted, so there are no findings to show."""
+    title, next_step = _STOP_TITLE.get(results.get("stopped_at") or "",
+                                       ("Run stopped before drafting", "Run it again."))
+    lines = [
+        f"# {title}",
+        "",
+        f"**Question:** {results.get('strategic_question') or ''}",
+        "",
+        f"**Status:** {results.get('status') or ''}",
+        "",
+        "## Why it stopped",
+    ]
+    reasons = list((results.get("publish_res") or {}).get("reasons") or [])
+    stop_reason = results.get("stop_reason")
+    if stop_reason and not any(stop_reason in r for r in reasons):
+        reasons.append(stop_reason)
+    lines += [f"- {r}" for r in reasons or ["No reason was recorded."]]
+    sources = (results.get("check_a") or {}).get("sources") or []
+    if sources:
+        lines += ["", "## Sources judged by Check A", "", "| Source | Lane | Verdict | Why |", "|---|---|---|---|"]
+        lines += [
+            f"| {_md_cell(s.get('title'))} | {_md_cell(str(s.get('lane', '')).capitalize())} | "
+            f"{'On-topic' if s.get('verdict') == 'on_topic' else 'Off-topic'} | {_md_cell(s.get('reason'))} |"
+            for s in sources
+        ]
+    lines += ["", "## What to do next", f"- {next_step}", ""]
+    return "\n".join(lines)
