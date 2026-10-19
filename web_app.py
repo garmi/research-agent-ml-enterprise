@@ -56,6 +56,7 @@ from src.ui.safe_page import safe_page, format_error_payload, render_safe_error
 from src.ui.evidence_view import finding_card_html, render_sentence
 from src.ui.intake_view import approved_question_text, effective_provider, render_intake_view
 from src.ui.rerun import board_editor_key, export_view, papers_for_rerun
+from src.ui.publish_view import gate_rows, gates_summary, publish_eligibility
 
 
 logger = logging.getLogger("ExecutiveResearchStudio")
@@ -1302,7 +1303,7 @@ if results:
                         <strong>✓ Multi-lane synthesis complete</strong> in {results['duration']} ({len(results.get('papers', []))} papers • {len(results.get('claims', []))} atomic ledger claims)
                     </div>
                     <div style="font-size: 0.78rem; background: #DCFCE7; padding: 0.2rem 0.6rem; border-radius: 6px; font-weight: 700;">
-                        G1–G6 AUDITED • ZERO UNGROUNDED CLAIMS
+                        {gates_summary(results.get("gates_audit") or {})}
                     </div>
                 </div>
                 """,
@@ -1730,41 +1731,56 @@ if results:
     with phase_tab_gov:
         st.markdown("### 🛡️ Phase 4B: Deterministic Governance Audit (Gates G1–G6 & S1–S7 Scorecard)")
         audit_res = results.get("gates_audit", {})
-        all_gates_pass = audit_res.get("passed", True)
+        # A gate with no data counts as a fail (S6): only an audited PASS on all six is a pass.
+        all_gates_pass = audit_res.get("passed", False)
         if all_gates_pass:
-            st.success("✅ All Deterministic Hard Gates Passed (G1–G6 100% PASS • Denylist Clean • Verbatim Excerpts <= 25 Words)")
+            st.success("✅ All six gates passed on this draft's own evidence.")
         else:
-            st.error("⛔ Hard Gate Violations Detected — Review sentence-level trace below.")
+            st.error(f"⛔ Not all gates passed ({gates_summary(audit_res)}). A gate with no data counts as a fail; see why below.")
 
         g_col1, g_col2 = st.columns(2)
         with g_col1:
-            st.markdown("##### Hard Gates Audit Status (G1–G6)")
-            gates_dict = (audit_res.get("gates") or {})
-            gate_defs = [
-                ("Gate G1", "Sentence Grounding (All assertive sentences cite claims)", gates_dict.get("G1_traceability", {}).get("pass", True)),
-                ("Gate G2", "Numeric Fidelity (Numerals grounded in ledger)", gates_dict.get("G2_numeric_fidelity", {}).get("pass", True)),
-                ("Gate G3", "Entity & Topic Fidelity (Substantive overlap)", gates_dict.get("G3_entity_fidelity", {}).get("pass", True)),
-                ("Gate G4", "Language Honesty (Verb capped by weakest claim grade)", gates_dict.get("G4_language_honesty", {}).get("pass", True)),
-                ("Gate G5", "Confidentiality & Denylist (Zero client names)", gates_dict.get("G5_confidentiality", {}).get("pass", True)),
-                ("Gate G6", "Copyright & Quotation Cap (Excerpts <= 25 words)", gates_dict.get("G6_copyright", {}).get("pass", True)),
-            ]
-            g_df = [{"Gate": g[0], "Rule": g[1], "Status": "🟢 PASS" if g[2] else "🔴 BLOCKED"} for g in gate_defs]
-            render_safe_table(g_df, use_container_width=True)
+            st.markdown("##### Gates G1–G6")
+            render_safe_table(gate_rows(audit_res), use_container_width=True)
 
         with g_col2:
             st.markdown("##### Quality Scorecard (S1–S7 Components)")
             score_data = results.get("quality_scorecard", {})
-            comp_scores = score_data.get("components", {
-                "S1_evidence_strength": 28,
-                "S2_corroboration_diversity": 14,
-                "S3_question_coverage": 14,
-                "S4_gap_disclosure": 10,
-                "S5_freshness_scope": 10,
-                "S6_human_review": 10,
-                "S7_extraction_determinism": 10,
-            })
-            s_df = [{"Component": k, "Score": v} for k, v in comp_scores.items()]
-            render_safe_table(s_df, use_container_width=True)
+            comp_scores = score_data.get("components") or {}
+            if comp_scores:
+                s_df = [{"Component": k, "Score": v} for k, v in comp_scores.items()]
+                render_safe_table(s_df, use_container_width=True)
+            else:
+                st.caption("Not scored: this run stopped before drafting.")
+
+        # PUBLISH (S6): runs never publish themselves; a named reviewer does, here.
+        st.markdown("---")
+        st.markdown("##### Publish")
+        eligible, needs_reason, why_not = publish_eligibility(results)
+        reviewer_name = st.text_input("Reviewer name", key=f"publish_reviewer_{results.get('run_id')}")
+        signoff_reason = st.text_area(
+            "Sign-off reason" + (" (required for REVISE)" if needs_reason else ""),
+            key=f"publish_reason_{results.get('run_id')}",
+            height=70,
+        )
+        if why_not:
+            (st.info if eligible else st.warning)(why_not)
+        publish_ready = eligible and reviewer_name.strip() and (signoff_reason.strip() or not needs_reason)
+        if st.button("Publish this draft", type="primary", disabled=not publish_ready, key=f"publish_btn_{results.get('run_id')}"):
+            ok, pub = multilane_runner.publisher.publish_output(
+                output_id=results["doc_id"],
+                reviewer=reviewer_name.strip(),
+                signoff_reason=signoff_reason.strip() or "Approved by reviewer.",
+                force_publish_non_band=needs_reason,
+            )
+            if ok:
+                results["status"] = "PUBLISHED"
+                results["publish_res"] = {**results.get("publish_res", {}), **pub, "published": True, "status": "PUBLISHED"}
+                st.session_state["research_results"] = results
+                st.success("Published. The sign-off is logged with your name and reason.")
+                st.rerun()
+            else:
+                st.error(f"Not published: {pub.get('reason', 'unknown reason')}")
 
         st.markdown("---")
         st.markdown("##### Complete Sentence-Level Grounding Trace (`output_sentences` Ledger)")

@@ -23,6 +23,15 @@ from src.ledger.models import Claim, OutputSentence
 
 logger = logging.getLogger(__name__)
 
+# Gate states (S6, DEC-019): a gate with no data to judge is NO_DATA, and NO_DATA is not a pass.
+PASS = "PASS"
+FAIL = "FAIL"
+NO_DATA = "NO_DATA"
+GATE_IDS = ("G1", "G2", "G3", "G4", "G5", "G6")
+# Sentence types whose claims must be grounded (G1-G4). Roadmap actions are recommendations:
+# they get G5/G6 only. Headings, opinions, field notes and negative findings are not assertions.
+GROUNDED_TYPES = ("assertive", "finding", "signal", "risk")
+
 
 class GateCheckResult:
     def __init__(self):
@@ -32,25 +41,50 @@ class GateCheckResult:
         self.g4_pass: bool = True
         self.g5_pass: bool = True
         self.g6_pass: bool = True
-        self.violations: Dict[str, List[str]] = {
-            "G1": [],
-            "G2": [],
-            "G3": [],
-            "G4": [],
-            "G5": [],
-            "G6": [],
-        }
+        self.violations: Dict[str, List[str]] = {g: [] for g in GATE_IDS}
+        # Whether each gate had something to judge, and why not when it did not.
+        self.evaluated: Dict[str, bool] = {g: False for g in GATE_IDS}
+        self.no_data_reasons: Dict[str, str] = {}
+
+    def mark_evaluated(self, gate: str) -> None:
+        self.evaluated[gate] = True
+
+    def mark_no_data(self, gate: str, reason: str) -> None:
+        """Record that the gate could not be judged (even if other sentences were)."""
+        self.no_data_reasons.setdefault(gate, reason)
+
+    def state(self, gate: str) -> str:
+        if not getattr(self, f"{gate.lower()}_pass"):
+            return FAIL
+        if not self.evaluated[gate] or gate in self.no_data_reasons:
+            return NO_DATA
+        return PASS
+
+    def states(self) -> Dict[str, str]:
+        return {g: self.state(g) for g in GATE_IDS}
+
+    def reason_plain(self, gate: str) -> str:
+        st = self.state(gate)
+        if st == FAIL:
+            n = len(self.violations[gate])
+            first = self.violations[gate][0] if n else "Gate failed."
+            return f"{n} problem{'' if n == 1 else 's'} found. First: {first}"
+        if st == NO_DATA:
+            return self.no_data_reasons.get(gate, "Nothing to check for this gate.")
+        return "Checked and passed."
 
     @property
     def passed(self) -> bool:
-        return (
-            self.g1_pass
-            and self.g2_pass
-            and self.g3_pass
-            and self.g4_pass
-            and self.g5_pass
-            and self.g6_pass
-        )
+        return all(self.state(g) == PASS for g in GATE_IDS)
+
+    @classmethod
+    def all_passed(cls) -> "GateCheckResult":
+        """A result in which every gate was evaluated and passed (for callers and tests that
+        need an explicit pass; an empty GateCheckResult() is NO_DATA on every gate)."""
+        r = cls()
+        for g in GATE_IDS:
+            r.mark_evaluated(g)
+        return r
 
     def to_dict(self) -> Dict[str, Any]:
         def _parse_violations(gate_key: str) -> List[Dict[str, Any]]:
@@ -61,25 +95,20 @@ class GateCheckResult:
                 parsed.append({"sentence_id": sent_id, "message": str(v)})
             return parsed
 
+        names = {
+            "G1": "G1_traceability", "G2": "G2_numeric_fidelity", "G3": "G3_entity_fidelity",
+            "G4": "G4_language_honesty", "G5": "G5_confidentiality", "G6": "G6_copyright",
+        }
+
+        def entry(g: str, violations: Any) -> Dict[str, Any]:
+            # "pass" is True only for PASS: NO_DATA reads as not passed everywhere it is consumed.
+            return {"pass": self.state(g) == PASS, "state": self.state(g), "reason_plain": self.reason_plain(g), "violations": violations}
+
         return {
             "passed": self.passed,
             "status": "PASS" if self.passed else "BLOCKED",
-            "gates": {
-                "G1_traceability": {"pass": self.g1_pass, "violations": self.violations["G1"]},
-                "G2_numeric_fidelity": {"pass": self.g2_pass, "violations": self.violations["G2"]},
-                "G3_entity_fidelity": {"pass": self.g3_pass, "violations": self.violations["G3"]},
-                "G4_language_honesty": {"pass": self.g4_pass, "violations": self.violations["G4"]},
-                "G5_confidentiality": {"pass": self.g5_pass, "violations": self.violations["G5"]},
-                "G6_copyright": {"pass": self.g6_pass, "violations": self.violations["G6"]},
-            },
-            "hard_gates": {
-                "G1": {"pass": self.g1_pass, "violations": _parse_violations("G1")},
-                "G2": {"pass": self.g2_pass, "violations": _parse_violations("G2")},
-                "G3": {"pass": self.g3_pass, "violations": _parse_violations("G3")},
-                "G4": {"pass": self.g4_pass, "violations": _parse_violations("G4")},
-                "G5": {"pass": self.g5_pass, "violations": _parse_violations("G5")},
-                "G6": {"pass": self.g6_pass, "violations": _parse_violations("G6")},
-            },
+            "gates": {names[g]: entry(g, self.violations[g]) for g in GATE_IDS},
+            "hard_gates": {g: entry(g, _parse_violations(g)) for g in GATE_IDS},
         }
 
 
@@ -87,7 +116,7 @@ class GateChecker:
     def __init__(
         self,
         verbs_path: str = "synth/strength_verbs.yaml",
-        denylist_path: str = "denylist.txt",
+        denylist_path: Optional[str] = None,
     ):
         self.verbs_path = verbs_path
         self.denylist_path = denylist_path
@@ -103,9 +132,14 @@ class GateChecker:
             self.verbs_cfg = {}
 
     def _load_denylist(self) -> Set[str]:
+        """Load the denylist (RESEARCH_DENYLIST overrides the configured path). A missing file
+        leaves confidentiality unchecked (G5 NO_DATA); an empty but present file is checked."""
         self.denylist: Set[str] = set()
-        if os.path.exists(self.denylist_path):
-            with open(self.denylist_path, "r", encoding="utf-8") as f:
+        # An explicit path wins; otherwise RESEARCH_DENYLIST, otherwise ./denylist.txt.
+        path = self.denylist_path or os.getenv("RESEARCH_DENYLIST") or "denylist.txt"
+        self.denylist_configured = os.path.exists(path)
+        if self.denylist_configured:
+            with open(path, "r", encoding="utf-8") as f:
                 for line in f:
                     entry = line.strip().lower()
                     if entry and not entry.startswith("#"):
@@ -161,8 +195,22 @@ class GateChecker:
         # Reload denylist in case it changed
         self._load_denylist()
 
+        if not any(s.type in GROUNDED_TYPES for s in sentences):
+            result.mark_no_data("G1", "No grounded sentences to audit: the draft has no findings, signals or risks.")
+        # The denylist reason comes first: it is the one the operator can act on.
+        if not self.denylist_configured:
+            result.mark_no_data("G5", "Add denylist.txt (an empty file is fine) so confidentiality can be checked.")
+        if not sentences:
+            for g in ("G5", "G6"):
+                result.mark_no_data(g, "The draft has no sentences to check.")
+        if question is None:
+            result.mark_no_data("G3", "No approved question was given, so topic fit could not be checked.")
+
         for s in sentences:
             s_text = s.text.strip()
+            result.mark_evaluated("G6")
+            if self.denylist_configured:
+                result.mark_evaluated("G5")
 
             # [P#] run-scoped resolution check
             p_matches = re.findall(r"\[P(\d+)\]", s_text)
@@ -174,13 +222,14 @@ class GateChecker:
                         f"Sentence [{s.id}] (ordinal {s.ordinal}) cites [P{p_num}] which does not resolve to any source in run's Lane A list"
                     )
 
-            if s.type not in ("assertive", "finding"):
-                # Opinions and field notes are checked for confidentiality and copyright only
+            if s.type not in GROUNDED_TYPES:
+                # Roadmap, opinions and field notes are checked for confidentiality and copyright only
                 self._check_confidentiality(s_text, result)
                 self._check_copyright(s_text, source_texts or {}, result)
                 continue
 
             # G1: Traceability
+            result.mark_evaluated("G1")
             claim_ids = s.claim_ids_json or []
             if not claim_ids:
                 result.g1_pass = False
@@ -202,6 +251,11 @@ class GateChecker:
 
             if not cited_claims:
                 continue
+            # This sentence has valid evidence, so grounding, numbers and wording can be judged.
+            for g in ("G2", "G4"):
+                result.mark_evaluated(g)
+            if question is not None:
+                result.mark_evaluated("G3")
 
             # Support Check (2): Excerpt overlap - sentence must share >= 2 non-stopword terms with claim excerpt
             s_words = {
@@ -257,6 +311,8 @@ class GateChecker:
                         elif source_texts and c.source_id in source_texts:
                             src_text = source_texts[c.source_id]
 
+                        if not src_text:
+                            result.mark_no_data("G3", f"No source text for claim {c.id}, so its topic fit could not be checked.")
                         if src_text:
                             src_terms = {
                                 w for w in normalize_text(src_text).split()
@@ -366,6 +422,9 @@ class GateChecker:
             # G6: Copyright
             self._check_copyright(s_text, source_texts or {}, result)
 
+        for g in ("G2", "G3", "G4"):
+            if not result.evaluated[g]:
+                result.mark_no_data(g, "No sentence cited a valid claim, so there was nothing to check.")
         return result
 
     def _check_confidentiality(self, text: str, result: GateCheckResult) -> None:

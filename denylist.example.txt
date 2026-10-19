@@ -1,0 +1,4 @@
+# Denylist for Gate G5 (confidentiality). Copy to denylist.txt (git-ignored) and add one name per line:
+# clients, vendors under NDA, programme code names, people. Matching is case-insensitive, whole words.
+# An empty denylist.txt is fine: it tells the gate confidentiality was checked. Without the file, G5 has
+# no data and every draft is BLOCKED (S6, DEC-019).

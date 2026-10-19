@@ -1,0 +1,73 @@
+{
+ "provider": "ollama",
+ "date": "2026-10-19",
+ "runs": {
+  "Q1 kiro": {
+   "seconds": 210,
+   "status": "BLOCKED",
+   "run_status": [
+    "BLOCKED",
+    "Stopped at Check B: Only 5 usable claims from 1 source; at least 3 claims from 2 sources are needed. Nothing was drafted. Add sources or re-include claims on the evidence board, then re-draft."
+   ],
+   "stopped_at": "check_b",
+   "check_a": "1 of 2 sources are on-topic for the approved question (at least 1 on-topic source is needed).",
+   "check_b": "Only 5 usable claims from 1 source; at least 3 claims from 2 sources are needed.",
+   "gates": {},
+   "reasons": [
+    "Stopped at Check B: Only 5 usable claims from 1 source; at least 3 claims from 2 sources are needed. Nothing was drafted. Add sources or re-include claims on the evidence board, then re-draft."
+   ],
+   "papers": 1,
+   "claims": 5
+  },
+  "Q2 hospital": {
+   "seconds": 251,
+   "status": "BLOCKED",
+   "run_status": [
+    "BLOCKED",
+    "G2: 83 problems found. First: Sentence [out_25c29538ae03_3] (ordinal 3) failed citation support check: Insufficient excerpt overlap (0 < 2 non-stopword terms) with claim c_f502d729c8a20e45_1: 'Deployment frequency increased significantly under automated testing frameworks [P1]'; G5: Add denylist.txt (an empty file is fine) so confidentiality can be checked."
+   ],
+   "stopped_at": null,
+   "check_a": "3 of 5 sources are on-topic for the approved question (at least 1 on-topic source is needed).",
+   "check_b": "25 usable claims from 3 sources (at least 3 claims from 2 sources needed).",
+   "gates": {
+    "G1": "PASS",
+    "G2": "FAIL",
+    "G3": "PASS",
+    "G4": "PASS",
+    "G5": "NO_DATA",
+    "G6": "PASS"
+   },
+   "reasons": [
+    "G2: 83 problems found. First: Sentence [out_25c29538ae03_3] (ordinal 3) failed citation support check: Insufficient excerpt overlap (0 < 2 non-stopword terms) with claim c_f502d729c8a20e45_1: 'Deployment frequency increased significantly under automated testing frameworks [P1]'",
+    "G5: Add denylist.txt (an empty file is fine) so confidentiality can be checked."
+   ],
+   "papers": 3,
+   "claims": 25
+  },
+  "Q3 sourdough": {
+   "seconds": 263,
+   "status": "BLOCKED",
+   "run_status": [
+    "BLOCKED",
+    "G2: 83 problems found. First: Sentence [out_0f7ff0288a45_3] (ordinal 3) failed citation support check: Insufficient excerpt overlap (0 < 2 non-stopword terms) with claim c_c30e57d9f5e17cbd_2: 'Carob flour addition significantly increases water absorption capacity and dough development time, which could be exploited by quantum attacks [P1]'; G5: Add denylist.txt (an empty file is fine) so confidentiality can be checked."
+   ],
+   "stopped_at": null,
+   "check_a": "2 of 4 sources are on-topic for the approved question (at least 1 on-topic source is needed).",
+   "check_b": "15 usable claims from 2 sources (at least 3 claims from 2 sources needed).",
+   "gates": {
+    "G1": "PASS",
+    "G2": "FAIL",
+    "G3": "PASS",
+    "G4": "PASS",
+    "G5": "NO_DATA",
+    "G6": "PASS"
+   },
+   "reasons": [
+    "G2: 83 problems found. First: Sentence [out_0f7ff0288a45_3] (ordinal 3) failed citation support check: Insufficient excerpt overlap (0 < 2 non-stopword terms) with claim c_c30e57d9f5e17cbd_2: 'Carob flour addition significantly increases water absorption capacity and dough development time, which could be exploited by quantum attacks [P1]'",
+    "G5: Add denylist.txt (an empty file is fine) so confidentiality can be checked."
+   ],
+   "papers": 2,
+   "claims": 15
+  }
+ }
+}

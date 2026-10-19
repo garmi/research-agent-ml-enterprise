@@ -39,7 +39,8 @@ def test_unified_status_vocabulary_and_no_do_not_publish():
     assert res_blocked["band"] == "BLOCKED"
 
     # Gate passed, low score -> NOT_PUBLISHABLE (never DO_NOT_PUBLISH)
-    gate_passed = GateCheckResult()
+    # An explicit all-PASS result: an empty GateCheckResult() is NO_DATA on every gate (S6).
+    gate_passed = GateCheckResult.all_passed()
     res_low = scorer.calculate_score(
         gate_result=gate_passed,
         sentences=[],
@@ -54,7 +55,8 @@ def test_unified_status_vocabulary_and_no_do_not_publish():
 def test_scorer_yields_distinct_scores_for_different_evidence_sets():
     """Verify that strong vs weak evidence sets produce distinct scores, not constant 66.0."""
     scorer = QualityScorer()
-    gate_passed = GateCheckResult()
+    # An explicit all-PASS result: an empty GateCheckResult() is NO_DATA on every gate (S6).
+    gate_passed = GateCheckResult.all_passed()
     q = Question(id="q-test", text="How do teams adopt AI in enterprise software?", scope="ai")
 
     # Set 1: Strong peer-reviewed evidence with verified sources and full excerpts

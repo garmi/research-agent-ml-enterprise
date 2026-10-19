@@ -298,14 +298,19 @@ class SynthesisEngine:
         )
         ordinal += 1
 
+        # Signals restate findings. Model findings carry their own tags; signals copied from the
+        # drafted findings keep those findings' claims (their text has no tags to resolve).
+        assertive_by_text = {x.text: (x.claim_ids_json or []) for x in sentences if x.type == "assertive"}
         signals_candidates = (
             (executive_synthesis.get("key_findings") or [])[:3]
             if executive_synthesis
-            else [s.text for s in sentences if s.type == "assertive"][:3]
+            else list(assertive_by_text)[:3]
         )
         if signals_candidates:
             for sig in signals_candidates:
                 sig_cids, sig_checks = bind(sig)
+                if not sig_cids and assertive_by_text.get(sig):
+                    sig_cids, sig_checks = list(assertive_by_text[sig]), None
                 sentences.append(
                     OutputSentence(
                         id=f"{output_id}_{ordinal}",

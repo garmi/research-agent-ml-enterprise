@@ -18,7 +18,8 @@ from src.score.scorer import QualityScorer
 def test_human_review_state_changes_s6():
     """Verify that changing human review state changes S6."""
     scorer = QualityScorer()
-    gate_ok = GateCheckResult()
+    # An explicit all-PASS result: an empty GateCheckResult() is NO_DATA on every gate (S6).
+    gate_ok = GateCheckResult.all_passed()
 
     q = Question(id="q1", text="Enterprise AI adoption")
     c1 = Claim(
@@ -74,7 +75,8 @@ def test_human_review_state_changes_s6():
 def test_two_runs_with_same_cache_give_measured_s7():
     """Verify that two runs with the same cached sources give a measured S7 score."""
     scorer = QualityScorer()
-    gate_ok = GateCheckResult()
+    # An explicit all-PASS result: an empty GateCheckResult() is NO_DATA on every gate (S6).
+    gate_ok = GateCheckResult.all_passed()
 
     cached_papers = [
         {
@@ -127,7 +129,8 @@ def test_two_runs_with_same_cache_give_measured_s7():
 def test_unmeasured_s7_caps_band_at_revise():
     """Verify that when S7 is unmeasured, it is marked 'not measured' and caps band at REVISE."""
     scorer = QualityScorer()
-    gate_ok = GateCheckResult()
+    # An explicit all-PASS result: an empty GateCheckResult() is NO_DATA on every gate (S6).
+    gate_ok = GateCheckResult.all_passed()
 
     # Pass everything needed for a high score (> 85), but no S7 reproducibility measured
     q = Question(id="q1", text="Topic")
@@ -157,7 +160,8 @@ def test_unmeasured_s7_caps_band_at_revise():
 def test_s4_computed_from_gap_outcomes_and_contradictions():
     """Verify that S4 is dynamically computed from gap outcomes stated and ledger contradictions."""
     scorer = QualityScorer()
-    gate_ok = GateCheckResult()
+    # An explicit all-PASS result: an empty GateCheckResult() is NO_DATA on every gate (S6).
+    gate_ok = GateCheckResult.all_passed()
     q = Question(id="q1", text="Topic")
 
     # Case A: Sentences with zero gap outcomes and zero contradictions mentioned
