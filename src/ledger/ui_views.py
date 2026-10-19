@@ -438,7 +438,7 @@ def render_publish_gate_view(service: LedgerService) -> None:
             st.error("Publication is strictly BLOCKED until all hard gate violations are resolved.")
             with st.expander("Hard Gate Violations", expanded=True):
                 for g_id, g_info in gate_res.get("gates", {}).items():
-                    if not g_info.get("pass", True):
+                    if not g_info.get("pass", False):
                         st.write(f"**{g_id}:** {g_info.get('violations')}")
     else:
         st.info("Draft a document in Gate 5 to review the Publish Scorecard.")

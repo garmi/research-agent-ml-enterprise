@@ -136,7 +136,8 @@ class QualityScorer:
             if known_contradictions > 0:
                 contradiction_ratio = min(1.0, contradictions_mentioned / known_contradictions)
             else:
-                contradiction_ratio = 1.0 if (gap_outcomes_count > 0 or contradictions_mentioned > 0) else 0.5
+                # No known contradictions: credit only if the draft discloses gaps or tensions at all.
+                contradiction_ratio = 1.0 if (gap_outcomes_count > 0 or contradictions_mentioned > 0) else 0.0
 
             s4_ratio = 0.6 * gap_ratio + 0.4 * contradiction_ratio
             s4_score = s4_ratio * weights.get("S4_gap_disclosure", 10)
@@ -150,7 +151,8 @@ class QualityScorer:
                 claim_year = int(c.claim_date) if c.claim_date and c.claim_date.isdigit() else 2026
                 if claim_year >= 2023:
                     fresh_claims += 1
-        freshness_ratio = fresh_claims / len(all_cited_claim_ids) if all_cited_claim_ids else 1.0
+        # Nothing cited means freshness is unknown, not perfect (S6: no data earns no credit).
+        freshness_ratio = fresh_claims / len(all_cited_claim_ids) if all_cited_claim_ids else 0.0
         s5_score = freshness_ratio * weights.get("S5_freshness_scope", 10)
 
         # S6: Human review (Weight: 10)
@@ -175,8 +177,10 @@ class QualityScorer:
             s7_measured = True
             s7_agreement = float(reproducibility_agreement)
         elif cached_papers is not None:
-            s7_agreement = self.compute_reproducibility(cached_papers, ledger_claims)
-            s7_measured = True
+            agreement = self.compute_reproducibility(cached_papers, ledger_claims)
+            if agreement is not None:
+                s7_agreement = agreement
+                s7_measured = True
 
         if s7_measured:
             s7_score = s7_agreement * weights.get("S7_reproducibility", 10)
@@ -239,10 +243,11 @@ class QualityScorer:
         self,
         cached_papers: List[Dict[str, Any]],
         ledger_claims: Dict[str, Claim],
-    ) -> float:
-        """Re-run extraction and grading from cached sources and compute agreement."""
+    ) -> Optional[float]:
+        """Re-run extraction and grading from cached sources and compute agreement.
+        None when there is nothing to re-run (not measured, which caps the band at REVISE)."""
         if not cached_papers and not ledger_claims:
-            return 1.0
+            return None
         if not cached_papers or not ledger_claims:
             return 0.0
 

@@ -32,7 +32,7 @@ class Publisher:
     def __init__(
         self,
         db_path: Optional[str] = None,
-        denylist_path: str = "denylist.txt",
+        denylist_path: Optional[str] = None,
         verbs_path: str = "synth/strength_verbs.yaml",
         scoring_path: str = "score/scoring.yaml",
         export_dir: Optional[str] = None,
@@ -63,6 +63,13 @@ class Publisher:
                 "reason": "TEST MODE: synthetic data. Results are not real and cannot be published.",
             }
 
+        if not str(reviewer or "").strip():
+            return False, {
+                "published": False,
+                "status": "NOT_PUBLISHED",
+                "reason": "A named reviewer is required to publish.",
+            }
+
         doc = self.repo.get_output(output_id)
         if not doc:
             raise ValueError(f"Output document '{output_id}' not found in ledger")
@@ -90,11 +97,24 @@ class Publisher:
                     sources[c.source_id] = src
                     source_texts[src.id] = f"{src.title} {src.url or ''}"
 
-        # 1. Run Gate Checker (G1 to G6)
+        # The run's own question, so G3 can check topic fit (without it G3 has no data and fails).
+        question = None
+        run = self.repo.get_run(doc.run_id) if doc.run_id else None
+        candidate_qids = list((run.question_ids or []) if run else [])
+        # An output drafted outside a run: use the question its cited claims belong to.
+        candidate_qids += [c.question_id for c in ledger_claims.values() if c.question_id]
+        for qid in candidate_qids:
+            question = self.repo.get_question(qid)
+            if question:
+                break
+
+        # 1. Re-run Gate Checker (G1 to G6) on the stored draft, so later changes are caught
         gate_res = self.checker.check_output(
             sentences=sentences,
             ledger_claims=ledger_claims,
             source_texts=source_texts,
+            sources=sources,
+            question=question,
         )
 
         # 2. Check for Practitioner Abstraction (R12 enforcement)
@@ -141,10 +161,11 @@ class Publisher:
                     "UPDATE outputs SET status = ?, gates_json = ? WHERE id = ?;",
                     ("blocked", json.dumps(doc.gates_json), doc.id),
                 )
+            not_passed = [f"{g}: {gate_res.reason_plain(g)}" for g, st in gate_res.states().items() if st != "PASS"]
             block_reason = (
                 "Gate 6: Practitioner abstraction not confirmed by operator."
                 if any("Gate 6" in v for v in gate_res.violations.get("G6", []))
-                else "Hard gate violation"
+                else "Not all gates passed. " + " ".join(not_passed)
             )
             return False, {
                 "published": False,
@@ -153,28 +174,47 @@ class Publisher:
                 "gate_results": gate_res.to_dict(),
             }
 
-        # 3. Calculate Final Quality Score
-        questions = self.repo.list_questions()
-        score_res = self.scorer.calculate_score(
-            gate_result=gate_res,
-            sentences=sentences,
-            ledger_claims=ledger_claims,
-            sources=sources,
-            questions=questions,
-            gap_outcomes_disclosed=1.0,
-        )
+        # 3. The run's audited score decides the band (it was computed with the run's papers and
+        # gap outcomes); re-scoring here without them would understate it.
+        score_res = dict(doc.score_json or {})
+        if not score_res.get("band"):
+            score_res = self.scorer.calculate_score(
+                gate_result=gate_res,
+                sentences=sentences,
+                ledger_claims=ledger_claims,
+                sources=sources,
+                questions=[question] if question else [],
+            )
+        band = str(score_res.get("band") or "NOT_PUBLISHABLE").upper()
 
-        # 4. Enforce Band or explicit sign-off
-        is_band_ready = score_res.get("band") == "PUBLISH_READY"
+        # 4. Enforce band: PUBLISH_READY publishes; REVISE only with an explicit, reasoned override;
+        # anything else (NOT_PUBLISHABLE, BLOCKED) is never published.
+        if band not in ("PUBLISH_READY", "REVISE"):
+            return False, {
+                "published": False,
+                "status": band,
+                "reason": f"Band '{band}' cannot be published, even with an override.",
+                "score_results": score_res,
+                "gate_results": gate_res.to_dict(),
+            }
+        if band == "REVISE" and force_publish_non_band and not str(signoff_reason or "").strip():
+            return False, {
+                "published": False,
+                "status": band,
+                "reason": "Publishing a REVISE draft needs a sign-off reason, which is logged.",
+                "score_results": score_res,
+                "gate_results": gate_res.to_dict(),
+            }
+        is_band_ready = band == "PUBLISH_READY"
         if not is_band_ready and not force_publish_non_band:
-            band_status = score_res.get("band", "NOT_PUBLISHABLE")
+            band_status = band
             doc.status = "draft"
             with self.repo._conn() as conn:
                 conn.execute("UPDATE outputs SET status = ? WHERE id = ?;", (doc.status, doc.id))
             return False, {
                 "published": False,
                 "status": band_status,
-                "reason": f"Quality score {score_res['total_score']} is in band '{score_res['band']}'. Requires human sign-off.",
+                "reason": f"Quality score {score_res.get('total_score')} is in band '{band}'. Publishing it needs an explicit, reasoned sign-off.",
                 "score_results": score_res,
                 "gate_results": gate_res.to_dict(),
             }
@@ -197,11 +237,14 @@ class Publisher:
                 object_id=doc.id,
                 action="publish",
                 before_json={"previous_status": "draft"},
-                after_json={"new_status": "published", "score": score_res["total_score"], "band": score_res["band"]},
+                after_json={"new_status": "published", "score": score_res.get("total_score"), "band": band},
                 reason=signoff_reason,
                 reviewer=reviewer,
             )
         )
+
+        if doc.run_id:
+            self.repo.set_run_status(doc.run_id, "PUBLISHED", f"Published by {reviewer} (band {band}): {signoff_reason}")
 
         # 6. Generate Versioned Website JSON Export
         export_payload = {

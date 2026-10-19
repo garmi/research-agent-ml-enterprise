@@ -579,13 +579,16 @@ class MultiLaneResearchRunner:
                     conn.execute("UPDATE outputs SET status = ? WHERE id = ?;", ("blocked", doc.id))
         elif is_fallback:
             publish_success = False
-            gate_res_passed = gate_results.get("passed", True)
-            fallback_status = "BLOCKED" if not gate_res_passed else score_results.get("band", "NOT_PUBLISHABLE")
+            gate_res_passed = gate_results.get("passed", False)
+            # Extractive fallback output can never be published, whatever its score band.
+            fallback_status = "BLOCKED" if not gate_res_passed else "NOT_PUBLISHABLE"
             doc.status = "blocked"
 
             pub_res = {
+                "published": False,
                 "allowed": False,
                 "status": fallback_status,
+                "reason": "Outputs generated via extractive fallback cannot be published.",
                 "reasons": [
                     "Outputs generated via extractive fallback cannot be published."
                 ],
@@ -609,12 +612,10 @@ class MultiLaneResearchRunner:
                 "gate_results": gate_results,
             }
         else:
-            publish_success, pub_res = self.publisher.publish_output(
-                output_id=doc.id,
-                reviewer="Research Studio Automated Gate",
-                signoff_reason="Multi-lane evidence ledger validated across Academic, Enterprise, and Field lanes.",
-                force_publish_non_band=False,
-            )
+            # S6: a run never publishes itself. It ends at a gated status; a named reviewer
+            # publishes from the Publish step (Publisher.publish_output, logged to reviews).
+            publish_success = False
+            pub_res = self._gated_status(gate_results, score_results)
 
         elapsed = int(time.time() - start_time)
 
@@ -832,6 +833,37 @@ class MultiLaneResearchRunner:
             "year": p_info["year"] if p_info else (src.pub_date if src and src.pub_date else str(c.claim_date or "Date unknown")),
             "rules": ", ".join(c.grade_reasons_json or ["Default rules"]),
             "is_custom": bool((src and "[Custom User Source]" in src.title) or (p_info and p_info.get("is_custom"))),
+        }
+
+    @staticmethod
+    def _gated_status(gate_results: Dict[str, Any], score_results: Dict[str, Any]) -> Dict[str, Any]:
+        """BLOCKED if any gate is not PASS (a gate with no data counts as a fail); otherwise the
+        score band. Only PUBLISH_READY, and REVISE with a human reason, can be published."""
+        hard = (gate_results or {}).get("hard_gates") or {}
+        not_passed = [
+            f"{gid}: {g.get('reason_plain') or 'not passed'}"
+            for gid, g in sorted(hard.items()) if g.get("state") != "PASS"
+        ]
+        if not gate_results.get("passed", False) or not_passed:
+            status = "BLOCKED"
+            reasons = not_passed or ["Gates were not audited for this draft."]
+        else:
+            status = str(score_results.get("band") or "NOT_PUBLISHABLE").upper()
+            if status not in ("PUBLISH_READY", "REVISE", "NOT_PUBLISHABLE"):
+                status = "NOT_PUBLISHABLE"
+            reasons = {
+                "PUBLISH_READY": ["All gates passed and the score is publish-ready: waiting for a reviewer to publish."],
+                "REVISE": ["All gates passed but the score is in REVISE: a reviewer may publish with a logged reason."],
+                "NOT_PUBLISHABLE": ["All gates passed but the score is too low to publish."],
+            }[status]
+        return {
+            "published": False,
+            "allowed": status in ("PUBLISH_READY", "REVISE"),
+            "status": status,
+            "reason": " ".join(reasons),
+            "reasons": reasons,
+            "score_results": score_results,
+            "gate_results": gate_results,
         }
 
     def _format_enterprise_sources(self, claims: List[Claim]) -> List[Dict[str, Any]]:
@@ -1961,7 +1993,10 @@ class MultiLaneResearchRunner:
                 "volume": f"{len(academic_papers)} Papers ({len(academic_claims)} claims) • {len(ent_sources_formatted)} Enterprise Sources ({len(enterprise_claims)} claims) • {len(prac_obs_formatted)} Field Observations",
                 "sources": f"{len(sources_set)} Repositories",
                 "horizon": year_range_str,
-                "quality": f"{score_results.get('total_score', 88)}/100 ({score_results.get('band', 'PUBLISH_READY')})",
+                "quality": (
+                    f"{score_results['total_score']}/100 ({score_results.get('band', 'unbanded')})"
+                    if score_results.get("total_score") is not None else "Not scored"
+                ),
             },
             "doc_id": doc.id,
             "signals": ui_signals,
