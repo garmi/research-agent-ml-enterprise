@@ -53,7 +53,7 @@ from src.engine.entry import start_run
 from src.engine.ids import resolve_question_id
 from src.engine.stub_mode import is_stub_mode
 from src.ui.safe_page import safe_page, format_error_payload, render_safe_error
-from src.ui.evidence_view import finding_card_html
+from src.ui.evidence_view import finding_card_html, render_sentence
 from src.ui.intake_view import approved_question_text, effective_provider, render_intake_view
 from src.ui.rerun import board_editor_key, export_view, papers_for_rerun
 
@@ -679,15 +679,8 @@ if "custom_prac_urls" not in st.session_state:
 
 # --- CITATION FORMATTER ---
 def format_citation_pills(text: str, paper_map: Dict[str, Any]) -> str:
-    """Format [P1], [P2] tags into interactive styled citation pill badges."""
-    def repl(m):
-        pkey = m.group(1)
-        paper = paper_map.get(pkey, {})
-        url = paper.get("url") or paper.get("link") or paper.get("doi") or "#"
-        title = (paper.get("title") or "Academic Paper").replace('"', '&quot;')
-        year = paper.get("year", "")
-        return f'<a href="{url}" target="_blank" title="{title} ({year})" class="cite-pill">[{pkey}]</a>'
-    return re.sub(r"\[(P\d+)\]", repl, text)
+    """Escape model/source text, then format [P1], [P2] tags into citation pills (http(s) links only)."""
+    return render_sentence(text, paper_map)
 
 
 # --- ERROR DIAGNOSTICS FORMATTER ---
@@ -1319,7 +1312,7 @@ if results:
     # Helper to render a single finding: click the sentence to see its cited quotes and hedges (S5)
     def _render_traceable_finding_card(item: Dict[str, Any], idx_num: int) -> None:
         st.markdown(
-            finding_card_html(item, idx_num, format_citation_pills(item.get("text", ""), paper_map)),
+            finding_card_html(item, idx_num, item.get("text", ""), paper_map=paper_map),
             unsafe_allow_html=True,
         )
 

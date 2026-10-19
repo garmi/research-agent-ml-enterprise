@@ -38,17 +38,19 @@ def resolve_citations(
     """Claim ids a sentence cites through its own tags, in order: [P#] means every eligible claim
     from that paper, [c_...] means that claim. No tag, or only unknown tags, means no claims."""
     cited: List[str] = []
-    for m in re.finditer(r"\[P(\d+)\]|\[(c_[^\]]+)\]", text or ""):
-        if m.group(1):
-            idx = int(m.group(1)) - 1
-            if 0 <= idx < len(papers):
-                pid = papers[idx].get("id")
-                ids = [c.id for c in eligible_claims if c.source_id == pid]
+    # A bracket may hold one id or a group ("[P1, P3]", "[c_a; c_b]"); other brackets are ignored.
+    for group in re.findall(r"\[([^\[\]]+)\]", text or ""):
+        for token in re.split(r"[,;\s]+", group.strip()):
+            p = re.fullmatch(r"P(\d+)", token)
+            if p:
+                idx = int(p.group(1)) - 1
+                pid = papers[idx].get("id") if 0 <= idx < len(papers) else None
+                ids = [c.id for c in eligible_claims if pid is not None and c.source_id == pid]
+            elif token.startswith("c_") and token in claims_by_id:
+                ids = [token]
             else:
                 ids = []
-        else:
-            ids = [m.group(2)] if m.group(2) in claims_by_id else []
-        cited.extend(i for i in ids if i not in cited)
+            cited.extend(i for i in ids if i not in cited)
     return cited
 
 
@@ -303,6 +305,7 @@ class SynthesisEngine:
         )
         if signals_candidates:
             for sig in signals_candidates:
+                sig_cids, sig_checks = bind(sig)
                 sentences.append(
                     OutputSentence(
                         id=f"{output_id}_{ordinal}",
@@ -310,8 +313,8 @@ class SynthesisEngine:
                         ordinal=ordinal,
                         text=sig.strip(),
                         type="signal",
-                        claim_ids_json=bind(sig)[0],
-                        checks_json=bind(sig)[1],
+                        claim_ids_json=sig_cids,
+                        checks_json=sig_checks,
                     )
                 )
                 ordinal += 1
@@ -342,6 +345,7 @@ class SynthesisEngine:
         risks_candidates = executive_synthesis.get("business_problems", []) if executive_synthesis else []
         if risks_candidates:
             for r in risks_candidates:
+                r_cids, r_checks = bind(r)
                 sentences.append(
                     OutputSentence(
                         id=f"{output_id}_{ordinal}",
@@ -349,8 +353,8 @@ class SynthesisEngine:
                         ordinal=ordinal,
                         text=r.strip(),
                         type="risk",
-                        claim_ids_json=bind(r)[0],
-                        checks_json=bind(r)[1],
+                        claim_ids_json=r_cids,
+                        checks_json=r_checks,
                     )
                 )
                 ordinal += 1
@@ -452,6 +456,7 @@ class SynthesisEngine:
                 phase_title = phase.get("stage", "Phase") if isinstance(phase, dict) else "Phase"
                 actions = phase.get("actions", []) if isinstance(phase, dict) else [str(phase)]
                 for act in actions:
+                    act_cids, act_checks = bind(str(act))
                     sentences.append(
                         OutputSentence(
                             id=f"{output_id}_{ordinal}",
@@ -459,8 +464,8 @@ class SynthesisEngine:
                             ordinal=ordinal,
                             text=f"{phase_title}: {act}",
                             type="roadmap",
-                            claim_ids_json=bind(str(act))[0],
-                            checks_json=bind(str(act))[1],
+                            claim_ids_json=act_cids,
+                            checks_json=act_checks,
                         )
                     )
                     ordinal += 1

@@ -199,7 +199,7 @@ def extract_claims_from_paper(
             grade="weak",  # Assigned by grader
             grade_reasons_json=[],
             status="auto",
-            hedge_terms_json=find_hedge_terms(sentence),
+            hedge_terms_json=find_hedge_terms(excerpt),  # the quote that is shown, not the full sentence
         )
         extracted_claims.append(claim)
 

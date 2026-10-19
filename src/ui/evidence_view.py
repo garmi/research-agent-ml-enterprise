@@ -8,9 +8,30 @@ from __future__ import annotations
 
 import html
 import re
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
-_LOCATION_TAG = re.compile(r"\s*\(Location:\s*([^)]*)\)\s*$")
+from src.engine.check_b_wellformed import LOCATION_TAG
+
+
+def safe_url(url: Any) -> str:
+    """Only http(s) links are rendered; anything else (javascript:, data:, empty) becomes '#'."""
+    u = str(url or "").strip()
+    return u if re.match(r"^https?://", u, re.IGNORECASE) else "#"
+
+
+def render_sentence(text: str, paper_map: Optional[Dict[str, Any]] = None) -> str:
+    """Escape the sentence, then turn [P#] tags into citation pills linking to their paper."""
+    escaped = html.escape(str(text or ""))
+    papers = paper_map or {}
+
+    def pill(m: "re.Match[str]") -> str:
+        key = m.group(1)
+        paper = papers.get(key) or {}
+        url = html.escape(safe_url(paper.get("url") or paper.get("link") or paper.get("doi")), quote=True)
+        title = html.escape(f"{paper.get('title') or 'Academic Paper'} ({paper.get('year', '')})", quote=True)
+        return f'<a href="{url}" target="_blank" title="{title}" class="cite-pill">[{key}]</a>'
+
+    return re.sub(r"\[(P\d+)\]", pill, escaped)
 
 
 def _chip(text: str, bg: str, fg: str) -> str:
@@ -24,14 +45,14 @@ def _trace_html(tr: Dict[str, Any]) -> str:
     grade = str(tr.get("grade") or "WEAK").upper()
     grade_bg, grade_fg = {"STRONG": ("#DCFCE7", "#166534"), "MODERATE": ("#DBEAFE", "#1E40AF")}.get(grade, ("#F1F5F9", "#475569"))
     raw_excerpt = str(tr.get("excerpt") or "")
-    loc = _LOCATION_TAG.search(raw_excerpt)
-    quote = _LOCATION_TAG.sub("", raw_excerpt)
+    loc = LOCATION_TAG.search(raw_excerpt)
+    quote = LOCATION_TAG.sub("", raw_excerpt)
     hedges: List[str] = list(tr.get("hedge_terms") or [])
     hedge_html = (
         "Hedges in source: " + " ".join(_chip(h, "#FEF3C7", "#92400E") for h in hedges)
         if hedges else '<span style="color:#64748B;">No hedge in source</span>'
     )
-    url = html.escape(str(tr.get("url") or "#"), quote=True)
+    url = html.escape(safe_url(tr.get("url")), quote=True)
     return f"""
     <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:6px;padding:0.55rem 0.75rem;margin-top:0.45rem;font-size:0.8rem;">
         <div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:0.4rem;margin-bottom:0.3rem;">
@@ -54,12 +75,18 @@ def _trace_html(tr: Dict[str, Any]) -> str:
     </div>"""
 
 
-def finding_card_html(item: Dict[str, Any], idx_num: int, sentence: str, sentence_is_html: bool = True) -> str:
-    """HTML for one finding. `sentence` is the display text (citation pills already applied when
-    `sentence_is_html` is True; escaped otherwise)."""
+def finding_card_html(
+    item: Dict[str, Any],
+    idx_num: int,
+    sentence: str,
+    sentence_is_html: bool = False,
+    paper_map: Optional[Dict[str, Any]] = None,
+) -> str:
+    """HTML for one finding. `sentence` is plain text: it is escaped and its [P#] tags become pills
+    (via `paper_map`). Pass sentence_is_html=True only for markup built by trusted code."""
     traces = list(item.get("sources_trace") or [])
     unbound = item.get("binding") == "unbound" or not traces
-    sentence_html = sentence if sentence_is_html else html.escape(sentence)
+    sentence_html = sentence if sentence_is_html else render_sentence(sentence, paper_map)
     if unbound:
         badge = _chip("Unbound: no citation", "#FEE2E2", "#991B1B")
         body = (
