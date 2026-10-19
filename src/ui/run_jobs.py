@@ -28,7 +28,8 @@ ProgressFn = Callable[[int, str, float], None]
 
 
 def _now() -> str:
-    return datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
+    # Microseconds, so runs finishing in the same second still sort in order.
+    return datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="microseconds")
 
 
 class RunJobs:

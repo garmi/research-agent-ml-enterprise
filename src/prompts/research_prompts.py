@@ -69,7 +69,7 @@ You are a technology strategy analyst. Topic: {topic}
 Below are compact summaries of research papers, each with an id like P1.
 Analyse them and return valid JSON with exactly these keys:
 {{
-  "executive_summary": "Summary for a busy executive: what the research says and why it matters",
+  "executive_summary": "The bottom line in 2-3 sentences: what the evidence shows, how strong it is, and why it matters. Every sentence cites the paper ids it rests on, e.g. [P1][P3]",
   "objective": "one sentence",
   "research_questions": ["3 questions the evidence helps answer"],
   "key_findings": ["4-6 complete descriptive findings, each followed by supporting paper ids, e.g. Deployment frequency increased significantly under automated testing frameworks [P1][P3]"],
@@ -84,6 +84,7 @@ Rules:
 - Use ONLY the provided summaries. Do not invent numbers, companies, or studies.
 - Every finding, trend, and problem must cite at least one paper id in square brackets.
 - If evidence on a point is thin, explicitly state that evidence is limited.
+- executive_summary: describe what the evidence shows, not what leaders should do. Do not use "must", "should" or other directives (actions belong in the recommendations). Hedge claims that rest on a single study ("one study reports", "suggests"). Use only figures that appear in the summaries, and cite every sentence with its [P#] ids.
 
 Paper summaries:
 {json.dumps(compact, ensure_ascii=False, indent=1)}
@@ -143,7 +144,10 @@ Return valid JSON: {{"strategic_roadmap": [
 ]}}
 
 Rules:
-- 3-4 actions per phase, each starting with an active verb and naming the owner role in brackets (e.g. "Deploy automated policy-as-code guardrails across CI/CD [Security Lead]").
+- 3-4 actions per phase, each starting with an active verb and naming the owner role in brackets (e.g. "Deploy automated policy-as-code guardrails across CI/CD [Security Lead] [P2]").
+- Keep the [P#] tags of the recommendation each action comes from at the end of the action, so it stays tied to its evidence.
+- One sentence per action, at most 40 words. Name the deliverable, not a tool shopping list.
+- Do not turn figures from the findings into targets (a study's 93% result is not your SLA). Put numeric targets only in kpis.
 - KPIs must be measurable metrics with a direction or target (e.g. "Deployment frequency", "Mean Time to Remediate (MTTR)", "Coverage %").
 - FORBIDDEN: research agendas, publishing papers, or generic phrases like "completion of framework".
 

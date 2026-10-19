@@ -27,7 +27,7 @@ OutputKind = Literal["field_note", "strategy_doc", "json_export"]
 OutputStatus = Literal["draft", "in_review", "published", "blocked", "legacy-ungraded"]
 SentenceType = Literal[
     "assertive", "opinion", "field", "heading",
-    "signal", "risk", "roadmap", "finding", "negative_finding"
+    "signal", "risk", "roadmap", "finding", "negative_finding", "summary"
 ]
 
 

@@ -32,6 +32,12 @@ def token_set(text: str) -> Set[str]:
     return set(normalize_text(text).split())
 
 
+def support_terms(text: Any) -> Set[str]:
+    """Content terms used to judge whether a sentence is supported by a quote (G2, and citation
+    binding): normalised words longer than two letters that are not stopwords."""
+    return {w for w in normalize_text(text).split() if w not in STOPWORDS and len(w) > 2}
+
+
 def stems_match(w1: str, w2: str) -> bool:
     """Loose stem equality used by the topic filters (e.g. 'assistant' ~ 'assistants')."""
     if w1 == w2:
