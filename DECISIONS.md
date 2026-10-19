@@ -110,6 +110,7 @@ This log records all design choices, trade-offs, and deviations where prompt ass
 | DEC-015 | 2026-10-18 | Governance | Record of Unreviewed Commits Merged Without Acceptance (b8cd874, a3c4b9d, 6c4360f) | Documented |
 | DEC-016 | 2026-10-18 | Pipeline | Handoff Checks A–D, Verdict Ledger, and No-Data-Is-FAIL Gates | Proposed |
 | DEC-017 | 2026-10-18 | Evidence | Run-Scoped Evidence, Check B Thresholds, and Evidence Board Exclusions | Proposed |
+| DEC-018 | 2026-10-18 | Synthesis | Hedge Terms on Claims, Honest Citation Binding, Check C Bake-off Baseline | Proposed |
 
 ---
 
@@ -179,4 +180,15 @@ This log records all design choices, trade-offs, and deviations where prompt ass
 - **Context:** `GapMatrixBuilder.evaluate_question_lanes` and `LedgerSynthesisEngine.build_field_note` read every ledger claim for the question and only used the run's claims when the ledger was empty, so a re-run inherited earlier runs' claims. Check B (DEC-016) needed thresholds.
 - **Decision:** A run's claims (academic, enterprise, practitioner) are passed explicitly and take precedence; the whole-ledger read remains only when no claims are passed. Check B defaults to at least 3 usable claims from 2 sources (`config.yaml` → `checks.check_b`). Tests with deliberately thin fixtures that exercise drafting set 1/1 explicitly. Evidence-board exclusions are keyed by content (source + normalised text) because some claim ids are random, and each exclusion is logged to `reviews`.
 - **Rationale:** Each draft reflects exactly the evidence of its own run and the operator's choices; thin evidence stops honestly as BLOCKED with a reason the operator can act on.
+
+---
+
+### DEC-018: Hedge Terms on Claims, Honest Citation Binding, Check C Bake-off Baseline (S5, part 1)
+- **Context:** Check C needs to know which claims were hedged. The draft also bound any untagged model sentence to the first strong claim (`default_claim_ids`), so citations could look grounded when they were not. Check C itself waits on a bake-off (DEC-016).
+- **Decision:**
+  1. Record rule-detected hedge terms per claim (`synth/hedge_terms.yaml`, migration 007).
+  2. Resolve every citation tag in a sentence. Leave untagged sentences unbound and marked as such.
+  3. Ship the Check C rules and model judges, the bake-off harness and 29 hand-labelled pairs, without wiring Check C into runs.
+- **Baseline:** rules reach 1.00 precision and 0.71 recall on "dropped" (after dropping "can", "about", "around" from the hedge list in the PR #4 review; 0.92 / 0.86 before); qwen2.5:3b reaches 0.90 and 0.64. Neither judge catches overstatement that keeps a hedge word. The pairs set is small and favours the rules judge, so the hold-or-warn decision is deferred to a larger set and a Gemini run (blocked: the key's project rejects generativelanguage.googleapis.com).
+- **Rationale:** Honest binding and recorded hedges are useful on their own and are prerequisites for Check C. Wiring a judge that misses a third of overstatements, or that has not been measured on representative data, would give false assurance.
 

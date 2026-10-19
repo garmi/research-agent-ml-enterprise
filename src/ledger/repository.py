@@ -110,8 +110,8 @@ class LedgerRepository:
                    (id, question_id, source_id, text, source_excerpt, value_json,
                     entity, entity_match, study_type, context_json, claim_date,
                     extraction_model, extraction_confidence, grade, grade_reasons_json,
-                    status, observations_count, created_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);""",
+                    status, observations_count, created_at, hedge_terms_json)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);""",
                 (
                     c.id, c.question_id, c.source_id, c.text, c.source_excerpt,
                     json.dumps(c.value_json) if c.value_json is not None else None,
@@ -121,6 +121,7 @@ class LedgerRepository:
                     c.grade,
                     json.dumps(c.grade_reasons_json) if c.grade_reasons_json is not None else None,
                     c.status, c.observations_count, c.created_at,
+                    json.dumps(c.hedge_terms_json) if c.hedge_terms_json is not None else None,
                 ),
             )
 
@@ -137,6 +138,8 @@ class LedgerRepository:
                 d["context_json"] = json.loads(d["context_json"])
             if d.get("grade_reasons_json"):
                 d["grade_reasons_json"] = json.loads(d["grade_reasons_json"])
+            if d.get("hedge_terms_json"):
+                d["hedge_terms_json"] = json.loads(d["hedge_terms_json"])
             return Claim(**d)
 
     def list_claims(self, question_id: Optional[str] = None) -> List[Claim]:
@@ -154,6 +157,8 @@ class LedgerRepository:
                     d["context_json"] = json.loads(d["context_json"])
                 if d.get("grade_reasons_json"):
                     d["grade_reasons_json"] = json.loads(d["grade_reasons_json"])
+                if d.get("hedge_terms_json"):
+                    d["hedge_terms_json"] = json.loads(d["hedge_terms_json"])
                 claims.append(Claim(**d))
             return claims
 

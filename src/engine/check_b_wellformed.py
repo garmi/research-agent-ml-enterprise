@@ -16,7 +16,8 @@ from src.engine.checks import CheckVerdict
 CHECK_B_ID = "check_b_wellformed"
 MAX_EXCERPT_WORDS = 25
 VALID_GRADES = {"strong", "moderate", "weak", "vendor_claim", "anecdote"}
-LOCATION_TAG = re.compile(r"\s*\(Location:[^)]*\)\s*$")
+# The extractor's trailing "(Location: Abstract)" tag; group 1 is the location text.
+LOCATION_TAG = re.compile(r"\s*\(Location:\s*([^)]*)\)\s*$")
 
 
 @dataclass

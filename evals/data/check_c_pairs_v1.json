@@ -1,0 +1,299 @@
+{
+ "version": 1,
+ "created": "2026-10-18",
+ "labeller": "Claude (needs owner review)",
+ "how_built": "Claims are real excerpts from the S3 live canary ledger and the Check A harvest (lightly trimmed). Sentences are hand-written: a faithful and an overstated rewrite per claim, plus tricky cases (hedge word kept but overstated; limit kept without a listed hedge word; claims with no hedge).",
+ "positive_class": "dropped",
+ "pairs": [
+  {
+   "id": "h01",
+   "claim_key": "A",
+   "claim": "This paper discusses how AI may affect the productivity of developers working in a software engineering team.",
+   "claim_hedges": [
+    "may"
+   ],
+   "sentence": "The paper discusses how AI may affect developer productivity in software teams.",
+   "label": "kept"
+  },
+  {
+   "id": "h02",
+   "claim_key": "A",
+   "claim": "This paper discusses how AI may affect the productivity of developers working in a software engineering team.",
+   "claim_hedges": [
+    "may"
+   ],
+   "sentence": "The paper shows that AI affects developer productivity in software teams.",
+   "label": "dropped"
+  },
+  {
+   "id": "h03",
+   "claim_key": "B",
+   "claim": "The results also suggest that AI-enabled devices can be used to provide about 25-35 percent of efficiency in overall development.",
+   "claim_hedges": [
+    "suggest"
+   ],
+   "sentence": "Results suggest AI tools could deliver roughly 25-35% efficiency gains in development.",
+   "label": "kept",
+   "note": "hedge reworded"
+  },
+  {
+   "id": "h04",
+   "claim_key": "B",
+   "claim": "The results also suggest that AI-enabled devices can be used to provide about 25-35 percent of efficiency in overall development.",
+   "claim_hedges": [
+    "suggest"
+   ],
+   "sentence": "Results prove AI tools deliver 25-35% efficiency gains in development.",
+   "label": "dropped"
+  },
+  {
+   "id": "h05",
+   "claim_key": "C",
+   "claim": "AI can improve teamwork, particularly in agile and distributed teams, through creating a common view of work progress.",
+   "claim_hedges": [],
+   "sentence": "AI can improve teamwork, especially in agile and distributed teams.",
+   "label": "kept"
+  },
+  {
+   "id": "h06",
+   "claim_key": "C",
+   "claim": "AI can improve teamwork, particularly in agile and distributed teams, through creating a common view of work progress.",
+   "claim_hedges": [],
+   "sentence": "AI improves teamwork in agile and distributed teams.",
+   "label": "dropped"
+  },
+  {
+   "id": "h07",
+   "claim_key": "D",
+   "claim": "AI could significantly enhance productivity of developers, yet sustainable gains would be achieved under planned intake of integration.",
+   "claim_hedges": [
+    "could",
+    "would"
+   ],
+   "sentence": "AI could enhance developer productivity, but lasting gains depend on planned integration.",
+   "label": "kept"
+  },
+  {
+   "id": "h08",
+   "claim_key": "D",
+   "claim": "AI could significantly enhance productivity of developers, yet sustainable gains would be achieved under planned intake of integration.",
+   "claim_hedges": [
+    "could",
+    "would"
+   ],
+   "sentence": "AI significantly enhances developer productivity.",
+   "label": "dropped"
+  },
+  {
+   "id": "h09",
+   "claim_key": "D",
+   "claim": "AI could significantly enhance productivity of developers, yet sustainable gains would be achieved under planned intake of integration.",
+   "claim_hedges": [
+    "could",
+    "would"
+   ],
+   "sentence": "AI could enhance productivity, and the gains are guaranteed to last.",
+   "label": "dropped",
+   "note": "keeps a hedge word but overstates"
+  },
+  {
+   "id": "h10",
+   "claim_key": "E",
+   "claim": "Controlled studies report speedups of 21-56% in some settings and slowdowns of up to 19% in others.",
+   "claim_hedges": [
+    "in some settings",
+    "up to"
+   ],
+   "sentence": "Controlled studies find speedups of 21-56% in some settings but slowdowns of up to 19% in others.",
+   "label": "kept"
+  },
+  {
+   "id": "h11",
+   "claim_key": "E",
+   "claim": "Controlled studies report speedups of 21-56% in some settings and slowdowns of up to 19% in others.",
+   "claim_hedges": [
+    "in some settings",
+    "up to"
+   ],
+   "sentence": "Controlled studies find AI coding agents speed developers up by 21-56%.",
+   "label": "dropped"
+  },
+  {
+   "id": "h12",
+   "claim_key": "F",
+   "claim": "AI coding agents are in widespread professional use, yet developer productivity gains remain inconsistent.",
+   "claim_hedges": [
+    "inconsistent"
+   ],
+   "sentence": "Productivity gains from AI coding agents remain inconsistent.",
+   "label": "kept"
+  },
+  {
+   "id": "h13",
+   "claim_key": "F",
+   "claim": "AI coding agents are in widespread professional use, yet developer productivity gains remain inconsistent.",
+   "claim_hedges": [
+    "inconsistent"
+   ],
+   "sentence": "AI coding agents deliver consistent productivity gains.",
+   "label": "dropped"
+  },
+  {
+   "id": "h14",
+   "claim_key": "G",
+   "claim": "Brittle, prototype-derived architectures often plague industrial applications of clinical AI.",
+   "claim_hedges": [
+    "often"
+   ],
+   "sentence": "Prototype-derived architectures often cause problems in industrial clinical AI.",
+   "label": "kept"
+  },
+  {
+   "id": "h15",
+   "claim_key": "G",
+   "claim": "Brittle, prototype-derived architectures often plague industrial applications of clinical AI.",
+   "claim_hedges": [
+    "often"
+   ],
+   "sentence": "Prototype-derived architectures always fail in industrial clinical AI.",
+   "label": "dropped"
+  },
+  {
+   "id": "h16",
+   "claim_key": "H",
+   "claim": "Generative AI tools often operate as disconnected point solutions across the software delivery lifecycle.",
+   "claim_hedges": [
+    "often"
+   ],
+   "sentence": "Generative AI tools often operate as disconnected point solutions.",
+   "label": "kept"
+  },
+  {
+   "id": "h17",
+   "claim_key": "H",
+   "claim": "Generative AI tools often operate as disconnected point solutions across the software delivery lifecycle.",
+   "claim_hedges": [
+    "often"
+   ],
+   "sentence": "Generative AI tools operate as disconnected point solutions.",
+   "label": "dropped"
+  },
+  {
+   "id": "h18",
+   "claim_key": "I",
+   "claim": "The key claim is that productivity gains from AI are real but conditional.",
+   "claim_hedges": [
+    "conditional"
+   ],
+   "sentence": "Productivity gains from AI are real but conditional on how teams adopt it.",
+   "label": "kept"
+  },
+  {
+   "id": "h19",
+   "claim_key": "I",
+   "claim": "The key claim is that productivity gains from AI are real but conditional.",
+   "claim_hedges": [
+    "conditional"
+   ],
+   "sentence": "Productivity gains from AI are real across all teams.",
+   "label": "dropped"
+  },
+  {
+   "id": "h20",
+   "claim_key": "I",
+   "claim": "The key claim is that productivity gains from AI are real but conditional.",
+   "claim_hedges": [
+    "conditional"
+   ],
+   "sentence": "Gains from AI may be real, and they hold unconditionally for every team.",
+   "label": "dropped",
+   "note": "keeps a hedge word but overstates"
+  },
+  {
+   "id": "h21",
+   "claim_key": "J",
+   "claim": "Contemporary studies show that these tools can improve task completion.",
+   "claim_hedges": [],
+   "sentence": "Studies show these assistants can improve task completion.",
+   "label": "kept"
+  },
+  {
+   "id": "h22",
+   "claim_key": "J",
+   "claim": "Contemporary studies show that these tools can improve task completion.",
+   "claim_hedges": [],
+   "sentence": "Studies show these assistants improve task completion for all developers.",
+   "label": "dropped"
+  },
+  {
+   "id": "h23",
+   "claim_key": "K",
+   "claim": "Sourdough fermentation is considered as a promising tool to improve the quality of bread.",
+   "claim_hedges": [
+    "considered",
+    "promising"
+   ],
+   "sentence": "Sourdough fermentation is considered a promising way to improve bread quality.",
+   "label": "kept"
+  },
+  {
+   "id": "h24",
+   "claim_key": "K",
+   "claim": "Sourdough fermentation is considered as a promising tool to improve the quality of bread.",
+   "claim_hedges": [
+    "considered",
+    "promising"
+   ],
+   "sentence": "Sourdough fermentation improves bread quality.",
+   "label": "dropped"
+  },
+  {
+   "id": "h25",
+   "claim_key": "L",
+   "claim": "AI offers transformative potential in healthcare, but its deployment introduces new risks.",
+   "claim_hedges": [
+    "potential"
+   ],
+   "sentence": "AI has transformative potential in healthcare but brings new risks.",
+   "label": "kept"
+  },
+  {
+   "id": "h26",
+   "claim_key": "L",
+   "claim": "AI offers transformative potential in healthcare, but its deployment introduces new risks.",
+   "claim_hedges": [
+    "potential"
+   ],
+   "sentence": "AI transforms healthcare.",
+   "label": "dropped"
+  },
+  {
+   "id": "h27",
+   "claim_key": "C",
+   "claim": "AI can improve teamwork, particularly in agile and distributed teams, through creating a common view of work progress.",
+   "claim_hedges": [],
+   "sentence": "AI is not guaranteed to improve teamwork, though agile and distributed teams report benefits.",
+   "label": "kept",
+   "note": "preserves the limit without a listed hedge word"
+  },
+  {
+   "id": "h28",
+   "claim_key": "M",
+   "claim": "Large language model assistants present new opportunities to transform software development.",
+   "claim_hedges": [],
+   "sentence": "Large language model assistants present new opportunities to transform software development.",
+   "label": "kept",
+   "note": "claim has no hedge"
+  },
+  {
+   "id": "h29",
+   "claim_key": "N",
+   "claim": "Developers are increasingly adopting these tools across tasks, including coding, testing, debugging and documentation.",
+   "claim_hedges": [],
+   "sentence": "Developers increasingly adopt these tools for coding, testing and debugging.",
+   "label": "kept",
+   "note": "claim has no hedge"
+  }
+ ],
+ "note": "claim_hedges is informational, recomputed from synth/hedge_terms.yaml; the harness recomputes it at run time."
+}

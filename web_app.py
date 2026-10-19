@@ -53,6 +53,7 @@ from src.engine.entry import start_run
 from src.engine.ids import resolve_question_id
 from src.engine.stub_mode import is_stub_mode
 from src.ui.safe_page import safe_page, format_error_payload, render_safe_error
+from src.ui.evidence_view import finding_card_html, render_sentence
 from src.ui.intake_view import approved_question_text, effective_provider, render_intake_view
 from src.ui.rerun import board_editor_key, export_view, papers_for_rerun
 
@@ -678,15 +679,8 @@ if "custom_prac_urls" not in st.session_state:
 
 # --- CITATION FORMATTER ---
 def format_citation_pills(text: str, paper_map: Dict[str, Any]) -> str:
-    """Format [P1], [P2] tags into interactive styled citation pill badges."""
-    def repl(m):
-        pkey = m.group(1)
-        paper = paper_map.get(pkey, {})
-        url = paper.get("url") or paper.get("link") or paper.get("doi") or "#"
-        title = (paper.get("title") or "Academic Paper").replace('"', '&quot;')
-        year = paper.get("year", "")
-        return f'<a href="{url}" target="_blank" title="{title} ({year})" class="cite-pill">[{pkey}]</a>'
-    return re.sub(r"\[(P\d+)\]", repl, text)
+    """Escape model/source text, then format [P1], [P2] tags into citation pills (http(s) links only)."""
+    return render_sentence(text, paper_map)
 
 
 # --- ERROR DIAGNOSTICS FORMATTER ---
@@ -1315,97 +1309,10 @@ if results:
                 unsafe_allow_html=True,
             )
 
-    # Helper to render a single finding with full source traceability card
+    # Helper to render a single finding: click the sentence to see its cited quotes and hedges (S5)
     def _render_traceable_finding_card(item: Dict[str, Any], idx_num: int) -> None:
-        raw_text = item.get("text", "")
-        formatted_text = format_citation_pills(raw_text, paper_map)
-        cids = item.get("claim_ids") or []
-        traces = item.get("sources_trace") or []
-
-        # If sources_trace wasn't pre-populated on item, resolve from claims_by_id_map or [P#]
-        if not traces:
-            for cid in cids:
-                c_match = claims_by_id_map.get(cid)
-                if c_match:
-                    traces.append({
-                        "claim_id": c_match.get("id", cid),
-                        "source_key": c_match.get("source_key", "SRC"),
-                        "lane": c_match.get("lane", "ACADEMIC"),
-                        "source_title": c_match.get("source_title", "Verified Source"),
-                        "venue": c_match.get("venue", "Academic Repo"),
-                        "year": c_match.get("year", "2024"),
-                        "url": c_match.get("source_url", "#"),
-                        "grade": c_match.get("grade", "MODERATE"),
-                        "study_type": c_match.get("study_type", "empirical"),
-                        "excerpt": c_match.get("excerpt", ""),
-                    })
-            if not traces:
-                for p_match in re.findall(r"\[(P\d+)\]", raw_text):
-                    p_obj = paper_map.get(p_match)
-                    if p_obj:
-                        traces.append({
-                            "claim_id": "ledger_verified",
-                            "source_key": p_match,
-                            "lane": "ACADEMIC",
-                            "source_title": p_obj.get("title", "Academic Paper"),
-                            "venue": p_obj.get("venue", "Journal"),
-                            "year": p_obj.get("year", "2024"),
-                            "url": p_obj.get("url", "#"),
-                            "grade": "VERIFIED",
-                            "study_type": p_obj.get("type", "Peer-Reviewed"),
-                            "excerpt": p_obj.get("title", ""),
-                        })
-
-        trace_rows_html = ""
-        for tr in traces:
-            grade_badge_bg = "#DCFCE7" if tr.get("grade") == "STRONG" else ("#DBEAFE" if tr.get("grade") == "MODERATE" else "#F1F5F9")
-            grade_badge_fg = "#166534" if tr.get("grade") == "STRONG" else ("#1E40AF" if tr.get("grade") == "MODERATE" else "#475569")
-            trace_rows_html += f"""
-            <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 0.55rem 0.75rem; margin-top: 0.45rem; font-size: 0.8rem;">
-                <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.4rem; margin-bottom: 0.25rem;">
-                    <div>
-                        <a href="{tr.get('url', '#')}" target="_blank" class="cite-pill">[{tr.get('source_key', 'SRC')}]</a>
-                        <a href="{tr.get('url', '#')}" target="_blank" style="font-weight: 700; color: #0F172A; text-decoration: none; margin-left: 0.3rem;">
-                            {tr.get('source_title', 'Source')} ↗
-                        </a>
-                    </div>
-                    <div style="display: flex; gap: 0.35rem; align-items: center;">
-                        <span style="background: {grade_badge_bg}; color: {grade_badge_fg}; padding: 0.1rem 0.45rem; border-radius: 4px; font-weight: 700; font-size: 0.7rem;">
-                            GRADE: {tr.get('grade', 'VERIFIED')}
-                        </span>
-                        <span style="background: #EEF2F6; color: #334155; padding: 0.1rem 0.45rem; border-radius: 4px; font-size: 0.7rem; font-weight: 600;">
-                            {tr.get('lane', 'ACADEMIC')} • {tr.get('study_type', 'study')}
-                        </span>
-                    </div>
-                </div>
-                <div style="color: #475569; font-size: 0.76rem; margin-bottom: 0.2rem;">
-                    <strong>Venue:</strong> {tr.get('venue', 'n/a')} &nbsp;•&nbsp;
-                    <strong>Year:</strong> {tr.get('year', 'n/a')} &nbsp;•&nbsp;
-                    <strong>Ledger Claim ID:</strong> <code>{tr.get('claim_id', 'n/a')}</code>
-                </div>
-                <div style="color: #334155; font-size: 0.77rem; font-style: italic; background: #FFFFFF; padding: 0.35rem 0.55rem; border-left: 3px solid #93C5FD; border-radius: 4px;">
-                    <strong>Verbatim Source Excerpt:</strong> "{tr.get('excerpt', '')}"
-                </div>
-            </div>
-            """
-
         st.markdown(
-            f"""
-            <div class="finding-item" style="padding: 1rem 1.2rem; margin-bottom: 0.9rem;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
-                    <span style="font-size: 0.74rem; font-weight: 700; color: #1D4ED8; background: #EFF6FF; padding: 0.15rem 0.5rem; border-radius: 4px;">
-                        FINDING #{idx_num}
-                    </span>
-                    <span style="font-size: 0.72rem; color: #64748B; font-family: var(--font-mono);">
-                        Sentence ID: {item.get('id', f'f_{idx_num}')}
-                    </span>
-                </div>
-                <div style="font-size: 0.96rem; font-weight: 600; color: #0F172A; line-height: 1.55; margin-bottom: 0.4rem;">
-                    {formatted_text}
-                </div>
-                {trace_rows_html}
-            </div>
-            """,
+            finding_card_html(item, idx_num, item.get("text", ""), paper_map=paper_map),
             unsafe_allow_html=True,
         )
 

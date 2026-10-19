@@ -156,7 +156,8 @@ CREATE TABLE IF NOT EXISTS claims (
     grade_reasons_json TEXT,
     status TEXT CHECK(status IN ('auto', 'approved', 'edited', 'rejected', 'legacy-ungraded')) DEFAULT 'auto',
     observations_count INTEGER DEFAULT 1,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    hedge_terms_json TEXT
 );
 
 CREATE TABLE IF NOT EXISTS claim_links (
@@ -330,10 +331,10 @@ def apply_migrations(
                 now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
                 conn.execute(
                     "INSERT INTO meta (schema_version, created_at) VALUES (?, ?);",
-                    (6, now_iso),
+                    (7, now_iso),
                 )
                 conn.commit()
-                return 6
+                return 7
             finally:
                 conn.close()
         conn.close()
