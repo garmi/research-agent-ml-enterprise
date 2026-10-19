@@ -61,6 +61,7 @@ def test_executive_studio_ui_smoke():
         env["HOME"] = tmp_home
         env["PYTHONPATH"] = "."
         env["HOSTED_DEMO"] = "0"
+        env["STUB_LLM"] = "1"
 
         proc = subprocess.Popen(
             [
@@ -114,7 +115,7 @@ def test_executive_studio_ui_smoke():
 
                 # 4. Assert Intake Panel & Console
                 assert page.locator("text=Frame your question").count() > 0
-                assert page.locator('button:has-text("Show framings")').count() > 0
+                assert page.locator('button:has-text("Reason about my question")').count() > 0
 
                 run_btn = page.locator('button:has-text("Run Research")')
                 assert run_btn.count() > 0
@@ -130,8 +131,20 @@ def test_executive_studio_ui_smoke():
                 page.locator("textarea").first.press("Tab")
                 time.sleep(1)
 
-                # Approve framing in Step 2
-                approve_btn = page.locator('button:has-text("Approve this framing")')
+                # Reason about question in Step 1
+                reason_btn = page.locator('button:has-text("Reason about my question")')
+                assert reason_btn.count() > 0
+                reason_btn.click()
+                page.wait_for_selector('button:has-text("Approve this reasoned question")', timeout=10000)
+
+                # Confirm terms checkbox if present
+                confirm_lbl = page.locator("label:has-text('I acknowledge and confirm')")
+                if confirm_lbl.count() > 0:
+                    confirm_lbl.first.click()
+                    time.sleep(1)
+
+                # Approve proposal in Step 2
+                approve_btn = page.locator('button:has-text("Approve this reasoned question")')
                 assert approve_btn.count() > 0
                 approve_btn.click()
                 time.sleep(1)

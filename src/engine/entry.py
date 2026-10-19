@@ -19,6 +19,7 @@ from src.engine.approvals import get_latest_gate1_approval
 from src.engine.framings import get_lens_by_id
 from src.engine.ids import compute_question_sha256
 from src.engine.stub_mode import is_stub_mode
+from src.ledger.db import default_ledger_path, default_practitioner_path
 
 logger = logging.getLogger(__name__)
 
@@ -61,24 +62,35 @@ def start_run(
     approval = get_latest_gate1_approval(question_id, approvals_dir=approvals_dir)
     if approval is None:
         raise GateApprovalError(
-            f"Run refused: Problem framing is not approved for question '{question_id}'. "
+            "Run refused: Problem framing is not approved. "
             "Please review and approve a framing before initiating research."
         )
 
-    current_sha256 = compute_question_sha256(question_text)
-    if current_sha256 != approval.question_sha256:
-        logger.warning(
-            "Gate 1 hash mismatch for '%s': approved=%s, current=%s",
-            question_id,
-            approval.question_sha256,
-            current_sha256,
-        )
-        raise GateApprovalError(
-            "Run refused: You changed the question after approving a framing. Approve a framing again to continue."
-        )
+    reasoned_pkg = kwargs.get("reasoned_package")
+    if reasoned_pkg:
+        from src.engine.approvals import is_package_approved
+        if not is_package_approved(question_id, reasoned_pkg, approvals_dir=approvals_dir):
+            raise GateApprovalError(
+                "Run refused: You changed the proposal after approving. Approve again to continue."
+            )
+    else:
+        current_sha256 = compute_question_sha256(question_text)
+        if current_sha256 != approval.question_sha256:
+            logger.warning(
+                "Gate 1 hash mismatch for '%s': approved=%s, current=%s",
+                question_id,
+                approval.question_sha256,
+                current_sha256,
+            )
+            raise GateApprovalError(
+                "Run refused: You changed the question after approving a framing. Approve a framing again to continue."
+            )
 
     run_args = dict(kwargs)
-    if "topic" not in run_args:
+    if reasoned_pkg:
+        run_args["topic"] = reasoned_pkg.get("refined_question", question_text)
+        run_args["reasoned_package"] = reasoned_pkg
+    elif "topic" not in run_args:
         run_args["topic"] = question_text
     run_args.setdefault("framing_id", approval.framing_id)
     lens = get_lens_by_id(approval.framing_id)
@@ -95,10 +107,10 @@ def start_run(
         with tempfile.TemporaryDirectory() as tmp_stub_dir:
             temp_db = os.path.join(tmp_stub_dir, "stub_ledger.db")
             temp_prac_db = os.path.join(tmp_stub_dir, "stub_practitioner.db")
-            if os.path.exists("ledger/ledger.db"):
-                shutil.copy("ledger/ledger.db", temp_db)
-            if os.path.exists("ledger/practitioner.db"):
-                shutil.copy("ledger/practitioner.db", temp_prac_db)
+            if os.path.exists(default_ledger_path()):
+                shutil.copy(default_ledger_path(), temp_db)
+            if os.path.exists(default_practitioner_path()):
+                shutil.copy(default_practitioner_path(), temp_prac_db)
 
             if runner is None:
                 from src.analysis.multilane_runner import MultiLaneResearchRunner
@@ -107,7 +119,7 @@ def start_run(
                     practitioner_db_path=temp_prac_db,
                 )
                 actual_runner = stub_instance.run_workflow
-            elif hasattr(runner, "__self__") and getattr(runner.__self__, "db_path", None) == "ledger/ledger.db":
+            elif hasattr(runner, "__self__") and getattr(runner.__self__, "db_path", None) == default_ledger_path():
                 from src.analysis.multilane_runner import MultiLaneResearchRunner
                 stub_instance = MultiLaneResearchRunner(
                     db_path=temp_db,

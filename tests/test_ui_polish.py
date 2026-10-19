@@ -139,6 +139,7 @@ def test_intake_screen_exact_copy(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
     """Verify exact copy strings defined in Task 2."""
     approvals_dir = str(tmp_path / "approvals")
     monkeypatch.setenv("RESEARCH_APPROVALS_DIR", approvals_dir)
+    monkeypatch.setenv("STUB_LLM", "1")
 
     at = AppTest.from_string(APP_SCRIPT).run()
 
@@ -147,10 +148,10 @@ def test_intake_screen_exact_copy(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
     assert "Frame your question" in all_text
     assert "Type your question, pick the angle you want researched, approve it, then run." in all_text
 
-    # Step 1 button label: "Show framings"
-    show_btn = at.button(key="btn_formulate_question")
-    assert show_btn is not None
-    assert show_btn.label == "Show framings"
+    # Step 1 button label: "🧠 Reason about my question"
+    reason_btn = at.button(key="btn_reason_question")
+    assert reason_btn is not None
+    assert "Reason about my question" in reason_btn.label
 
     # Step 3 disabled reason when empty
     assert "Type a question in Step 1." in all_text
@@ -159,24 +160,31 @@ def test_intake_screen_exact_copy(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
     q_text = "What empirical evidence exists regarding Amazon Kiro adoption, productivity gains, and delivery trade-offs in engineering teams?"
     at.text_area(key="input_user_question").input(q_text).run()
 
-    # Step 3 disabled reason when not approved
+    # Step 3 disabled reason when not reasoned yet
     all_text_typed = _extract_all_visible_text(at)
-    assert "Approve a framing in Step 2 to unlock Run." in all_text_typed
+    assert "Click Reason about my question and approve a proposal in Step 2 to unlock Run." in all_text_typed
 
-    # Approve in Step 2
-    approve_btn = at.button(key="btn_approve_framing")
+    # Click Reason about my question
+    at.button(key="btn_reason_question").click().run()
+
+    # Step 3 disabled reason when reasoned but not approved
+    all_text_reasoned = _extract_all_visible_text(at)
+    assert "Approve the reasoned proposal in Step 2 to unlock Run." in all_text_reasoned
+
+    # Approve reasoned package in Step 2
+    approve_btn = at.button(key="btn_approve_reasoned_package")
     assert approve_btn is not None
     approve_btn.click().run()
 
-    # Approval message: "Framing approved. You can now run the research." No ID.
+    # Approval message: "Reasoned question approved. You can now run the research." No ID.
     all_text_approved = _extract_all_visible_text(at)
-    assert "Framing approved. You can now run the research." in all_text_approved
+    assert "Reasoned question approved. You can now run the research." in all_text_approved
     assert "q-" not in all_text_approved
 
     # Edit question after approval
-    at.text_area(key="input_user_question").input(q_text + " and code quality").run()
+    at.text_input(key="input_s2_refined_question").input(q_text + " and code quality").run()
     all_text_edited = _extract_all_visible_text(at)
-    assert "You changed the question after approving. Approve a framing again." in all_text_edited
+    assert "You changed the proposal after approving. Approve again to unlock Run." in all_text_edited
 
 
 # ==============================================================================
@@ -205,6 +213,7 @@ def test_intake_screen_glossary_prohibitions(tmp_path: Path, monkeypatch: pytest
     """The intake screen must never display Gate, sha, q-xxxx, Agent, or hash across all 4 states."""
     approvals_dir = str(tmp_path / "approvals")
     monkeypatch.setenv("RESEARCH_APPROVALS_DIR", approvals_dir)
+    monkeypatch.setenv("STUB_LLM", "1")
 
     at = AppTest.from_string(APP_SCRIPT).run()
 
@@ -212,19 +221,20 @@ def test_intake_screen_glossary_prohibitions(tmp_path: Path, monkeypatch: pytest
     text_empty = _extract_all_visible_text(at)
     _assert_no_forbidden_terms(text_empty, "empty")
 
-    # State 2: Framings shown
+    # State 2: Reasoned proposal shown
     q_text = "What empirical evidence exists regarding Amazon Kiro adoption, productivity gains, and delivery trade-offs in engineering teams?"
     at.text_area(key="input_user_question").input(q_text).run()
-    text_framings = _extract_all_visible_text(at)
-    _assert_no_forbidden_terms(text_framings, "framings shown")
+    at.button(key="btn_reason_question").click().run()
+    text_proposal = _extract_all_visible_text(at)
+    _assert_no_forbidden_terms(text_proposal, "proposal shown")
 
     # State 3: Approved
-    at.button(key="btn_approve_framing").click().run()
+    at.button(key="btn_approve_reasoned_package").click().run()
     text_approved = _extract_all_visible_text(at)
     _assert_no_forbidden_terms(text_approved, "approved")
 
     # State 4: Edited after approval
-    at.text_area(key="input_user_question").input(q_text + " and code review speed").run()
+    at.text_input(key="input_s2_refined_question").input(q_text + " and code review speed").run()
     text_edited = _extract_all_visible_text(at)
     _assert_no_forbidden_terms(text_edited, "edited after approval")
 

@@ -6,11 +6,13 @@ strictly from the output_sentences table in the ledger.
 """
 
 import json
+import os
 from pathlib import Path
 import tempfile
 import pytest
 
 from src.analysis.multilane_runner import MultiLaneResearchRunner
+from src.config import default_outputs_dir
 
 
 def test_every_rendered_text_exists_in_output_sentences():
@@ -102,17 +104,20 @@ def test_every_rendered_text_exists_in_output_sentences():
                         f"Gate audit logged sentence_id '{sent_id}' not found in output_sentences table!"
                     )
 
+        # The runner renders into the outputs directory of this test's sandbox.
+        outputs_dir = Path(default_outputs_dir())
+
         # 6. JSON export must contain the exact output_sentences list
-        json_path = Path("outputs/json/research_report.json")
-        assert json_path.exists(), "outputs/json/research_report.json must exist"
+        json_path = outputs_dir / "json" / "research_report.json"
+        assert json_path.exists(), f"{json_path} must exist"
         json_data = json.loads(json_path.read_text())
         assert "output_sentences" in json_data, "research_report.json must include output_sentences"
         exported_sentences = json_data["output_sentences"]
         assert len(exported_sentences) == len(stored_sentences)
 
         # 7. Markdown report must render sentences from output_sentences
-        md_path = Path("outputs/reports/research_report.md")
-        assert md_path.exists(), "outputs/reports/research_report.md must exist"
+        md_path = outputs_dir / "reports" / "research_report.md"
+        assert md_path.exists(), f"{md_path} must exist"
         md_text = md_path.read_text()
         for f in findings:
             assert f["text"] in md_text, f"Finding '{f['text']}' missing from markdown report"
@@ -120,8 +125,8 @@ def test_every_rendered_text_exists_in_output_sentences():
             assert r in md_text, f"Risk '{r}' missing from markdown report"
 
         # 8. LinkedIn pack must render sentences from output_sentences
-        li_path = Path("outputs/reports/linkedin_professional_pack.md")
-        assert li_path.exists(), "outputs/reports/linkedin_professional_pack.md must exist"
+        li_path = outputs_dir / "reports" / "linkedin_professional_pack.md"
+        assert li_path.exists(), f"{li_path} must exist"
         li_text = li_path.read_text()
         for f in findings:
             assert f["text"] in li_text, f"Finding '{f['text']}' missing from LinkedIn pack"

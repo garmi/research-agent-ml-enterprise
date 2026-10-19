@@ -28,9 +28,14 @@ DEFAULT_MIGRATIONS_DIR = "ledger/migrations"
 DEFAULT_BACKUPS_DIR = "ledger/backups"
 
 
+def default_backups_dir() -> str:
+    """Backups directory: LEDGER_BACKUPS_DIR when set, otherwise DEFAULT_BACKUPS_DIR."""
+    return os.getenv("LEDGER_BACKUPS_DIR") or DEFAULT_BACKUPS_DIR
+
+
 def create_backup(
     db_path: str,
-    backups_dir: str = DEFAULT_BACKUPS_DIR,
+    backups_dir: Optional[str] = None,
     keep_last_n: int = 10,
     prefix: str = "backup",
 ) -> Optional[str]:
@@ -38,6 +43,9 @@ def create_backup(
 
     Rotates older backups to keep the last `keep_last_n`.
     """
+    if backups_dir is None or backups_dir == DEFAULT_BACKUPS_DIR or backups_dir == "ledger/backups":
+        backups_dir = default_backups_dir()
+
     source = Path(db_path)
     if not source.exists() or source.stat().st_size == 0:
         return None
@@ -275,7 +283,7 @@ def list_migration_files(migrations_dir: str = DEFAULT_MIGRATIONS_DIR) -> List[T
 def apply_migrations(
     db_path: str,
     migrations_dir: str = DEFAULT_MIGRATIONS_DIR,
-    backups_dir: str = DEFAULT_BACKUPS_DIR,
+    backups_dir: Optional[str] = None,
     keep_last_n: int = 10,
 ) -> int:
     """Apply all pending forward migrations to the target database.
@@ -285,6 +293,9 @@ def apply_migrations(
     Returns:
         The latest schema version after migrations.
     """
+    if backups_dir is None or backups_dir == DEFAULT_BACKUPS_DIR or backups_dir == "ledger/backups":
+        backups_dir = default_backups_dir()
+
     conn = get_connection(db_path, verify_integrity=False)
     current_version = get_current_schema_version(conn)
     all_migrations = list_migration_files(migrations_dir)

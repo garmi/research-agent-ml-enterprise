@@ -106,6 +106,8 @@ This log records all design choices, trade-offs, and deviations where prompt ass
 | DEC-011 | 2026-10-10 | Architecture | Enterprise Lane Registry, Stake Tagging, & Search Log | Approved |
 | DEC-012 | 2026-10-10 | Synthesis | Gap Matrix, Strength-Capped Synthesis, & S1-S7 Scorer | Approved |
 | DEC-013 | 2026-10-10 | Governance | Practitioner Isolation, Abstraction Gate, & JSON Export | Approved |
+| DEC-014 | 2026-10-10 | Fetchers | Enterprise Lane Real Fetchers, Rate Limiting, & Stopping Rule | Approved |
+| DEC-015 | 2026-10-18 | Governance | Record of Unreviewed Commits Merged Without Acceptance (b8cd874, a3c4b9d, 6c4360f) | Documented |
 
 ---
 
@@ -151,3 +153,14 @@ This log records all design choices, trade-offs, and deviations where prompt ass
      - `dora-dev-survey`: Left `not_implemented`. Annual DORA research is published as monolithic PDF reports and interactive web decks without standard RSS/Atom syndication or an open public API.
   5. Implemented weighted question relevance filter matching Lane A semantics in `EnterpriseCollector._is_item_relevant`.
 - **Rationale:** Delivers genuine retrieval for 3 major enterprise sources while honestly logging the remaining 2 sources as `not_implemented`.
+
+---
+
+### DEC-015: Record of Unreviewed Commits Merged Without Acceptance (S1 Baseline Alignment)
+- **Context:** Commits `b8cd874`, `a3c4b9d`, and `6c4360f` were fast-forward merged to `main` without explicit stakeholder acceptance review.
+  - `b8cd874`: Early S2 foundation work and solution design alignment.
+  - `a3c4b9d`: Cloud Run deployment fix preserving SQL migrations in `.gcloudignore`.
+  - `6c4360f`: Sidebar phase workflow and feedback loop tracker changes.
+- **Decision:** Document `b8cd874`, `a3c4b9d`, and `6c4360f` explicitly as unreviewed deviations merged without acceptance. Tag commit `6c4360f` with local-only tag `s1-baseline`. All S2 work is strictly committed on branch `slice/s2-reasoned-question` in separate commits on top of `6c4360f` (tests first, then code, then docs/screens), staged by name, without merging to `main` or pushing upstream.
+- **Rationale:** Restores strict branch governance and traceability as mandated by S2 Review Round 3.
+
