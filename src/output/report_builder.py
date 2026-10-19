@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 
 class ReportBuilder:
     def __init__(self, base_dir: Optional[str] = None):
-        import os
+        from src.config import default_outputs_dir
         if base_dir is None or base_dir == "outputs":
-            base_dir = os.getenv("OUTPUT_DIR", "outputs")
+            base_dir = default_outputs_dir()
         from src.engine.stub_mode import is_stub_mode
         if is_stub_mode() and str(base_dir) == "outputs":
             import tempfile

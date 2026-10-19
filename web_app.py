@@ -31,7 +31,7 @@ from src.analysis.multilane_runner import MultiLaneResearchRunner
 from src.analysis.question_formulator import FormulatedQuestion, QuestionFormulationAgent
 from src.analysis.relevance import rank_papers
 from src.analysis.synthesizer import SynthesisEngine
-from src.config import ensure_directories, load_config
+from src.config import default_outputs_dir, ensure_directories, load_config
 from src.fetchers.arxiv_client import ArxivClient
 from src.fetchers.crossref_client import CrossrefClient
 from src.fetchers.openalex_client import OpenAlexClient
@@ -53,7 +53,7 @@ from src.engine.entry import start_run
 from src.engine.ids import resolve_question_id
 from src.engine.stub_mode import is_stub_mode
 from src.ui.safe_page import safe_page, format_error_payload, render_safe_error
-from src.ui.intake_view import render_intake_view
+from src.ui.intake_view import approved_question_text, effective_provider, render_intake_view
 
 
 logger = logging.getLogger("ExecutiveResearchStudio")
@@ -61,7 +61,7 @@ logging.basicConfig(level=logging.INFO)
 
 load_dotenv()
 config = load_config("config.yaml") if Path("config.yaml").exists() else {}
-ensure_directories("outputs")
+ensure_directories()
 ledger_service = LedgerService()
 question_agent = QuestionFormulationAgent(config)
 multilane_runner = MultiLaneResearchRunner()
@@ -1028,6 +1028,16 @@ with st.expander(
     + (f" — Active Question: {st.session_state.get('current_question', '')[:75]}" if results else " (Current Phase)"),
     expanded=show_intake_expanded,
 ):
+    # Reasoning runs on the engine chosen in the Inference Model selector (rendered further down;
+    # its key holds the last choice), resolved the same way the run handler resolves it.
+    _sel_label = st.session_state.get("select_inference_model")
+    if _sel_label in available_models:
+        _sel_provider = available_models[_sel_label]
+    else:
+        _sel_provider = "stub" if is_stub_requested else ("ollama" if ollama_online else ("gemini" if has_gemini_key else "stub"))
+    st.session_state["selected_model_provider"] = effective_provider(
+        _sel_provider, has_gemini_key=bool(os.getenv("GEMINI_API_KEY", "").strip()), ollama_ok=ollama_online
+    )
     intake_state = render_intake_view()
     query_input = intake_state["question_text"]
     run_submitted = intake_state["run_submitted"]
@@ -1058,7 +1068,7 @@ with st.expander(
             else:
                 default_idx = next((i for i, k in enumerate(model_names) if available_models.get(k) == "stub"), 0)
 
-            sel_model_label = st.selectbox("Inference Model", model_names, index=default_idx)
+            sel_model_label = st.selectbox("Inference Model", model_names, index=default_idx, key="select_inference_model")
 
             if os.getenv("HOSTED_DEMO") == "1":
                 st.info("API key override disabled on shared instance.")
@@ -1654,7 +1664,7 @@ if results:
                     progress_box = st.empty()
                     try:
                         refreshed = run_production_pipeline(
-                            topic=st.session_state["current_question"],
+                            topic=approved_question_text(st.session_state.get("s2_active_package"), results),
                             depth=depth_option,
                             tone=tone_option,
                             map_provider=selected_provider,
@@ -1843,7 +1853,7 @@ if results:
     papers_df = pd.DataFrame(results.get("papers", []))
     csv_content = papers_df.to_csv(index=False)
     linkedin_pack = builder.build_linkedin_pack(topic_str, syn_raw) if syn_raw else "# LinkedIn Executive Thought Leadership Pack\n\n"
-    deck_path = Path("outputs/reports/strategic_storyline.html")
+    deck_path = Path(default_outputs_dir()) / "reports" / "strategic_storyline.html"
     deck_html = deck_path.read_text(encoding="utf-8") if deck_path.exists() else builder.build_html_storyline(topic_str, syn_raw)
 
     with export_col1:

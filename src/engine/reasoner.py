@@ -148,6 +148,17 @@ def _extract_entities_and_numbers(text: str) -> List[str]:
     return all_terms
 
 
+def _contains_words(haystack: str, needle: str) -> bool:
+    """True if `needle` occurs in `haystack` as whole word(s), not inside a longer word or number."""
+    if not needle:
+        return False
+    return re.search(r"(?<![a-z0-9])" + re.escape(needle) + r"(?![a-z0-9])", haystack) is not None
+
+
+def _normalize_sentence(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", str(text).lower()).strip()
+
+
 def find_unlisted_terms(package: Dict[str, Any], user_text: str) -> List[str]:
     """Identify terms, entities, numbers, and content phrases introduced by the model across all text fields
     (refined_question, sub_questions, premises_to_test, in_scope, evidence_needed) that do not appear
@@ -175,10 +186,10 @@ def find_unlisted_terms(package: Dict[str, Any], user_text: str) -> List[str]:
     for term in extracted_terms:
         term_clean = term.strip()
         t_low = term_clean.lower()
-        if t_low in u_lower:
+        # Whole words only: "5" is not in "25 developers", "ai" does not cover "maintainability".
+        if _contains_words(u_lower, t_low):
             continue
-        # Check against added_terms
-        if any(t_low == at or t_low in at or at in t_low for at in added_terms):
+        if any(t_low == at or _contains_words(at, t_low) or _contains_words(t_low, at) for at in added_terms):
             continue
         unlisted.append(term_clean)
 
@@ -243,18 +254,20 @@ def validate_reasoned_package(
         errors.append("Coverage error: 'coverage_map' is missing or not a dictionary.")
     else:
         # Check every user sentence is present
-        normalized_cov_keys = {k.strip().lower(): v for k, v in coverage_map.items()}
+        normalized_cov_keys = {_normalize_sentence(k): v for k, v in coverage_map.items()}
         for idx, sentence in enumerate(user_sentences):
-            s_clean = sentence.strip().lower()
-            # Match directly or by prefix/substring match
+            s_clean = _normalize_sentence(sentence)
+            # Exact match after normalising case and punctuation, or a near-complete overlap:
+            # a fragment must cover most of the sentence, so "the" or "" cannot cover everything.
             matched_target = normalized_cov_keys.get(s_clean)
             if not matched_target:
                 for k, v in normalized_cov_keys.items():
-                    if s_clean in k or k in s_clean:
+                    shorter, longer = sorted((k, s_clean), key=len)
+                    if shorter and shorter in longer and len(shorter) >= 0.6 * len(longer):
                         matched_target = v
                         break
             if not matched_target:
-                alt_keys = [f"sentence {idx+1}", f"sentence_{idx+1}", f"sentence{idx+1}", str(idx+1)]
+                alt_keys = [f"sentence {idx+1}", f"sentence{idx+1}", str(idx+1)]
                 for ak in alt_keys:
                     if ak in normalized_cov_keys:
                         matched_target = normalized_cov_keys[ak]
@@ -288,7 +301,7 @@ def validate_reasoned_package(
         "concluded that", "is proven to", "statistically significant increase of",
         "measured an increase of", "reported a 25%"
     ]
-    for sq in [refined_q] + (sub_qs or []):
+    for sq in [refined_q] + (sub_qs if isinstance(sub_qs, list) else []):
         sq_low = str(sq).lower()
         for cue in forbidden_finding_cues:
             if cue in sq_low:
@@ -530,30 +543,23 @@ Angle Hint:
         if retry_feedback:
             user_prompt += f"\nPREVIOUS ATTEMPT FAILED GUARDS: {retry_feedback}. Correct these errors immediately.\n"
 
-    if provider == "gemini":
-        from src.llm.gemini_client import GeminiClient
-        api_key = os.getenv("GEMINI_API_KEY", "").strip()
-        if not api_key:
+    if provider in ("gemini", "ollama"):
+        from src.llm import factory
+        from src.llm.ollama_client import is_ollama_reachable
+
+        if provider == "gemini" and not os.getenv("GEMINI_API_KEY", "").strip():
             raise QuestionReasoningError(
                 "Gemini API key is not configured. Please enter a valid key in Advanced Settings or switch to Local Ollama."
             )
-        client = GeminiClient(model=model, api_key=api_key)
-        return client.generate(
-            prompt=user_prompt,
-            system_prompt=system_instruction,
-            temperature=0.1,
-            json_mode=True,
-        )
-
-    elif provider == "ollama":
-        from src.llm.ollama_client import OllamaClient, is_ollama_reachable
-        if not is_ollama_reachable():
+        if provider == "ollama" and not is_ollama_reachable():
             raise QuestionReasoningError(
                 "Local Ollama service is not reachable. "
                 "Please start Ollama locally or select a configured cloud provider."
             )
-        target_model = model or os.getenv("OLLAMA_MODEL", "qwen2.5:3b-instruct")
-        client = OllamaClient(model=target_model)
+        # Same client construction (model, base_url, num_ctx, timeout) as every other model call.
+        client = factory.build_llm(provider, _load_llm_config())
+        if model:
+            client.model = model
         return client.generate(
             prompt=user_prompt,
             system_prompt=system_instruction,
@@ -561,7 +567,7 @@ Angle Hint:
             json_mode=True,
         )
 
-    elif provider in ("fake", "mock", "test_fake"):
+    if provider in ("fake", "mock", "test_fake"):
         fake_fn = getattr(_call_model_for_reasoning, "fake_fn", None)
         if callable(fake_fn):
             return fake_fn(
@@ -576,6 +582,24 @@ Angle Hint:
 
 
 _call_model_for_reasoning.fake_fn = None
+
+
+def _load_llm_config() -> Dict[str, Any]:
+    from src.config import load_config
+
+    return load_config("config.yaml") if Path("config.yaml").exists() else {}
+
+
+def resolve_model_name(provider: str) -> str:
+    """The model a provider will actually run, as recorded on the Gate 1 approval."""
+    p = str(provider or "").strip().lower()
+    if p in ("ollama", "local"):
+        cfg = _load_llm_config().get("ollama", {})
+        return str(os.getenv("OLLAMA_MODEL") or cfg.get("model", "qwen2.5:3b-instruct")).strip()
+    if p == "gemini":
+        cfg = _load_llm_config().get("gemini", {})
+        return str(os.getenv("GEMINI_MODEL") or cfg.get("model", "gemini-2.5-flash")).strip()
+    return p or "unknown"
 
 
 def _parse_model_json(text: str) -> Dict[str, Any]:

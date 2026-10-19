@@ -31,9 +31,9 @@ class UnifiedRenderer:
         self.sentences = sentences
         self.papers = papers
         self.metadata = metadata or {}
-        import os
+        from src.config import default_outputs_dir
         if base_dir is None or base_dir == "outputs":
-            base_dir = os.getenv("OUTPUT_DIR", "outputs")
+            base_dir = default_outputs_dir()
         from src.engine.stub_mode import is_stub_mode
         if is_stub_mode() and str(base_dir) == "outputs":
             import tempfile

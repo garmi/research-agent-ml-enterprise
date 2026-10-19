@@ -25,6 +25,7 @@ import yaml
 from src.collectors.enterprise.feed_fetcher import EnterpriseFeedFetcher, strip_html_and_truncate
 from src.extract.claim_extractor import extract_claims_from_paper
 from src.grade.grader import Grader
+from src.ledger.db import default_ledger_path
 from src.ledger.migrations import apply_migrations
 from src.ledger.models import Claim, Question, SearchLog, Source
 from src.ledger.repository import LedgerRepository
@@ -36,12 +37,12 @@ class EnterpriseCollector:
     def __init__(
         self,
         registry_path: str = "collectors/enterprise/sources_registry.yaml",
-        db_path: str = "ledger/ledger.db",
+        db_path: Optional[str] = None,
         cache_dir: str = "data/cache/enterprise",
         config_path: str = "config.yaml",
     ):
         self.registry_path = registry_path
-        self.db_path = db_path
+        self.db_path = db_path or default_ledger_path()
         self.cache_dir = cache_dir
         self.config_path = config_path
         apply_migrations(db_path=self.db_path)
