@@ -131,8 +131,9 @@ class EnterpriseFeedFetcher:
                 except Exception:
                     date_str = str(datetime.datetime.now().year)
 
-            excerpt = strip_html_and_truncate(desc or title, max_words=25)
-            if title and link:
+            # S11: only the feed's own summary; an item without one is skipped, not given its title.
+            excerpt = strip_html_and_truncate(desc, max_words=25)
+            if title and link and excerpt:
                 items.append({
                     "title": title,
                     "url": link,
@@ -146,14 +147,16 @@ class EnterpriseFeedFetcher:
             ns = {"atom": "http://www.w3.org/2005/Atom"}
             for entry_node in root.findall(".//atom:entry", ns) or root.findall(".//entry"):
                 title = (entry_node.findtext("atom:title", namespaces=ns) or entry_node.findtext("title") or "").strip()
-                link_node = entry_node.find("atom:link", ns) or entry_node.find("link")
+                link_node = entry_node.find("atom:link", ns)
+                if link_node is None:
+                    link_node = entry_node.find("link")
                 link = link_node.attrib.get("href", "") if link_node is not None else ""
                 published = (entry_node.findtext("atom:published", namespaces=ns) or entry_node.findtext("published") or "").strip()
                 summary = (entry_node.findtext("atom:summary", namespaces=ns) or entry_node.findtext("summary") or "").strip()
 
                 date_str = published[:10] if len(published) >= 10 else str(datetime.datetime.now().year)
-                excerpt = strip_html_and_truncate(summary or title, max_words=25)
-                if title and link:
+                excerpt = strip_html_and_truncate(summary, max_words=25)
+                if title and link and excerpt:
                     items.append({
                         "title": title,
                         "url": link,

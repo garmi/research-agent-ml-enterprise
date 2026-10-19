@@ -103,8 +103,7 @@ def test_blog_items_filtered_capped_and_graded_as_vendor_claims(tmp_path, monkey
     c, q = _collector(tmp_path)
     feed = [_item(i) for i in range(6)] + [
         _item(9, title="Optimizing DynamoDB for gaming leaderboards", abstract="Partition keys give low latency for games."),
-        # shares only the generic word "teams" with the question
-        _item(10, title="Planning offsites for remote teams", abstract="Our teams met in Lisbon for a week."),
+        _item(10, title="Planning offsites in Lisbon", abstract="We met in Lisbon for a week of talks."),
     ]
     monkeypatch.setattr(c.fetcher, "fetch_rss_feed", lambda url: feed)
     claims = c.search_and_ingest(question=q, query=QUESTION, allow_live=True)

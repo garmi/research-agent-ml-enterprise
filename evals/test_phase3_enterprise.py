@@ -100,7 +100,7 @@ def test_enterprise_claims_carry_stake_and_vendor_grade(enterprise_env):
         "dora-dev-survey": [
             {
                 "title": "2025 State of DevOps Report",
-                "text": "Teams adopting specification guardrails saw a 12% increase in deployment stability.",
+                "text": "Teams adopting AI coding tools with specification guardrails saw a 12% increase in deployment stability.",
                 "year": 2025,
                 "speaker": "independent",
             }
