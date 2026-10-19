@@ -1844,7 +1844,11 @@ class MultiLaneResearchRunner:
                 if c_text.lower().startswith(prefix):
                     c_text = c_text[len(prefix):]
                     break
-            extractive_findings.append(f"[{p_tag}] Academic claim {verb} that {c_text}.")
+            # S16: one claim, one source: a figure is attributed to one study.
+            from src.score.checker import extract_numerals
+
+            subject = "One study" if extract_numerals(c_text) else "Academic claim"
+            extractive_findings.append(f"[{p_tag}] {subject} {verb} that {c_text}.")
 
         for c in enterprise_claims:
             verb = temp_engine._select_verb_for_grade(c.grade)

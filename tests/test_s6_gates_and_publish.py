@@ -43,7 +43,8 @@ def _sentence(i: int, text: str, type_: str = "assertive", claims: List[str] | N
     return OutputSentence(id=f"out_{i}", output_id="out", ordinal=i, text=text, type=type_, claim_ids_json=claims)
 
 
-GOOD = _sentence(1, "Coding assistants shortened enterprise delivery cycle time by 14% [P1].", claims=[CLAIM.id])
+# S16: one source's figure is attributed to one study.
+GOOD = _sentence(1, "One study reports that coding assistants shortened enterprise delivery cycle time by 14% [P1].", claims=[CLAIM.id])
 
 
 def _check(sentences, question=QUESTION, checker=None):

@@ -69,6 +69,7 @@ def test_single_source_figure_needs_one_study_wording():
     res = _check("EA-GKS raises the determinism coefficient from 0.61 to 0.97 [P9].", [c])
     assert res.state("G4") == "FAIL" and any("one study" in v for v in res.violations["G4"])
     for ok in ("One study reports that EA-GKS raises the determinism coefficient from 0.61 to 0.97 [P9].",
+               "One early enterprise study reports that EA-GKS raises the determinism coefficient from 0.61 to 0.97 [P9].",
                "A single preprint reports that EA-GKS raises the determinism coefficient from 0.61 to 0.97 [P9]."):
         assert not any("one study" in v for v in _check(ok, [c]).violations["G4"]), ok
 

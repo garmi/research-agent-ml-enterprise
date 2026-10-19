@@ -72,7 +72,7 @@ Analyse them and return valid JSON with exactly these keys:
   "executive_summary": "The bottom line in 2-3 sentences: what the evidence shows, how strong it is, and why it matters. Every sentence cites the paper ids it rests on, e.g. [P1][P3]",
   "objective": "one sentence",
   "research_questions": ["3 questions the evidence helps answer"],
-  "key_findings": ["4-6 complete descriptive findings, each followed by supporting paper ids, e.g. Deployment frequency increased significantly under automated testing frameworks [P1][P3]"],
+  "key_findings": ["4-6 complete descriptive findings, each followed by supporting paper ids, e.g. Two studies report higher deployment frequency under automated testing frameworks [P1][P3]"],
   "themes": [{{"name": "Theme Name", "description": "Complete description of the theme [P2]"}}],
   "market_trends": ["3-4 complete descriptive market trend statements, each citing paper ids"],
   "business_problems": ["3-5 complete descriptive problem statements explaining what goes wrong in the enterprise, each citing paper ids"],
@@ -84,6 +84,7 @@ Rules:
 - Use ONLY the provided summaries. Do not invent numbers, companies, or studies.
 - Every finding, trend, and problem must cite at least one paper id in square brackets.
 - If evidence on a point is thin, explicitly state that evidence is limited.
+- When a figure rests on one paper, say so in the sentence: "One study reports that ... 41% ... [P2]". State a figure as general fact only when two or more papers report it.
 - executive_summary: describe what the evidence shows, not what leaders should do. Do not use "must", "should" or other directives (actions belong in the recommendations). Hedge claims that rest on a single study ("one study reports", "suggests"). Use only figures that appear in the summaries, and cite every sentence with its [P#] ids.
 
 Paper summaries:
