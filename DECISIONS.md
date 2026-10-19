@@ -112,6 +112,7 @@ This log records all design choices, trade-offs, and deviations where prompt ass
 | DEC-017 | 2026-10-18 | Evidence | Run-Scoped Evidence, Check B Thresholds, and Evidence Board Exclusions | Proposed |
 | DEC-018 | 2026-10-18 | Synthesis | Hedge Terms on Claims, Honest Citation Binding, Check C Bake-off Baseline | Proposed |
 | DEC-019 | 2026-10-19 | Governance | No Data Counts as FAIL; Human-Only Publishing | Proposed |
+| DEC-020 | 2026-10-19 | Evidence | Check A Prompt v3: Relevance to the Subject, Not a Full Answer | Proposed |
 
 ---
 
@@ -207,4 +208,16 @@ This log records all design choices, trade-offs, and deviations where prompt ass
   7. A named reviewer publishes `PUBLISH_READY`, or `REVISE` with a logged reason. `BLOCKED` and `NOT_PUBLISHABLE` are refused.
   8. The publisher uses the run's question and audited band, and records `PUBLISHED` on the run.
 - **Rationale:** The topography's Stage 7 ("a gate with no data counts as FAIL") and its final step ("You review and publish"). A pass now always means something was checked, and publishing is always a recorded human decision.
+
+---
+
+### DEC-020: Check A Prompt v3: Relevance to the Subject, Not a Full Answer (S13)
+- **Context:** Cloud Run job `job_3cd226217fd8` stopped with 0 of 26 sources on topic. Prompt v1 asked whether a source "directly addresses the subject of the approved question". Gemini read the subject as the whole compound question, and rejected even AI-in-software-engineering papers as "not the transition to specialized ... AI systems". The searches had also drifted: S11's 8-term condensed query dropped "code generation" and "AI".
+- **Decision:**
+  1. Check A's live prompt becomes v3. It keeps a source that studies the subject and can inform at least one part or sub-question, keeps the compound-subject rule (sourdough) and the out-of-scope rule, and drops sources whose main subject is a different field.
+  2. Queries always keep the configured anchor terms (`research.query_anchor_terms`), and sub-question queries carry the main question's.
+  3. The bake-off set grows to v2 with that run's 26 hand-labelled sources.
+- **Evidence:** On qwen2.5:3b (57 clear labels), v3 raises recall from 0.67 to 0.89 with precision 0.56 → 0.55, keeping 5 of 6 relevant platform sources (v1: 4). The 3B model passes the sourdough canary under both prompts (the known 3B leak, DEC-016). Gemini, the cloud model, has not been bake-off tested on v3, because the local key is blocked.
+- **Rationale:** Check A only removes off-topic evidence. Judging whether a source answers the question is the job of later stages (grading, gates). A strict reading of "subject" turned Check A into a second, unmeasured answer check that stopped real runs.
+- **Open:** Confirm on Gemini: the platform question should pass and the sourdough canary should stop. If sourdough passes on Gemini with v3, tighten the compound-subject rule rather than revert.
 

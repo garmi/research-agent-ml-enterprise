@@ -169,9 +169,10 @@ def test_queries_come_from_question_and_sub_questions():
     ]}
     qs = research_queries(q, pkg)
     assert len(qs) == len(set(q_.lower() for q_ in qs))
-    assert all(len(x.split()) <= 8 for x in qs[:3])
-    assert "orchestration" in qs[1] and "multi" in qs[1] and "agent" in qs[1]
-    assert "measure" in qs[2] or "business" in qs[2]
+    # S13: condensed main question, then the cleaned full question, then the sub-questions (with anchors).
+    assert len(qs[0].split()) <= 10 and all(len(x.split()) <= 13 for x in qs[2:4])
+    assert "orchestration" in qs[2] and "multi" in qs[2] and "agent" in qs[2]
+    assert "measure" in qs[3] or "business" in qs[3]
     assert not qs[0].lower().startswith("what")
     assert any("software engineering" in x for x in qs[3:])
     assert research_queries("AI coding assistants and cycle time", None)[0] == "AI coding assistants cycle time"
@@ -238,9 +239,9 @@ def test_not_searched_is_one_line_per_lane():
     texts = [t for t, _ in out]
     # The question appears as its key terms only, so briefs for different questions never share the line (D1).
     assert texts == [
-        "Enterprise sources not searched for 'architectural frameworks required platform teams' (no fetcher yet): "
+        "Enterprise sources not searched for 'architectural frameworks platform teams' (no fetcher yet): "
         "dora-dev-survey, sec-edgar-filings, aws-dev-blog.",
-        "Practitioner sources not searched for 'architectural frameworks required platform teams' (no observations recorded): field_notes.",
+        "Practitioner sources not searched for 'architectural frameworks platform teams' (no observations recorded): field_notes.",
     ]
     assert all(q not in t for t in texts)
     assert out[0][1]["search_log_ids"] == ["e0", "e1", "e2"] and out[0][1]["search_log_id"] == "e0"

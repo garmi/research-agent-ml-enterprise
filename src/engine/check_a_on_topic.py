@@ -22,7 +22,9 @@ logger = logging.getLogger(__name__)
 
 CHECK_A_ID = "check_a_on_topic"
 # v1 stays live until the Check A bake-off picks a model: qwen2.5:3b returns malformed output on v2.
-PROMPT_FILE_PATH = "prompts/check_a_on_topic_v1.md"
+# v3 (S13): judges relevance to the subject, not a full answer; v1 made a strong model reject every
+# source that covered only one part of a compound question (0 of 26 on Cloud Run job_3cd226217fd8).
+PROMPT_FILE_PATH = "prompts/check_a_on_topic_v3.md"
 BATCH_SIZE = 12
 TEXT_CHARS = 320
 

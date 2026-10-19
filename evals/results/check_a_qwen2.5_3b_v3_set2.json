@@ -1,0 +1,774 @@
+{
+ "provider": "ollama",
+ "model": "qwen2.5:3b-instruct",
+ "prompt": "prompts/check_a_on_topic_v3.md",
+ "seconds": 151,
+ "abstained": 1,
+ "model_all": {
+  "n": 70,
+  "precision": 0.509,
+  "recall": 0.818,
+  "accuracy": 0.543,
+  "false_on_topic": 26,
+  "false_off_topic": 6
+ },
+ "model_clear": {
+  "n": 57,
+  "precision": 0.535,
+  "recall": 0.852,
+  "accuracy": 0.579,
+  "false_on_topic": 20,
+  "false_off_topic": 4
+ },
+ "final_all": {
+  "n": 70,
+  "precision": 0.519,
+  "recall": 0.848,
+  "accuracy": 0.557,
+  "false_on_topic": 26,
+  "false_off_topic": 5
+ },
+ "final_clear": {
+  "n": 57,
+  "precision": 0.545,
+  "recall": 0.889,
+  "accuracy": 0.596,
+  "false_on_topic": 20,
+  "false_off_topic": 3
+ },
+ "runs": {
+  "kiro": {
+   "passed": true,
+   "expected": true,
+   "on_topic": 8,
+   "total": 12
+  },
+  "hospital": {
+   "passed": true,
+   "expected": true,
+   "on_topic": 9,
+   "total": 12
+  },
+  "sourdough": {
+   "passed": true,
+   "expected": false,
+   "on_topic": 6,
+   "total": 8
+  },
+  "assistants": {
+   "passed": true,
+   "expected": true,
+   "on_topic": 10,
+   "total": 12
+  },
+  "platform": {
+   "passed": true,
+   "expected": true,
+   "on_topic": 21,
+   "total": 26
+  }
+ },
+ "runs_as_expected": 4,
+ "rows": [
+  {
+   "question": "kiro",
+   "title": "Human-AI Collaboration in Software Engineering: Enhancing Developer Productivity through Intelligent Assistants",
+   "gold": "on_topic",
+   "borderline": false,
+   "model": "off_topic",
+   "final": "off_topic",
+   "rule_decisive": false,
+   "reason": "focuses on human-AI collaboration inconsistency"
+  },
+  {
+   "question": "kiro",
+   "title": "SDAD: Spec-Driven Agentic Development for the AI-Native SDLC",
+   "gold": "on_topic",
+   "borderline": false,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "studies AI coding assistants and productivity"
+  },
+  {
+   "question": "kiro",
+   "title": "SPEC-DRIVEN DEVELOPMENT FOR ENTERPRISE AGENTIC SOFTWARE ENGINEERING: A GOVERNANCE FRAMEWORK FOR RELIABLE AI-GENERATED SOFTWARE",
+   "gold": "on_topic",
+   "borderline": false,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "studies AI coding assistants and governance"
+  },
+  {
+   "question": "kiro",
+   "title": "Productivity vs. Compliance: The New Engineering Challenge of AI Coding Assistants in Regulated Codebases",
+   "gold": "on_topic",
+   "borderline": false,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "studies AI coding assistants and productivity"
+  },
+  {
+   "question": "kiro",
+   "title": "Developer productivity in AI-driven engineering teams",
+   "gold": "on_topic",
+   "borderline": true,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "studies AI-driven engineering teams and productivity"
+  },
+  {
+   "question": "kiro",
+   "title": "Spec-Driven Development for Agentic Software Engineering: Harnessing Human-Agent Teamwork",
+   "gold": "on_topic",
+   "borderline": false,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "studies AI coding assistants and productivity"
+  },
+  {
+   "question": "kiro",
+   "title": "The Vibe Shift in Software Engineering: Evaluating AI-Led Conversational Programming for Performance, Cognition, and Responsible Adoption",
+   "gold": "on_topic",
+   "borderline": true,
+   "model": "off_topic",
+   "final": "off_topic",
+   "rule_decisive": false,
+   "reason": "focuses on AI-led conversational programming"
+  },
+  {
+   "question": "kiro",
+   "title": "Generative AI Assistants in Software Development: Productivity Gains, Code Quality, and Security Trade-offs",
+   "gold": "on_topic",
+   "borderline": false,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "studies AI coding assistants and productivity"
+  },
+  {
+   "question": "kiro",
+   "title": "Skill-Augmented AI Coding Agents: A Two-Layer Framework for SKILL.md Design and Developer Productivity",
+   "gold": "on_topic",
+   "borderline": false,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "studies AI coding assistants and productivity"
+  },
+  {
+   "question": "kiro",
+   "title": "Methods and Techniques of Agentic Software Engineering: A Systematic Literature Review",
+   "gold": "on_topic",
+   "borderline": true,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "studies AI coding assistants and productivity"
+  },
+  {
+   "question": "kiro",
+   "title": "Does AI Policy Adoption Matter? Evidence on Productivity and ICT Trade Competitiveness",
+   "gold": "off_topic",
+   "borderline": false,
+   "model": "off_topic",
+   "final": "off_topic",
+   "rule_decisive": false,
+   "reason": "focuses on AI policy adoption and productivity"
+  },
+  {
+   "question": "kiro",
+   "title": "Adoption and Effects of Software Engineering Best Practices in Machine Learning",
+   "gold": "off_topic",
+   "borderline": false,
+   "model": "off_topic",
+   "final": "off_topic",
+   "rule_decisive": false,
+   "reason": "focuses on software engineering best practices in ML"
+  },
+  {
+   "question": "hospital",
+   "title": "From Siloed Algorithms to Compliance‑First Agentic Platforms: A Multi‑Layered Architecture for Hospital AI Systems",
+   "gold": "on_topic",
+   "borderline": false,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "studies AI in hospital settings and compliance"
+  },
+  {
+   "question": "hospital",
+   "title": "The EU AI Act: implications and compliance guidance for healthcare facilities",
+   "gold": "on_topic",
+   "borderline": false,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "discusses EU AI Act implications for healthcare"
+  },
+  {
+   "question": "hospital",
+   "title": "AI-Driven Data Governance and Compliance: Building Trustworthy Enterprise Intelligence Systems",
+   "gold": "off_topic",
+   "borderline": false,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "focuses on AI governance and compliance"
+  },
+  {
+   "question": "hospital",
+   "title": "Governing medical AI under the EU AI Act: an integrated compliance-by-design framework",
+   "gold": "on_topic",
+   "borderline": false,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "addresses AI governance in healthcare"
+  },
+  {
+   "question": "hospital",
+   "title": "Governing Healthcare AI in the Real World: How Fairness, Transparency, and Human Oversight Can Coexist: A Narrative Review",
+   "gold": "on_topic",
+   "borderline": false,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "discusses AI governance and ethics in healthcare"
+  },
+  {
+   "question": "hospital",
+   "title": "A Self-Governing AI-Driven Agent for Advanced Patient Data Structuring",
+   "gold": "off_topic",
+   "borderline": false,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "focuses on AI-driven data structuring in healthcare"
+  },
+  {
+   "question": "hospital",
+   "title": "Cloud-Based Data Governance Architectures for Pharmacovigilance: Ensuring Security, Privacy, Compliance, And Patient Safety in Healthcare Systems",
+   "gold": "off_topic",
+   "borderline": false,
+   "model": "off_topic",
+   "final": "off_topic",
+   "rule_decisive": false,
+   "reason": "focuses on pharmacovigilance"
+  },
+  {
+   "question": "hospital",
+   "title": "AI and Big Data Security, Governance, and Regulatory Compliance in Enterprise Cloud Platforms: A Regulatory Document Analysis for the Saudi Public Sector",
+   "gold": "off_topic",
+   "borderline": false,
+   "model": "off_topic",
+   "final": "off_topic",
+   "rule_decisive": false,
+   "reason": "focuses on Saudi public sector"
+  },
+  {
+   "question": "hospital",
+   "title": "AI-based Clinical Decision Support for Primary Care: A Real-World Study",
+   "gold": "off_topic",
+   "borderline": false,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "evaluates AI in primary care"
+  },
+  {
+   "question": "hospital",
+   "title": "Blockchain-Enhanced Clinical Risk Management for AI Healthcare Systems : Privacy-Preserving Incident Response and Compliance Monitoring",
+   "gold": "on_topic",
+   "borderline": true,
+   "model": "off_topic",
+   "final": "off_topic",
+   "rule_decisive": false,
+   "reason": "focuses on blockchain for clinical risk management"
+  },
+  {
+   "question": "hospital",
+   "title": "Engineering AI Agents for Clinical Workflows: A Case Study in Architecture,MLOps, and Governance",
+   "gold": "on_topic",
+   "borderline": true,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "describes AI integration into clinical workflows"
+  },
+  {
+   "question": "hospital",
+   "title": "Toward a Regulatory Validation Framework for AI-Assisted Clinical Trial Activation and Execution: Formal Verification, Deterministic Compliance, and Patient Safety Assurance",
+   "gold": "off_topic",
+   "borderline": false,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "addresses AI-assisted clinical trial validation and compliance"
+  },
+  {
+   "question": "sourdough",
+   "title": "Secure Software Engineering Through Sensible AutoMation (SESAM)",
+   "gold": "off_topic",
+   "borderline": false,
+   "model": "off_topic",
+   "final": "off_topic",
+   "rule_decisive": false,
+   "reason": "focuses on secure software engineering, not quantum-secure sourdough fermentation controllers"
+  },
+  {
+   "question": "sourdough",
+   "title": "Smart Fermentation Technologies: Microbial Process Control in Traditional Fermented Foods",
+   "gold": "off_topic",
+   "borderline": false,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "studies smart fermentation technologies related to sourdough"
+  },
+  {
+   "question": "sourdough",
+   "title": "Carob Flour Addition to Sourdough: Effect of Sourdough Fermentation, Dough Rheology and Bread Quality",
+   "gold": "off_topic",
+   "borderline": false,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "discusses sourdough fermentation and its effects"
+  },
+  {
+   "question": "sourdough",
+   "title": "Use of Nash equilibrium in finding game theoretic robust security bound on quantum bit error rate",
+   "gold": "off_topic",
+   "borderline": false,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "explores quantum bit error rate in sourdough fermentation"
+  },
+  {
+   "question": "sourdough",
+   "title": "Technology of Sourdough Fermentation and Sourdough Application",
+   "gold": "off_topic",
+   "borderline": false,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "evaluates sourdough fermentation technology"
+  },
+  {
+   "question": "sourdough",
+   "title": "Handbook of Sourdough Microbiota and Fermentation",
+   "gold": "off_topic",
+   "borderline": false,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "covers sourdough microbiota and fermentation"
+  },
+  {
+   "question": "sourdough",
+   "title": "Recent development in sourdough-based metabolites in biochemical products",
+   "gold": "off_topic",
+   "borderline": false,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "focuses on sourdough-based metabolites"
+  },
+  {
+   "question": "sourdough",
+   "title": "A eucharist of sourdough or wafer? What a thousand-year-old religious quarrel tells us about fermentation",
+   "gold": "off_topic",
+   "borderline": false,
+   "model": "off_topic",
+   "final": "off_topic",
+   "rule_decisive": false,
+   "reason": "discusses religious aspects of sourdough, not technology"
+  },
+  {
+   "question": "assistants",
+   "title": "Trustworthy and Secure LLM-Assisted Code Generation for Enterprise Software Development",
+   "gold": "on_topic",
+   "borderline": false,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "studies LLM-assisted code generation and its impact on enterprise software development"
+  },
+  {
+   "question": "assistants",
+   "title": "Human-AI Collaboration in Software Engineering: Enhancing Developer Productivity through Intelligent Assistants",
+   "gold": "on_topic",
+   "borderline": false,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "discusses AI coding assistants and their impact on developer productivity"
+  },
+  {
+   "question": "assistants",
+   "title": "Productivity vs. Compliance: The New Engineering Challenge of AI Coding Assistants in Regulated Codebases",
+   "gold": "on_topic",
+   "borderline": false,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "examines AI coding assistants in regulated codebases"
+  },
+  {
+   "question": "assistants",
+   "title": "AI-Assisted Software Engineering Productivity: Evidence, Measurement, and Enterprise Adoption",
+   "gold": "on_topic",
+   "borderline": false,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "analyzes AI assistance in software engineering productivity"
+  },
+  {
+   "question": "assistants",
+   "title": "AI-Driven Product Development: Cognitive Software Delivery at Enterprise Scale",
+   "gold": "on_topic",
+   "borderline": false,
+   "model": "off_topic",
+   "final": "off_topic",
+   "rule_decisive": false,
+   "reason": "focuses on AI-driven product development"
+  },
+  {
+   "question": "assistants",
+   "title": "Developer productivity in AI-driven engineering teams",
+   "gold": "on_topic",
+   "borderline": false,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "focuses on AI and developer productivity in enterprise"
+  },
+  {
+   "question": "assistants",
+   "title": "Examining the Use and Impact of an AI Code Assistant on Developer Productivity and Experience in the Enterprise",
+   "gold": "on_topic",
+   "borderline": false,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "describes AI code assistant impact on developer productivity"
+  },
+  {
+   "question": "assistants",
+   "title": "AI Assisted Code Generation for Enterprise Java Services Productivity, Reliability, and Governance Considerations",
+   "gold": "on_topic",
+   "borderline": false,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "focuses on AI-assisted code generation for enterprise Java services"
+  },
+  {
+   "question": "assistants",
+   "title": "The Impact of LLM-Assistants on Software Developer Productivity: A Systematic Review and Mapping Study",
+   "gold": "on_topic",
+   "borderline": false,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "reviews LLM-assisted software developer productivity"
+  },
+  {
+   "question": "assistants",
+   "title": "Engineering Enterprise-Grade Generative AI: Architectures, Agentic Frameworks, and Protocols for Production-Ready LLM Systems",
+   "gold": "off_topic",
+   "borderline": false,
+   "model": "off_topic",
+   "final": "off_topic",
+   "rule_decisive": false,
+   "reason": "focuses on enterprise-grade generative AI"
+  },
+  {
+   "question": "assistants",
+   "title": "Skill-Augmented AI Coding Agents: A Two-Layer Framework for SKILL.md Design and Developer Productivity",
+   "gold": "on_topic",
+   "borderline": false,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "describes skill-augmented AI coding agents and productivity"
+  },
+  {
+   "question": "assistants",
+   "title": "The Impact of AI Coding Assistants on Software Engineering: A Longitudinal Study",
+   "gold": "on_topic",
+   "borderline": false,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "examines AI coding assistants' impact on software engineering"
+  },
+  {
+   "question": "platform",
+   "title": "PlatFab: A Platform Engineering Approach to Improve Developer Productivity",
+   "gold": "off_topic",
+   "borderline": true,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "PlatFab discusses platform engineering and developer productivity"
+  },
+  {
+   "question": "platform",
+   "title": "Evaluating the Impact of Internal Developer Platforms on Developer Productivity and DevOps Delivery",
+   "gold": "off_topic",
+   "borderline": true,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "IDPs address tool management for development teams"
+  },
+  {
+   "question": "platform",
+   "title": "AI-Augmented Decision Making: A Framework for Enterprise Workflow Transformation",
+   "gold": "off_topic",
+   "borderline": false,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "AI-augmented decision-making framework"
+  },
+  {
+   "question": "platform",
+   "title": "Building Developer-Centric Cloud Platforms: Internal Developer Tooling as a Software Development Multiplier",
+   "gold": "off_topic",
+   "borderline": true,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "Developer-centric cloud platforms improve productivity"
+  },
+  {
+   "question": "platform",
+   "title": "Architecture of a Software Platform for Affordable Artificial Intelligence in Manufacturing",
+   "gold": "off_topic",
+   "borderline": true,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "Software platform for AI in manufacturing"
+  },
+  {
+   "question": "platform",
+   "title": "Building Domain-Specific Machine Learning Workflows: A Conceptual Framework for the State of the Practice",
+   "gold": "off_topic",
+   "borderline": true,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "Domain-specific machine learning workflows"
+  },
+  {
+   "question": "platform",
+   "title": "Adaptive Workflow Intelligence: A Cognitive Architecture for Context-Driven Enterprise Automation",
+   "gold": "off_topic",
+   "borderline": false,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "Adaptive workflow intelligence for enterprise automation"
+  },
+  {
+   "question": "platform",
+   "title": "DevOps Adoption: Eight Emergent Perspectives",
+   "gold": "off_topic",
+   "borderline": false,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "DevOps adoption and perspectives"
+  },
+  {
+   "question": "platform",
+   "title": "Architectural practice in the Digital Age: Balancing Adoption and Adaptation",
+   "gold": "off_topic",
+   "borderline": false,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "Architectural practice in the Digital Age"
+  },
+  {
+   "question": "platform",
+   "title": "No-Code Automation Platforms for Incident Management: Transforming Engineering Operations",
+   "gold": "off_topic",
+   "borderline": false,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "No-code automation platforms for incident management"
+  },
+  {
+   "question": "platform",
+   "title": "Next-Generation Software Engineering: A Study on AI-Augmented Development, DevSecOps and Low-Code Frameworks",
+   "gold": "on_topic",
+   "borderline": false,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "AI-Augmented Development and DevSecOps"
+  },
+  {
+   "question": "platform",
+   "title": "Artificial Intelligence as a Catalyst for Innovation in Software Engineering",
+   "gold": "on_topic",
+   "borderline": false,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "Artificial Intelligence as a Catalyst for Innovation"
+  },
+  {
+   "question": "platform",
+   "title": "Customizable Software Tooling for Managing Cross-Platform Media Content Delivery",
+   "gold": "off_topic",
+   "borderline": false,
+   "model": "off_topic",
+   "final": "off_topic",
+   "rule_decisive": false,
+   "reason": "focuses on cross-platform media content delivery, not platform development"
+  },
+  {
+   "question": "platform",
+   "title": "WHY DID THREAT ACTORS REPLACE POSHC2 WITH SLIVERC2? COMPARISON OF TWO GREAT C2 FRAMEWORKS.",
+   "gold": "off_topic",
+   "borderline": false,
+   "model": "off_topic",
+   "final": "off_topic",
+   "rule_decisive": false,
+   "reason": "focuses on C2 frameworks, not platform development"
+  },
+  {
+   "question": "platform",
+   "title": "From Infrastructure to Intelligent Enterprise: Best Practices and Strategic Frameworks for Migrating SAP Applications to Microsoft Azure",
+   "gold": "off_topic",
+   "borderline": false,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "focuses on migrating SAP applications, relevant to platform development"
+  },
+  {
+   "question": "platform",
+   "title": "Algorithmic Transformation: Technological, Managerial, Social, and Economic Dimensions of Artificial Intelligence and Digitalization",
+   "gold": "off_topic",
+   "borderline": false,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "focuses on AI transformation, relevant to platform development"
+  },
+  {
+   "question": "platform",
+   "title": "Retrieval-Augmented Generation as a Foundation for Trusted Enterprise Artificial Intelligence: Architectural Principles for Accuracy, Explainability, and Operational Adoption",
+   "gold": "on_topic",
+   "borderline": true,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "focuses on AI architecture, relevant to platform development"
+  },
+  {
+   "question": "platform",
+   "title": "Evaluating AI technologies for automated code generation in interconnect development",
+   "gold": "on_topic",
+   "borderline": false,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "focuses on AI for code generation, relevant to platform development"
+  },
+  {
+   "question": "platform",
+   "title": "Operationalizing Intelligence: A Unified Approach to MLOps and Scalable AI Workflows in Hybrid Cloud Environments",
+   "gold": "off_topic",
+   "borderline": true,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "focuses on MLOps and AI workflows, relevant to platform development"
+  },
+  {
+   "question": "platform",
+   "title": "Investigating the barriers to Quality 4.0 adoption in the Indian manufacturing sector: insights and implications for industry and policy-making",
+   "gold": "off_topic",
+   "borderline": false,
+   "model": "off_topic",
+   "final": "off_topic",
+   "rule_decisive": false,
+   "reason": "focuses on Quality 4.0 adoption, not platform development"
+  },
+  {
+   "question": "platform",
+   "title": "Proceedings of the 2nd International Workshop on Multi-Agent Systems using Generative Artificial INtelligence for Automated Software Engineering",
+   "gold": "on_topic",
+   "borderline": false,
+   "model": "off_topic",
+   "final": "off_topic",
+   "rule_decisive": false,
+   "reason": "focuses on MAS-GAIN workshop, not platform development"
+  },
+  {
+   "question": "platform",
+   "title": "Artificial intelligence in mechanical engineering: foundations, opportunities, challenges, and responsibilities",
+   "gold": "off_topic",
+   "borderline": false,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "focuses on AI in mechanical engineering, relevant to platform development"
+  },
+  {
+   "question": "platform",
+   "title": "Engineering Digital Real Estate Platforms: Integrating Cloud Computing, AI, and Enterprise Software in PropTech",
+   "gold": "off_topic",
+   "borderline": false,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "focuses on PropTech, relevant to platform development"
+  },
+  {
+   "question": "platform",
+   "title": "Navigating Enterprise Transformations: TPM Strategies for Large-Scale Technology Migrations",
+   "gold": "off_topic",
+   "borderline": false,
+   "model": "on_topic",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "focuses on TPM strategies, relevant to platform development"
+  },
+  {
+   "question": "platform",
+   "title": "An AI Development Platform Utilizing HITL Verification: From Source Data to Tailored Domain Assistants",
+   "gold": "on_topic",
+   "borderline": false,
+   "model": "abstain",
+   "final": "on_topic",
+   "rule_decisive": false,
+   "reason": "Model gave no verdict; passed the key-term floor."
+  },
+  {
+   "question": "platform",
+   "title": "DIZEST: A low-code platform for workflow-driven artificial intelligence and data analysis",
+   "gold": "off_topic",
+   "borderline": true,
+   "model": "off_topic",
+   "final": "off_topic",
+   "rule_decisive": false,
+   "reason": "focuses on low-code platforms for data analysis, not AI development platforms"
+  }
+ ]
+}
