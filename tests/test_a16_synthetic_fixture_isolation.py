@@ -61,6 +61,8 @@ def test_publisher_blocks_synthetic_fixtures_from_export():
         import datetime
         from src.ledger.models import Run
         repo.insert_run(Run(id="run_synth_1", started_at=datetime.datetime.now(datetime.timezone.utc).isoformat(), question_ids=[q.id]))
+        # S6: the publisher refuses unfinished runs; mark it finished so the synthetic-claim gate is what blocks it.
+        repo.set_run_status("run_synth_1", "PUBLISH_READY")
 
         # Create output doc and sentence citing this synthetic claim
         out_doc = OutputDoc(

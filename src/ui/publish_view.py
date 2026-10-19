@@ -2,14 +2,10 @@
 
 from __future__ import annotations
 
+import os
 from typing import Any, Dict, Tuple
 
-_NOT_ELIGIBLE = {
-    "BLOCKED": "A gate failed or had no data to check. Fix the draft or its evidence, then re-draft.",
-    "NOT_PUBLISHABLE": "The evidence or score is too weak to publish. Strengthen the evidence and re-run.",
-    "PUBLISHED": "This draft is already published.",
-    "RUNNING": "The run has not finished.",
-}
+from src.publish.publisher import UNPUBLISHABLE_RUN_STATUS
 
 
 def publish_eligibility(results: Dict[str, Any]) -> Tuple[bool, bool, str]:
@@ -17,6 +13,8 @@ def publish_eligibility(results: Dict[str, Any]) -> Tuple[bool, bool, str]:
     REVISE only with a logged reason; every other status cannot be published."""
     if results.get("is_stub_mode"):
         return False, False, "Test mode: synthetic data cannot be published."
+    if os.getenv("HOSTED_DEMO") == "1":
+        return False, False, "Publishing is disabled in hosted demo mode: stateless execution only."
     if not results.get("doc_id"):
         return False, False, "Nothing was drafted, so there is nothing to publish."
     status = str(results.get("status") or "").upper()
@@ -24,7 +22,7 @@ def publish_eligibility(results: Dict[str, Any]) -> Tuple[bool, bool, str]:
         return True, False, ""
     if status == "REVISE":
         return True, True, "The score is in the REVISE band: publishing needs your reason, which is logged."
-    return False, False, _NOT_ELIGIBLE.get(status, f"Status '{status or 'unknown'}' cannot be published.")
+    return False, False, UNPUBLISHABLE_RUN_STATUS.get(status, f"Status '{status or 'unknown'}' cannot be published.")
 
 
 GATE_PLAIN = {
@@ -48,7 +46,11 @@ def gate_rows(gates_audit: Dict[str, Any]) -> list:
         rows.append({
             "Gate": f"{gid} {name}",
             "Result": STATE_LABEL.get(state, state),
-            "Why": g.get("reason_plain") or ("Not audited for this run." if not g else ""),
+            "Why": g.get("reason_plain") or (
+                "Not audited for this run." if not g
+                else "Audited before gate reasons were recorded: re-draft to see why." if state == "FAIL"
+                else "Checked and passed."
+            ),
             "What it checks": checks,
         })
     return rows

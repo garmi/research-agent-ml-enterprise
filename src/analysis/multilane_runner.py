@@ -561,9 +561,7 @@ class MultiLaneResearchRunner:
         if has_unconfirmed_practitioner_notes:
             publish_success = False
             g6_violation = "Gate 6: Practitioner abstraction not confirmed by operator."
-            if "violations" in gate_results:
-                gate_results["violations"].setdefault("G6", []).append(g6_violation)
-            gate_results["G6"] = {"pass": False, "violations": [g6_violation]}
+            self._fail_g6_practitioner(gate_results, g6_violation)
             pub_res = {
                 "published": False,
                 "status": "BLOCKED",
@@ -603,14 +601,7 @@ class MultiLaneResearchRunner:
                     conn.execute("UPDATE outputs SET status = ? WHERE id = ?;", (doc.status, doc.id))
         elif os.getenv("HOSTED_DEMO") == "1":
             publish_success = False
-            pub_res = {
-                "published": False,
-                "status": "DRAFT",
-                "allowed": False,
-                "reason": "Publishing is disabled in hosted demo mode: stateless execution only.",
-                "score_results": score_results,
-                "gate_results": gate_results,
-            }
+            pub_res = self._hosted_demo_status(gate_results, score_results)
         else:
             # S6: a run never publishes itself. It ends at a gated status; a named reviewer
             # publishes from the Publish step (Publisher.publish_output, logged to reviews).
@@ -865,6 +856,29 @@ class MultiLaneResearchRunner:
             "score_results": score_results,
             "gate_results": gate_results,
         }
+
+    @staticmethod
+    def _fail_g6_practitioner(gate_results: Dict[str, Any], violation: str) -> None:
+        """Record an unconfirmed practitioner abstraction as a G6 failure everywhere the gate is read."""
+        gate_results["passed"] = False
+        gate_results["status"] = "BLOCKED"
+        hard = gate_results.setdefault("hard_gates", {})
+        g6 = hard.setdefault("G6", {"violations": []})
+        g6.setdefault("violations", []).append({"sentence_id": None, "message": violation})
+        g6.update({"pass": False, "state": "FAIL", "reason_plain": violation})
+        named = gate_results.setdefault("gates", {}).setdefault("G6_copyright", {"violations": []})
+        named.setdefault("violations", []).append(violation)
+        named.update({"pass": False, "state": "FAIL", "reason_plain": violation})
+
+    @classmethod
+    def _hosted_demo_status(cls, gate_results: Dict[str, Any], score_results: Dict[str, Any]) -> Dict[str, Any]:
+        """The gated status a hosted demo run reaches; publishing stays disabled there."""
+        res = cls._gated_status(gate_results, score_results)
+        note = "Publishing is disabled in hosted demo mode: stateless execution only."
+        res["reasons"] = list(res["reasons"]) + [note]
+        res["reason"] = " ".join(res["reasons"])
+        res["allowed"] = False
+        return res
 
     def _format_enterprise_sources(self, claims: List[Claim]) -> List[Dict[str, Any]]:
         out: List[Dict[str, Any]] = []

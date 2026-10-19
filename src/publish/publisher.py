@@ -27,6 +27,16 @@ from src.score.scorer import QualityScorer
 
 logger = logging.getLogger(__name__)
 
+# Run statuses that can never be published (S6, DEC-019), with the reason shown to the reviewer.
+# PUBLISH_READY and REVISE (with a logged reason) are the only publishable ones.
+UNPUBLISHABLE_RUN_STATUS = {
+    "BLOCKED": "A gate failed or had no data to check. Fix the draft or its evidence, then re-draft.",
+    "NOT_PUBLISHABLE": "The evidence or score is too weak to publish. Strengthen the evidence and re-run.",
+    "PUBLISHED": "This draft is already published.",
+    "RUNNING": "The run has not finished.",
+    "FAILED": "The run failed before it finished, so there is nothing safe to publish.",
+}
+
 
 class Publisher:
     def __init__(
@@ -73,6 +83,17 @@ class Publisher:
         doc = self.repo.get_output(output_id)
         if not doc:
             raise ValueError(f"Output document '{output_id}' not found in ledger")
+
+        # The run's status is the gate outcome; the publisher enforces it, not only the UI.
+        if doc.status == "published":
+            return False, {"published": False, "status": "PUBLISHED", "reason": "This draft is already published."}
+        run_status = (self.repo.get_run_status(doc.run_id)[0] if doc.run_id else None) or ""
+        if run_status.upper() in UNPUBLISHABLE_RUN_STATUS:
+            return False, {
+                "published": False,
+                "status": run_status.upper(),
+                "reason": UNPUBLISHABLE_RUN_STATUS[run_status.upper()],
+            }
 
         sentences = self.repo.list_output_sentences(output_id=output_id)
         if not sentences:

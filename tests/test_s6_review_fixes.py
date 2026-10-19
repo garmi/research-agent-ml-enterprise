@@ -87,13 +87,18 @@ def test_practitioner_block_fails_g6_in_hard_gates():
 # ------------------------------------------------------------------------------
 # Test 4: Hosted demo ends in a gated status
 # ------------------------------------------------------------------------------
-def test_hosted_demo_status_is_gated():
+def test_hosted_demo_status_is_gated(monkeypatch):
     gate_results = GateChecker().check_output(sentences=[], ledger_claims={}).to_dict()
     res = MultiLaneResearchRunner._hosted_demo_status(gate_results, {"band": "PUBLISH_READY"})
     assert res["status"] == "BLOCKED" and res["allowed"] is False and res["published"] is False
     assert any("hosted demo" in r.lower() for r in res["reasons"])
     src = Path("src/analysis/multilane_runner.py").read_text(encoding="utf-8")
     assert '"status": "DRAFT"' not in src
+    from src.ui.publish_view import publish_eligibility
+
+    monkeypatch.setenv("HOSTED_DEMO", "1")
+    eligible, _, why = publish_eligibility({"status": "PUBLISH_READY", "doc_id": "o"})
+    assert not eligible and "hosted demo" in why.lower()
 
 
 # ------------------------------------------------------------------------------
