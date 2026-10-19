@@ -83,7 +83,9 @@ def test_resolve_citations_all_tags_and_unbound():
     ]
     papers = [{"id": "pa"}, {"id": "pb"}]
     by_id = {c.id: c for c in claims}
-    assert resolve_citations("Gains were seen [P1].", papers, claims, by_id) == ["c_a_1", "c_a_2"]
+    # S10: [P#] binds the paper's claims that support the sentence, not all of them; with none
+    # sharing two terms, the single closest claim is kept.
+    assert resolve_citations("Gains were seen [P1].", papers, claims, by_id) == ["c_a_1"]
     assert resolve_citations("Both [P2] and [c_a_2] agree.", papers, claims, by_id) == ["c_b_1", "c_a_2"]
     assert resolve_citations("A sentence with no citation.", papers, claims, by_id) == []
     assert resolve_citations("Unknown [P9] and [c_zz_1].", papers, claims, by_id) == []

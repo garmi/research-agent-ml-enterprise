@@ -1924,10 +1924,15 @@ class MultiLaneResearchRunner:
                 phase, action = s.text.split(":", 1)
             else:
                 phase, action = f"Phase {idx}", s.text
+            checks = s.checks_json or {}
             ui_roadmap.append({
                 "phase": phase.strip(),
                 "action": action.strip(),
-                "impact": "Empirical governance target verified",
+                # What the step rests on (S10): findings citing the same papers, the phase KPI, and
+                # figures that are not in the evidence the step cites.
+                "builds_on": list(checks.get("builds_on") or []),
+                "measure": (checks.get("kpis") or [""])[0],
+                "unsupported_numbers": list(checks.get("unsupported_numbers") or []),
             })
         ui_negative = [s.text for s in sentences if s.type == "negative_finding"]
 
@@ -1977,10 +1982,13 @@ class MultiLaneResearchRunner:
             })
 
         status_val = publish_res.get("status", score_results.get("band", "NOT_PUBLISHABLE"))
+        # The bottom line shown is the gated summary sentence (S10), the same text the gates checked.
+        summary_sentence = next((s for s in sentences if s.type == "summary"), None)
 
         return {
             "status": status_val,
-            "verdict": executive_synthesis.get("executive_summary", ""),
+            "verdict": summary_sentence.text if summary_sentence else executive_synthesis.get("executive_summary", ""),
+            "verdict_binding": "bound" if summary_sentence and summary_sentence.claim_ids_json else "unbound",
             "duration": f"{elapsed_seconds}s",
             "question_id": question_obj.id,
             "strategic_question": question_obj.text,

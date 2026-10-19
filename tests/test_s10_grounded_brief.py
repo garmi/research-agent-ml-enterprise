@@ -151,7 +151,8 @@ def test_roadmap_steps_record_findings_kpis_and_unsupported_figures(engine):
     steps = [s for s in sentences if s.type == "roadmap"]
     tied, untied = steps[0].checks_json, steps[1].checks_json
     assert tied["builds_on"] == [1] and tied["kpis"] == ["Skill reuse ratio (up)"] and tied["unsupported_numbers"] == []
-    assert untied["builds_on"] == [] and untied["unsupported_numbers"] == ["93.1%"]
+    # G2's numeral rule reads "93.1%" as 93.1; the binder uses the same rule.
+    assert untied["builds_on"] == [] and untied["unsupported_numbers"] == ["93.1"]
 
 
 def test_runner_payload_uses_gated_bottom_line_and_roadmap_checks():

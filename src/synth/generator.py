@@ -23,10 +23,34 @@ from src.gaps.matrix_builder import GapMatrixBuilder
 from src.ledger.db import default_ledger_path
 from src.ledger.models import Claim, OutputDoc, OutputSentence, Question, Run, Source
 from src.ledger.repository import LedgerRepository
-from src.score.checker import GateChecker
+from src.analysis.relevance import support_terms
+from src.score.checker import GateChecker, claim_has_numeral, extract_numerals
 from src.score.scorer import QualityScorer
 
 logger = logging.getLogger(__name__)
+
+
+MAX_CLAIMS_PER_TAG = 3
+MIN_SUPPORT_TERMS = 2  # the same overlap G2 requires between a sentence and each claim it cites
+
+
+def best_supporting_claims(text: str, candidates: List[Claim]) -> List[str]:
+    """The claims of one paper that support this sentence (S10). A claim qualifies when it shares at
+    least MIN_SUPPORT_TERMS content terms with the sentence; claims holding the sentence's own figures
+    rank first, then by overlap, at most MAX_CLAIMS_PER_TAG. With none qualifying, the single closest
+    claim is kept, so G2 reports the weak support rather than the sentence going unbound."""
+    if not candidates:
+        return []
+    s_terms = support_terms(text)
+    numerals = extract_numerals(text)
+    scored = []
+    for order, c in enumerate(candidates):
+        overlap = len(s_terms & support_terms(c.source_excerpt or c.text or ""))
+        figures = sum(1 for n in numerals if claim_has_numeral(c, n))
+        scored.append((figures, overlap, -order, c.id))
+    scored.sort(reverse=True)
+    qualified = [cid for figures, overlap, _, cid in scored if overlap >= MIN_SUPPORT_TERMS]
+    return qualified[:MAX_CLAIMS_PER_TAG] or [scored[0][3]]
 
 
 def resolve_citations(
@@ -35,8 +59,9 @@ def resolve_citations(
     eligible_claims: List[Claim],
     claims_by_id: Dict[str, Claim],
 ) -> List[str]:
-    """Claim ids a sentence cites through its own tags, in order: [P#] means every eligible claim
-    from that paper, [c_...] means that claim. No tag, or only unknown tags, means no claims."""
+    """Claim ids a sentence cites through its own tags, in order: [P#] means the claims from that
+    paper that support the sentence (best_supporting_claims), [c_...] means that claim. No tag, or
+    only unknown tags, means no claims."""
     cited: List[str] = []
     # A bracket may hold one id or a group ("[P1, P3]", "[c_a; c_b]"); other brackets are ignored.
     for group in re.findall(r"\[([^\[\]]+)\]", text or ""):
@@ -45,7 +70,7 @@ def resolve_citations(
             if p:
                 idx = int(p.group(1)) - 1
                 pid = papers[idx].get("id") if 0 <= idx < len(papers) else None
-                ids = [c.id for c in eligible_claims if pid is not None and c.source_id == pid]
+                ids = best_supporting_claims(text, [c for c in eligible_claims if pid is not None and c.source_id == pid])
             elif token.startswith("c_") and token in claims_by_id:
                 ids = [token]
             else:
@@ -217,6 +242,24 @@ class SynthesisEngine:
             )
         )
         ordinal += 1
+
+        # Bottom line (S10): a gated sentence like any finding. It cites only what its own tags point
+        # to; an untagged bottom line stays unbound and fails G1 instead of passing as free prose.
+        bottom_line = str((executive_synthesis or {}).get("executive_summary") or "").strip()
+        if bottom_line:
+            bl_cids, bl_checks = bind(bottom_line)
+            sentences.append(
+                OutputSentence(
+                    id=f"{output_id}_{ordinal}",
+                    output_id=output_id,
+                    ordinal=ordinal,
+                    text=bottom_line,
+                    type="summary",
+                    claim_ids_json=bl_cids,
+                    checks_json=bl_checks,
+                )
+            )
+            ordinal += 1
 
         # Section: What the Evidence Supports
         sentences.append(
@@ -457,11 +500,29 @@ class SynthesisEngine:
         roadmap_candidates = executive_synthesis.get("strategic_roadmap", []) if executive_synthesis else []
         is_fallback = bool(executive_synthesis.get("is_fallback")) if executive_synthesis else False
         if roadmap_candidates and not is_fallback:
+            # Roadmap steps are recommendations (not gated), but each one records what it rests on (S10):
+            # the findings citing the same papers, the KPI proposed for its phase, and any figure that
+            # is not in the evidence the step cites.
+            finding_sources = [
+                {claims_by_id[cid].source_id for cid in (s.claim_ids_json or []) if cid in claims_by_id}
+                for s in sentences if s.type == "assertive"
+            ]
             for phase in roadmap_candidates:
                 phase_title = phase.get("stage", "Phase") if isinstance(phase, dict) else "Phase"
                 actions = phase.get("actions", []) if isinstance(phase, dict) else [str(phase)]
+                kpis = [str(k) for k in (phase.get("kpis") or [])] if isinstance(phase, dict) else []
                 for act in actions:
                     act_cids, act_checks = bind(str(act))
+                    act_claims = [claims_by_id[cid] for cid in act_cids if cid in claims_by_id]
+                    act_sources = {c.source_id for c in act_claims}
+                    act_checks = {
+                        **(act_checks or {}),
+                        "builds_on": [i for i, srcs in enumerate(finding_sources, 1) if srcs & act_sources],
+                        "kpis": kpis,
+                        "unsupported_numbers": [
+                            n for n in extract_numerals(str(act)) if not any(claim_has_numeral(c, n) for c in act_claims)
+                        ],
+                    }
                     sentences.append(
                         OutputSentence(
                             id=f"{output_id}_{ordinal}",

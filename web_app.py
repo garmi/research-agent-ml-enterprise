@@ -667,6 +667,8 @@ st.markdown(
     .roadmap-phase { background: #1E3A8A; color: white; border-radius: 6px; padding: 0.25rem 0.55rem; font-size: 0.74rem; font-weight: 700; white-space: nowrap; }
     .roadmap-action { font-weight: 700; font-size: 0.9rem; color: #0F172A; }
     .roadmap-impact { font-size: 0.8rem; color: #059669; font-weight: 600; margin-top: 0.1rem; }
+    .roadmap-basis { font-size: 0.78rem; color: #1E40AF; font-weight: 600; margin-top: 0.15rem; }
+    .roadmap-flag { font-size: 0.78rem; color: #B45309; font-weight: 600; margin-top: 0.15rem; }
 
     /* S8: phone width. Streamlit stacks st.columns by itself; these cover the custom HTML. */
     @media (max-width: 640px) {

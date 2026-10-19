@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 import yaml
 
-from src.analysis.relevance import STOPWORDS, normalize_text
+from src.analysis.relevance import STOPWORDS, normalize_text, support_terms
 from src.ledger.models import Claim, OutputSentence
 
 logger = logging.getLogger(__name__)
@@ -28,9 +28,24 @@ PASS = "PASS"
 FAIL = "FAIL"
 NO_DATA = "NO_DATA"
 GATE_IDS = ("G1", "G2", "G3", "G4", "G5", "G6")
-# Sentence types whose claims must be grounded (G1-G4). Roadmap actions are recommendations:
+# Sentence types whose claims must be grounded (G1-G4); "summary" is the brief's bottom line (S10).
+# Roadmap actions are recommendations:
 # they get G5/G6 only. Headings, opinions, field notes and negative findings are not assertions.
-GROUNDED_TYPES = ("assertive", "finding", "signal", "risk")
+GROUNDED_TYPES = ("summary", "assertive", "finding", "signal", "risk")
+
+
+def extract_numerals(text: str) -> List[str]:
+    """Percentages, multipliers, currency and standalone numbers (years like 2024 are skipped)."""
+    # Matches e.g. 20x, 67%, 90%, $100M, 25-35%
+    raw_tokens = re.findall(r"\b(?:\d+(?:\.\d+)?(?:%|x|k|m|b)?|\$\d+(?:\.\d+)?(?:k|m|b)?)\b", text or "", re.IGNORECASE)
+    return [t.lower() for t in raw_tokens if not re.match(r"^(19|20)\d{2}$", t)]
+
+
+def claim_has_numeral(claim: Any, num: str) -> bool:
+    """G2's numeric rule: the figure appears in the claim's value, its quote, or (with no quote) its text."""
+    excerpt = str(claim.source_excerpt or "").lower()
+    value = str(claim.value_json or "").lower() if claim.value_json else ""
+    return num in value or num in excerpt or (not excerpt and num in str(claim.text or "").lower())
 
 
 class GateCheckResult:
@@ -147,16 +162,7 @@ class GateChecker:
         return self.denylist
 
     def extract_numerals(self, text: str) -> List[str]:
-        """Extract percentages, multipliers, currency and standalone numbers."""
-        # Matches e.g. 20x, 67%, 90%, $100M, 25-35%
-        raw_tokens = re.findall(r"\b(?:\d+(?:\.\d+)?(?:%|x|k|m|b)?|\$\d+(?:\.\d+)?(?:k|m|b)?)\b", text, re.IGNORECASE)
-        # Filter out years like 2023, 2024, 2025, 2026 or small section counts if isolated
-        numerals = []
-        for t in raw_tokens:
-            if re.match(r"^(19|20)\d{2}$", t):
-                continue
-            numerals.append(t.lower())
-        return numerals
+        return extract_numerals(text)
 
     def detect_strength_verb(self, text: str) -> Tuple[Optional[str], int]:
         """Find the strongest verb in the text and its rank (1-5)."""
@@ -258,16 +264,9 @@ class GateChecker:
                 result.mark_evaluated("G3")
 
             # Support Check (2): Excerpt overlap - sentence must share >= 2 non-stopword terms with claim excerpt
-            s_words = {
-                w for w in normalize_text(s_text).split()
-                if w not in STOPWORDS and len(w) > 2
-            }
+            s_words = support_terms(s_text)
             for c in cited_claims:
-                excerpt_raw = c.source_excerpt or c.text or ""
-                e_words = {
-                    w for w in normalize_text(excerpt_raw).split()
-                    if w not in STOPWORDS and len(w) > 2
-                }
+                e_words = support_terms(c.source_excerpt or c.text or "")
                 overlap = s_words.intersection(e_words)
                 if len(overlap) < 2:
                     result.g2_pass = False
@@ -363,16 +362,7 @@ class GateChecker:
             if numerals and "DERIVED" not in s_text:
                 for num in numerals:
                     # Check if numeral appears in any cited claim value_json or excerpt
-                    num_found = False
-                    for c in cited_claims:
-                        c_num_str = ""
-                        if c.value_json:
-                            c_num_str = str(c.value_json)
-                        excerpt_str = str(c.source_excerpt or "")
-                        if num in c_num_str.lower() or num in excerpt_str.lower() or (not excerpt_str and num in c.text.lower()):
-                            num_found = True
-                            break
-                    if not num_found:
+                    if not any(claim_has_numeral(c, num) for c in cited_claims):
                         result.g2_pass = False
                         result.violations["G2"].append(
                             f"Sentence [{s.id}] (ordinal {s.ordinal}) contains ungrounded numeral '{num}': '{s_text}'"

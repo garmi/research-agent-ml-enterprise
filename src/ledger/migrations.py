@@ -258,7 +258,7 @@ CREATE TABLE IF NOT EXISTS output_sentences (
     output_id TEXT REFERENCES outputs(id),
     ordinal INTEGER NOT NULL,
     text TEXT NOT NULL,
-    type TEXT CHECK(type IN ('assertive', 'opinion', 'field', 'heading', 'signal', 'risk', 'roadmap', 'finding', 'negative_finding')) NOT NULL,
+    type TEXT CHECK(type IN ('assertive', 'opinion', 'field', 'heading', 'signal', 'risk', 'roadmap', 'finding', 'negative_finding', 'summary')) NOT NULL,
     claim_ids_json TEXT,
     strength_verb TEXT,
     checks_json TEXT,
@@ -331,10 +331,10 @@ def apply_migrations(
                 now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
                 conn.execute(
                     "INSERT INTO meta (schema_version, created_at) VALUES (?, ?);",
-                    (7, now_iso),
+                    (8, now_iso),
                 )
                 conn.commit()
-                return 7
+                return 8
             finally:
                 conn.close()
         conn.close()
