@@ -42,10 +42,19 @@ def extract_numerals(text: str) -> List[str]:
 
 
 def claim_has_numeral(claim: Any, num: str) -> bool:
-    """G2's numeric rule: the figure appears in the claim's value, its quote, or (with no quote) its text."""
+    """G2's numeric rule: the figure appears in the claim's value, its quote, or its full source sentence
+    (the claim text). S16: the quote is capped at 25 words for copyright, so a figure later in the same
+    source sentence was wrongly 'ungrounded'."""
     excerpt = str(claim.source_excerpt or "").lower()
     value = str(claim.value_json or "").lower() if claim.value_json else ""
-    return num in value or num in excerpt or (not excerpt and num in str(claim.text or "").lower())
+    return num in value or num in excerpt or num in str(claim.text or "").lower()
+
+
+def _phrase_re(phrase: str) -> "re.Pattern[str]":
+    """A configured phrase, allowing up to two extra words between its words ('one early enterprise study')."""
+    words = [re.escape(w) for w in phrase.lower().split()]
+    gap = r"\s+(?:[\w-]+\s+){0,2}"
+    return re.compile(r"\b" + gap.join(words) + r"\b", re.IGNORECASE)
 
 
 class GateCheckResult:
@@ -144,9 +153,11 @@ class GateChecker:
                 data = yaml.safe_load(f)
                 self.verbs_cfg = data.get("levels", {})
                 self.intensifiers = [str(w).lower() for w in data.get("intensifiers") or []]
+                self.single_source_phrases = [str(w).lower() for w in data.get("single_source_phrases") or []]
         else:
             self.verbs_cfg = {}
             self.intensifiers = []
+            self.single_source_phrases = []
 
     def _load_denylist(self) -> Set[str]:
         """Load the denylist (RESEARCH_DENYLIST overrides the configured path). A missing file
@@ -404,6 +415,15 @@ class GateChecker:
                         result.violations["G4"].append(
                             f"Sentence [{s.id}] (ordinal {s.ordinal}) says '{word}', but none of its cited quotes does"
                         )
+
+            # G4 (S16): a figure that rests on a single source must say so ("one study reports ...").
+            if self.single_source_phrases and extract_numerals(s_text) and len({c.source_id for c in cited_claims}) == 1:
+                if not any(_phrase_re(ph).search(s_text) for ph in self.single_source_phrases):
+                    result.g4_pass = False
+                    result.violations["G4"].append(
+                        f"Sentence [{s.id}] (ordinal {s.ordinal}) states a figure from a single source; "
+                        "say it rests on one study (e.g. 'one study reports')"
+                    )
 
             # G5: Confidentiality
             self._check_confidentiality(s_text, result)

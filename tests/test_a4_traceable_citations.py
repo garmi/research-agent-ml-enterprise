@@ -122,7 +122,8 @@ def test_valid_citation_matching_numeral_and_topic_passes():
         id="out-02_1",
         output_id="out-02",
         ordinal=1,
-        text="Empirical studies demonstrate that automated verification gates reduce software defects by 30%.",
+        # S16: one source's figure is attributed to one study.
+        text="One study demonstrates that automated verification gates reduce software defects by 30%.",
         type="assertive",
         claim_ids_json=[valid_claim.id],
     )

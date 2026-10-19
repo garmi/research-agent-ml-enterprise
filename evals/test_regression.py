@@ -258,7 +258,8 @@ def test_compliant_draft_passes_all_gates(test_env):
         id="s_ok",
         output_id="out1",
         ordinal=1,
-        text="Early enterprise analysis suggests that Amazon Kiro delivers a 15% increase in developer throughput.",
+        # S16: one source's figure is attributed to one study.
+        text="One early enterprise study suggests that Amazon Kiro delivers a 15% increase in developer throughput.",
         type="assertive",
         claim_ids_json=["c_exact_kiro"],
     )

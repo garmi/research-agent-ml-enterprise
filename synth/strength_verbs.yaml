@@ -73,3 +73,18 @@ intensifiers:
   - "enormously"
   - "exponentially"
   - "remarkably"
+
+# S16: a sentence that states a figure and cites only one source must say it rests on one study.
+# G4 fails it unless it contains one of these phrases (case-insensitive).
+single_source_phrases:
+  - "one study"
+  - "a single study"
+  - "one paper"
+  - "a single paper"
+  - "one preprint"
+  - "a single preprint"
+  - "one survey"
+  - "one report"
+  - "one evaluation"
+  - "one experiment"
+  - "its authors report"

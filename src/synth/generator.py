@@ -320,7 +320,9 @@ class SynthesisEngine:
                         break
                 p_tag = paper_id_to_tag.get(c.source_id)
                 prefix_tag = f"[{p_tag}] " if p_tag else ""
-                text = f"{prefix_tag}Empirical literature {verb} that {c_text[0].lower() + c_text[1:] if c_text else ''}."
+                # S16: each sentence rests on one claim, so a figure is attributed to one study.
+                subject = "One study" if extract_numerals(c_text) else "Empirical literature"
+                text = f"{prefix_tag}{subject} {verb} that {c_text[0].lower() + c_text[1:] if c_text else ''}."
                 sentences.append(
                     OutputSentence(
                         id=f"{output_id}_{ordinal}",
