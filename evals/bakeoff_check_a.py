@@ -27,8 +27,8 @@ import yaml  # noqa: E402
 import src.engine.check_a_on_topic as check_a  # noqa: E402
 from src.engine.check_a_on_topic import SourceItem, run_check_a  # noqa: E402
 
-DATA = Path(__file__).resolve().parent / "data" / "check_a_labelled_v1.json"
-EXPECTED_RUN_PASS = {"kiro": True, "hospital": True, "assistants": True, "sourdough": False}
+DATA = Path(__file__).resolve().parent / "data" / "check_a_labelled_v2.json"
+EXPECTED_RUN_PASS = {"kiro": True, "hospital": True, "assistants": True, "sourdough": False, "platform": True}
 
 
 def _scores(pairs: List[tuple]) -> Dict[str, Any]:
