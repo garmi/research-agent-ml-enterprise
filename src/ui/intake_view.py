@@ -32,6 +32,7 @@ from src.engine.reasoner import (
     split_user_sentences,
     validate_reasoned_package,
 )
+from src.ui.feedback_review import QUICK_ADJUSTMENTS, compose_feedback, feedback_prompt, proposal_diff, review_feedback
 from src.ui.theme import (
     COLOR_BG_CARD,
     COLOR_BG_SURFACE,
@@ -283,12 +284,22 @@ def render_intake_view() -> Dict[str, Any]:
             for s, target in cov_map.items():
                 st.markdown(f"- `\"{s}\"` ➔ **{target}**")
 
-        # Feedback & Re-reasoning
+        # Feedback & Re-reasoning (S15): quick adjustments plus free text, each a numbered point that is
+        # checked by rule against the new proposal after re-reasoning.
         st.markdown("---")
+        st.markdown("##### Adjust the proposal (optional)")
+        adjustments = st.multiselect("Quick adjustments", list(QUICK_ADJUSTMENTS), key="ms_s2_quick_adjustments")
+        adj_col1, adj_col2 = st.columns(2)
+        with adj_col1:
+            add_sub_question = st.text_input("Add a sub-question about:", key="input_s2_add_sub_question",
+                                             placeholder="e.g. code review delays")
+        with adj_col2:
+            drop_terms = st.text_input("Drop these terms:", key="input_s2_drop_terms",
+                                       placeholder="e.g. throughput, velocity")
         feed_col1, feed_col2 = st.columns([3.5, 1.5])
         with feed_col1:
             user_feedback = st.text_input(
-                "Feedback for Model (Optional adjustment):",
+                "Other feedback for the model:",
                 placeholder="e.g. Focus more on code review bottlenecks and defect detection.",
                 key="input_s2_user_feedback",
             )
@@ -297,8 +308,9 @@ def render_intake_view() -> Dict[str, Any]:
             rereason_clicked = st.button("🔄 Re-reason with feedback", key="btn_rereason_feedback", use_container_width=True)
 
         if rereason_clicked:
-            if not user_feedback.strip():
-                st.warning("Please enter your adjustment feedback above.")
+            points = compose_feedback(adjustments, add_sub_question, drop_terms, user_feedback)
+            if not points:
+                st.warning("Choose an adjustment or write feedback above.")
             else:
                 try:
                     with st.spinner("Re-reasoning with your feedback..."):
@@ -306,15 +318,42 @@ def render_intake_view() -> Dict[str, Any]:
                             user_text=st.session_state.get("s2_raw_text", clean_text),
                             angle_hint=angle_hint,
                             provider=active_provider,
-                            feedback=user_feedback.strip(),
+                            feedback=feedback_prompt(points),
                             previous_package=current_package,
                         )
-                        proposals_history.append(v2_pkg)
-                        st.session_state["s2_proposals"] = proposals_history
-                        _load_proposal(v2_pkg)
-                        st.rerun()
+                    proposals_history.append(v2_pkg)
+                    st.session_state["s2_proposals"] = proposals_history
+                    st.session_state["s2_feedback_review"] = {
+                        "for_version": len(proposals_history),
+                        "rows": review_feedback(points, current_package, v2_pkg),
+                        "diff": proposal_diff(current_package, v2_pkg),
+                    }
+                    _load_proposal(v2_pkg)
+                    st.rerun()
                 except Exception as exc:
+                    st.session_state["s2_feedback_review"] = {
+                        "for_version": len(proposals_history),
+                        "rows": review_feedback(points, current_package, None, blocked_reason=str(exc)),
+                        "diff": None,
+                    }
                     st.error(f"Re-reasoning error: {exc}")
+
+        review = st.session_state.get("s2_feedback_review")
+        if review and review.get("for_version") == len(proposals_history):
+            with st.expander("What your feedback changed", expanded=True):
+                st.dataframe([{"Your feedback": r["point"], "Result": r["result"], "What changed": r["what_changed"]}
+                              for r in review["rows"]], hide_index=True, use_container_width=True)
+                d = review.get("diff")
+                if d:
+                    if d["question_changed"]:
+                        st.markdown(f"**Question before:** {d['question_before']}")
+                        st.markdown(f"**Question after:** {d['question_after']}")
+                    else:
+                        st.caption("The question itself did not change.")
+                    for label, key in (("Sub-questions added", "sub_questions_added"), ("Sub-questions removed", "sub_questions_removed"),
+                                       ("Added to out of scope", "out_of_scope_added"), ("Added to in scope", "in_scope_added")):
+                        if d.get(key):
+                            st.markdown(f"**{label}:**\n" + "\n".join(f"- {x}" for x in d[key]))
 
         # Unlisted terms confirmation check
         raw_user_input = st.session_state.get("s2_raw_text", clean_text)
@@ -397,12 +436,12 @@ def render_intake_view() -> Dict[str, Any]:
         depth_option = st.selectbox(
             "Research Depth",
             options=[
-                "⚡ Fast (~1-2 min • up to 5 papers)",
-                "🔬 Deep (~3-6 min • up to 10 papers, wider search)",
+                "⚡ Fast (~1-2 min • 12 checked, up to 5 papers used)",
+                "🔬 Deep (~4-8 min • 30 checked, up to 15 papers used)",
             ],
             index=1,  # S11: Deep by default; Fast for a quick look
             key="select_research_depth",
-            help="Deep searches more query variants and keeps up to 10 papers; Fast keeps up to 5. Either widens the search once if too few papers are on topic.",
+            help="Check A judges every candidate paper, then the best on-topic ones by venue and relevance are used. Either depth widens the search once if too few papers are on topic.",
         )
     with col_tone:
         tone_option = st.selectbox(

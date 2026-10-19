@@ -30,7 +30,14 @@ research:
     - devops
     - devsecops
   default_topic: "AI adoption in enterprise software delivery"
-  max_papers: 12
+  # S15: per depth, how many ranked candidates Check A judges, and how many on-topic papers are kept.
+  depth:
+    fast:
+      candidates: 12
+      keep: 5
+    deep:
+      candidates: 30
+      keep: 15
   min_relevance_score: 0.5
   time_window: "2019-2025"
   min_year: 2020

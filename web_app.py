@@ -1315,6 +1315,11 @@ if results:
         check_a_info = results.get("check_a") or {}
         if check_a_info and results.get("stopped_at") != "check_a":
             st.caption(f"Check A passed: {check_a_info.get('reason', '')}")
+        breadth = results.get("breadth") or {}
+        if breadth.get("checked"):
+            # S15: how many candidates Check A judged, how many were on topic, and how many were used.
+            st.caption(f"Checked {breadth['checked']} papers · {breadth.get('on_topic', 0)} on topic · "
+                       f"used the best {breadth.get('used', 0)} by venue quality and relevance.")
         if check_a_info.get("sources"):
             with st.expander("Check A: which sources were judged on-topic", expanded=results.get("stopped_at") == "check_a"):
                 st.table([
