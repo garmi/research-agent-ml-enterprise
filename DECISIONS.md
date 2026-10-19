@@ -189,6 +189,6 @@ This log records all design choices, trade-offs, and deviations where prompt ass
   1. Record rule-detected hedge terms per claim (`synth/hedge_terms.yaml`, migration 007).
   2. Resolve every citation tag in a sentence. Leave untagged sentences unbound and marked as such.
   3. Ship the Check C rules and model judges, the bake-off harness and 29 hand-labelled pairs, without wiring Check C into runs.
-- **Baseline:** rules reach 0.92 precision and 0.86 recall on "dropped"; qwen2.5:3b reaches 0.90 and 0.64. Neither judge catches overstatement that keeps a hedge word. The pairs set is small and favours the rules judge, so the hold-or-warn decision is deferred to a larger set and a Gemini run (blocked: the key's project rejects generativelanguage.googleapis.com).
+- **Baseline:** rules reach 1.00 precision and 0.71 recall on "dropped" (after dropping "can", "about", "around" from the hedge list in the PR #4 review; 0.92 / 0.86 before); qwen2.5:3b reaches 0.90 and 0.64. Neither judge catches overstatement that keeps a hedge word. The pairs set is small and favours the rules judge, so the hold-or-warn decision is deferred to a larger set and a Gemini run (blocked: the key's project rejects generativelanguage.googleapis.com).
 - **Rationale:** Honest binding and recorded hedges are useful on their own and are prerequisites for Check C. Wiring a judge that misses a third of overstatements, or that has not been measured on representative data, would give false assurance.
 

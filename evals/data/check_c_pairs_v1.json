@@ -30,9 +30,7 @@
    "claim_key": "B",
    "claim": "The results also suggest that AI-enabled devices can be used to provide about 25-35 percent of efficiency in overall development.",
    "claim_hedges": [
-    "suggest",
-    "can",
-    "about"
+    "suggest"
    ],
    "sentence": "Results suggest AI tools could deliver roughly 25-35% efficiency gains in development.",
    "label": "kept",
@@ -43,9 +41,7 @@
    "claim_key": "B",
    "claim": "The results also suggest that AI-enabled devices can be used to provide about 25-35 percent of efficiency in overall development.",
    "claim_hedges": [
-    "suggest",
-    "can",
-    "about"
+    "suggest"
    ],
    "sentence": "Results prove AI tools deliver 25-35% efficiency gains in development.",
    "label": "dropped"
@@ -54,9 +50,7 @@
    "id": "h05",
    "claim_key": "C",
    "claim": "AI can improve teamwork, particularly in agile and distributed teams, through creating a common view of work progress.",
-   "claim_hedges": [
-    "can"
-   ],
+   "claim_hedges": [],
    "sentence": "AI can improve teamwork, especially in agile and distributed teams.",
    "label": "kept"
   },
@@ -64,9 +58,7 @@
    "id": "h06",
    "claim_key": "C",
    "claim": "AI can improve teamwork, particularly in agile and distributed teams, through creating a common view of work progress.",
-   "claim_hedges": [
-    "can"
-   ],
+   "claim_hedges": [],
    "sentence": "AI improves teamwork in agile and distributed teams.",
    "label": "dropped"
   },
@@ -221,9 +213,7 @@
    "id": "h21",
    "claim_key": "J",
    "claim": "Contemporary studies show that these tools can improve task completion.",
-   "claim_hedges": [
-    "can"
-   ],
+   "claim_hedges": [],
    "sentence": "Studies show these assistants can improve task completion.",
    "label": "kept"
   },
@@ -231,9 +221,7 @@
    "id": "h22",
    "claim_key": "J",
    "claim": "Contemporary studies show that these tools can improve task completion.",
-   "claim_hedges": [
-    "can"
-   ],
+   "claim_hedges": [],
    "sentence": "Studies show these assistants improve task completion for all developers.",
    "label": "dropped"
   },
@@ -283,9 +271,7 @@
    "id": "h27",
    "claim_key": "C",
    "claim": "AI can improve teamwork, particularly in agile and distributed teams, through creating a common view of work progress.",
-   "claim_hedges": [
-    "can"
-   ],
+   "claim_hedges": [],
    "sentence": "AI is not guaranteed to improve teamwork, though agile and distributed teams report benefits.",
    "label": "kept",
    "note": "preserves the limit without a listed hedge word"
@@ -308,5 +294,6 @@
    "label": "kept",
    "note": "claim has no hedge"
   }
- ]
+ ],
+ "note": "claim_hedges is informational, recomputed from synth/hedge_terms.yaml; the harness recomputes it at run time."
 }

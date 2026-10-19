@@ -60,10 +60,10 @@ You review and publish
 
   | Judge | Precision | Recall |
   |---|---|---|
-  | rules | 0.92 | 0.86 |
+  | rules | 1.00 | 0.71 |
   | qwen2.5:3b | 0.90 | 0.64 |
 
-  Neither judge catches a sentence that keeps a hedge word but overstates elsewhere. The pairs set is small and partly built by deleting hedges, which favours the rules judge, so Check C stays unwired until a larger and less biased set (and the Gemini run) confirms the hold-or-warn decision.
+  The rules figure is after removing "can", "about" and "around" from the hedge list (they are usually capability or topic words); it now misses two claims whose only hedge was "can". Neither judge catches a sentence that keeps a hedge word but overstates elsewhere. The pairs set is small and partly built by deleting hedges, which favours the rules judge, so Check C stays unwired until a larger and less biased set (and the Gemini run) confirms the hold-or-warn decision.
 
 ### Open risk
 Check C is the least certain. A hedge check on a small local model may be unreliable, so the bake-off (`evals/bakeoff_check_c.py`, S5) runs before C is allowed to hold sentences. If it falls short, C ships warn-only, like D.

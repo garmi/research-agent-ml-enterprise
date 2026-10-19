@@ -16,17 +16,17 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import yaml  # noqa: E402
 
 from src.engine.check_c_hedges import PROMPT_FILE_PATH, judge_hedges_with_model, rules_hedge_verdict  # noqa: E402
+from src.extract.hedges import find_hedge_terms  # noqa: E402
 
 DATA = Path(__file__).resolve().parent / "data" / "check_c_pairs_v1.json"
 HOLD_PRECISION = 0.85
@@ -46,19 +46,20 @@ def _scores(pairs: List[tuple]) -> Dict[str, Any]:
     }
 
 
-def main() -> None:
+def main(argv: Optional[List[str]] = None) -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--provider", default="rules", help="rules | ollama | gemini")
     ap.add_argument("--model", default=None)
     ap.add_argument("--prompt", default=PROMPT_FILE_PATH)
     ap.add_argument("--out", default=None)
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
     pairs = json.loads(DATA.read_text(encoding="utf-8"))["pairs"]
     t0 = time.time()
     if args.provider == "rules":
         model_name = "rules"
-        raw = [rules_hedge_verdict(p["claim_hedges"], p["sentence"]) for p in pairs]
+        # Hedges are computed from the claim text with the current term list, not stored values.
+        raw = [rules_hedge_verdict(find_hedge_terms(p["claim"]), p["sentence"]) for p in pairs]
         verdicts = [{"verdict": "dropped" if r == "dropped" else "kept", "reason": r} for r in raw]
         abstained = 0
     else:
@@ -66,11 +67,12 @@ def main() -> None:
 
         from src.llm.factory import build_llm
 
-        load_dotenv()
+        if args.provider == "gemini":
+            load_dotenv()  # only the cloud provider needs a key from .env; local runs leave the env untouched
         cfg = yaml.safe_load(open("config.yaml", encoding="utf-8")) or {}
-        if args.model:
-            os.environ["OLLAMA_MODEL" if args.provider == "ollama" else "GEMINI_MODEL"] = args.model
         llm = build_llm(args.provider, cfg)
+        if args.model and hasattr(llm, "model"):
+            llm.model = args.model  # on this client only; no process-wide env is changed
         model_name = getattr(llm, "model", type(llm).__name__)
         verdicts = judge_hedges_with_model(llm, [{"claim": p["claim"], "sentence": p["sentence"]} for p in pairs], args.prompt)
         abstained = sum(1 for v in verdicts if v["verdict"] == "abstain")

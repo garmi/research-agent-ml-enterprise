@@ -6,11 +6,11 @@
  "n": 29,
  "abstained": 0,
  "dropped": {
-  "precision": 0.923,
-  "recall": 0.857,
-  "accuracy": 0.897,
-  "false_alarms": 1,
-  "missed": 2
+  "precision": 1.0,
+  "recall": 0.714,
+  "accuracy": 0.862,
+  "false_alarms": 0,
+  "missed": 4
  },
  "hold_precision": 0.85,
  "decision": "hold",
@@ -56,16 +56,16 @@
    "label": "kept",
    "pred": "kept",
    "raw": "kept",
-   "reason": "kept",
+   "reason": "no_hedge",
    "sentence": "AI can improve teamwork, especially in agile and distributed teams.",
    "note": ""
   },
   {
    "id": "h06",
    "label": "dropped",
-   "pred": "dropped",
-   "raw": "dropped",
-   "reason": "dropped",
+   "pred": "kept",
+   "raw": "kept",
+   "reason": "no_hedge",
    "sentence": "AI improves teamwork in agile and distributed teams.",
    "note": ""
   },
@@ -200,16 +200,16 @@
    "label": "kept",
    "pred": "kept",
    "raw": "kept",
-   "reason": "kept",
+   "reason": "no_hedge",
    "sentence": "Studies show these assistants can improve task completion.",
    "note": ""
   },
   {
    "id": "h22",
    "label": "dropped",
-   "pred": "dropped",
-   "raw": "dropped",
-   "reason": "dropped",
+   "pred": "kept",
+   "raw": "kept",
+   "reason": "no_hedge",
    "sentence": "Studies show these assistants improve task completion for all developers.",
    "note": ""
   },
@@ -252,9 +252,9 @@
   {
    "id": "h27",
    "label": "kept",
-   "pred": "dropped",
-   "raw": "dropped",
-   "reason": "dropped",
+   "pred": "kept",
+   "raw": "kept",
+   "reason": "no_hedge",
    "sentence": "AI is not guaranteed to improve teamwork, though agile and distributed teams report benefits.",
    "note": "preserves the limit without a listed hedge word"
   },
