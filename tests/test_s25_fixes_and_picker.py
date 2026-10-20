@@ -93,6 +93,6 @@ def test_buddha_mark():
     assert BUDDHA_SVG.startswith("<svg") and 'aria-label="Meditating Buddha"' in BUDDHA_SVG
     assert "\n\n" not in BUDDHA_SVG
     web = WEB.read_text(encoding="utf-8")
-    assert web.count("BUDDHA_SVG") >= 3, "imported, and used in the header and the sidebar"
+    assert web.count("buddha_svg(") >= 2, "used in the header and the sidebar"
     assert "🔬" not in web
     assert "<h1>AI Guruji</h1>" in web
