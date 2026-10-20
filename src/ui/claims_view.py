@@ -12,6 +12,7 @@ import html
 import re
 from typing import Any, Dict, List, Tuple
 
+from src.engine.check_b_wellformed import LOCATION_TAG
 from src.extract.claim_extractor import strip_claim_prefix
 
 _GRADES: Dict[str, Tuple[str, str, str, str]] = {
@@ -95,9 +96,13 @@ def _plain_claim(c: Dict[str, Any]) -> Dict[str, Any]:
     label, meaning = grade_label(c.get("grade"))
     source = " · ".join(str(x) for x in (c.get("source_title"), c.get("venue"), c.get("year")) if x and str(x) != "Date unknown")
     key = str(c.get("source_key") or "")
+    excerpt = str(c.get("excerpt") or "")
+    loc = LOCATION_TAG.search(excerpt)
+    where = f"from the {loc.group(1).strip().lower()}" if loc and loc.group(1).strip() else ""
     return {"id": c.get("id"), "text": text, "grade": label, "meaning": meaning,
             "grade_key": str(c.get("grade") or "").lower(), "source": source,
-            "key": key if re.fullmatch(r"P\d+", key) else "", "excerpt": c.get("excerpt") or "", "url": c.get("source_url") or ""}
+            "key": key if re.fullmatch(r"P\d+", key) else "", "excerpt": LOCATION_TAG.sub("", excerpt).strip(),
+            "where": where, "url": c.get("source_url") or ""}
 
 
 def _mix(claims: List[Dict[str, Any]]) -> str:
@@ -164,7 +169,8 @@ def claims_overview_html(results: Dict[str, Any]) -> str:
             chip = (f'<span class="cg-chip" title="{esc(c["meaning"])}" style="background:{bg};color:{fg};">'
                     f'{esc(c["grade"])}</span>')
             key = f'<b>{esc(c["key"])}</b> · ' if c["key"] else ""
-            quote = f'<div class="cg-quote">“{esc(c["excerpt"])}”</div>' if c["excerpt"] else ""
+            quote = (f'<div class="cg-quote">“{esc(c["excerpt"])}”' + (f' <span class="cg-src">({esc(c["where"])})</span>' if c["where"] else "")
+                     + "</div>") if c["excerpt"] else ""
             items.append(f'<div class="cg-claim">{chip} {esc(c["text"])}<div class="cg-src">{key}{esc(c["source"])}</div>{quote}</div>')
         n = len(g["claims"])
         groups.append(f'<details class="cg-group"{" open" if not groups else ""}><summary><b>{esc(g["title"])}</b> '

@@ -52,8 +52,34 @@ from src.synth.generator import SynthesisEngine as LedgerSynthesisEngine
 logger = logging.getLogger(__name__)
 
 
-def fetch_url_metadata(url: str) -> Tuple[str, str, str]:
-    """Fetch or infer title, summary excerpt, and domain from a web URL."""
+_DROP_BLOCKS = re.compile(r"<(script|style|noscript|svg|template|head|nav|header|footer|aside|form|iframe)\b[^>]*>.*?</\1\s*>",
+                          re.IGNORECASE | re.DOTALL)
+_BLOCK_BREAK = re.compile(r"</?(p|div|li|h[1-6]|br|tr|section|article|blockquote)\b[^>]*>", re.IGNORECASE)
+
+
+def readable_text(page: str) -> str:
+    """A page's article text (S24b): scripts, styles, navigation, header and footer dropped, <article> or <main>
+    preferred, entities unescaped. Falls back to the meta description; a page of only script gives ''."""
+    import html as _html
+
+    meta = re.search(r'<meta\s+(?:name|property)=["\'](?:og:)?description["\']\s+content=["\'](.*?)["\']', page or "",
+                     re.IGNORECASE | re.DOTALL)
+    body = _DROP_BLOCKS.sub(" ", page or "")
+    for tag in ("article", "main"):
+        m = re.search(rf"<{tag}\b[^>]*>(.*?)</{tag}\s*>", body, re.IGNORECASE | re.DOTALL)
+        if m and len(re.sub(r"<[^>]+>", "", m.group(1)).strip()) > 80:
+            body = m.group(1)
+            break
+    body = _BLOCK_BREAK.sub(" \n ", body)
+    text = _html.unescape(re.sub(r"<[^>]+>", " ", body))
+    text = " ".join(text.split())
+    if len(text) > 40:
+        return text
+    return _html.unescape(meta.group(1)).strip() if meta else ""
+
+
+def fetch_url_metadata(url: str, max_chars: int = 6000) -> Tuple[str, str, str]:
+    """Fetch or infer title, readable text excerpt, and domain from a web URL."""
     import urllib.request
     from urllib.parse import urlparse
 
@@ -64,17 +90,17 @@ def fetch_url_metadata(url: str) -> Tuple[str, str, str]:
     try:
         req = urllib.request.Request(
             url,
-            headers={"User-Agent": "ResearchAgent/2.0 (+https://github.com/garmi/research-agent-ml-enterprise)"},
+            headers={"User-Agent": "Mozilla/5.0 (compatible; ResearchAgent/2.0; +https://github.com/garmi/research-agent-ml-enterprise)"},
         )
-        with urllib.request.urlopen(req, timeout=3) as resp:
-            html = resp.read(65536).decode("utf-8", errors="ignore")
-            title_match = re.search(r"<title[^>]*>(.*?)</title>", html, re.IGNORECASE | re.DOTALL)
-            title = title_match.group(1).strip() if title_match else default_title
-            text = re.sub(r"<[^>]+>", " ", html[:4000])
-            text = " ".join(text.split())
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            page = resp.read(2_000_000).decode("utf-8", errors="ignore")
+            title_match = re.search(r"<title[^>]*>(.*?)</title>", page, re.IGNORECASE | re.DOTALL)
+            import html as _html
+
+            title = " ".join(_html.unescape(title_match.group(1)).split()) if title_match else default_title
             # S11: only text the page actually holds; an unreadable page gives an empty excerpt.
-            excerpt = text[:600] if len(text) > 40 else ""
-            return title[:120], excerpt, domain
+            # S24b: the article text, not the first 4,000 characters (mostly <head> and scripts on modern pages).
+            return title[:120], readable_text(page)[:max_chars], domain
     except Exception:
         return default_title[:120], "", domain
 

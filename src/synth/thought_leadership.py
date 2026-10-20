@@ -21,6 +21,7 @@ from src.synth.generator import resolve_citations
 MAX_TAKEAWAYS = 7
 MAX_HOOK_WORDS = 20
 MAX_TAKEAWAY_SENTENCES = 2
+MAX_QUESTION_WORDS = 15
 
 # First-person claims of experience the system cannot have had: the post may say "I reviewed", never "we built".
 _INVENTED = re.compile(
@@ -33,6 +34,9 @@ _INVENTED = re.compile(
 )
 _COUNT_CLAIM = re.compile(r"\bI\s+(reviewed|read|analy[sz]ed|looked at|went through|studied)\s+(\d+|[a-z]+-?[a-z]*)\s+"
                           r"(studies|papers|articles|reports|sources)\b", re.IGNORECASE)
+_NUMBER_WORDS = {w: i for i, w in enumerate("zero one two three four five six seven eight nine ten eleven twelve".split())}
+_STATED_COUNT = re.compile(r"\b(\d+|" + "|".join(_NUMBER_WORDS) + r")\s+(?:[a-z-]+\s+){0,2}(studies|papers|reports|sources)\b",
+                           re.IGNORECASE)
 _TAG = re.compile(r"\s*\[(?:P\d+(?:[,;\s]+P\d+)*)\]")
 _EMPIRICAL_WORDS = re.compile(r"conceptual|framework|propos|self-report|not state|early|limited|few", re.IGNORECASE)
 _SENTENCES = re.compile(r"(?<=[.!?])\s+")
@@ -145,20 +149,34 @@ def build_summary(raw: Any, report: Optional[Dict[str, Any]], papers: List[Dict[
     if not takeaways:
         return None
 
+    true_counts = {n_reviewed, profile["papers"], profile["empirical"], profile["conceptual"], profile["not_stated"]}
+
+    def counts_ok(sentence: str) -> bool:
+        for m in _STATED_COUNT.finditer(sentence):
+            n = m.group(1).lower()
+            if (int(n) if n.isdigit() else _NUMBER_WORDS[n]) not in true_counts:
+                return False
+        return True
+
     def line(field: str) -> str:
         text = strip_tags(raw.get(field))
         if invents_experience(text):
             dropped.append(f"{field} dropped (invents experience)")
             return ""
-        return text
+        kept = [s for s in _SENTENCES.split(text) if s.strip()]
+        ok = [s for s in kept if counts_ok(s)]
+        if len(ok) < len(kept):
+            dropped.append(f"{field}: a sentence stating a study count the evidence does not match was dropped")
+        return " ".join(ok)
 
     hook = strip_tags(raw.get("hook"))
     if not hook or len(hook.split()) > MAX_HOOK_WORDS or invents_experience(hook):
         dropped.append("hook replaced (over 20 words or invents experience)" if hook else "hook missing")
         hook = "I went through the research on one question. Here is what holds up."
     rest = [s for s in _SENTENCES.split(strip_tags(raw.get("opening"))) if s.strip()
-            and not _COUNT_CLAIM.search(s) and not invents_experience(s)]
-    lead = f"I reviewed {n_reviewed} studies to answer one question" + (f": {question.strip()}" if question else ".")
+            and not _COUNT_CLAIM.search(s) and not invents_experience(s) and counts_ok(s)]
+    short_q = question.strip() if question and len(question.split()) <= MAX_QUESTION_WORDS else ""
+    lead = f"I reviewed {n_reviewed} studies to answer one question" + (f": {short_q}" if short_q else ".")
     opening = " ".join([lead] + rest)
     nuance = line("nuance")
     if profile["papers"] and profile["empirical"] * 2 < profile["papers"] and not _EMPIRICAL_WORDS.search(nuance):
