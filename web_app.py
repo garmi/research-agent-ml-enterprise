@@ -53,7 +53,7 @@ from src.engine.entry import start_run
 from src.engine.ids import resolve_question_id
 from src.engine.stub_mode import is_stub_mode
 from src.ui.safe_page import safe_page, format_error_payload, render_safe_error
-from src.ui.evidence_view import finding_card_html, paper_card_html, render_sentence
+from src.ui.evidence_view import evidence_map_html, finding_card_html, paper_card_html, render_sentence
 from src.ui.intake_view import approved_question_text, effective_provider, render_intake_view
 from src.ui.rerun import board_editor_key, export_view, papers_for_rerun
 from src.ui.publish_view import gate_rows, gates_summary, publish_eligibility
@@ -959,14 +959,6 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
 
-    # S18: light / dark page theme, kept in the URL (?theme=dark) so a reload keeps it.
-    dark_on = st.toggle("🌙 Dark mode", value=theme_from_query(st.query_params) == "dark", key="ui_dark_mode")
-    if dark_on:
-        st.query_params["theme"] = "dark"
-    elif "theme" in st.query_params:
-        del st.query_params["theme"]
-    st.markdown(theme_css("dark" if dark_on else "light"), unsafe_allow_html=True)
-
     # 1. STEPS: where this run is, the same states the status banner reports (S8)
     st.markdown('<div class="sidebar-pod-title">Steps</div>', unsafe_allow_html=True)
     st.markdown(step_rail_html(step_rail(results)), unsafe_allow_html=True)
@@ -1047,8 +1039,26 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# S18/S19b: light / dark page theme, kept in the URL (?theme=dark) so a reload keeps it. The switch sits
+# under the header (not in the sidebar) so it can always be found and switched back.
+_theme_col, _ = st.columns([1.2, 4.8])
+with _theme_col:
+    dark_on = st.toggle("🌙 Dark mode", value=theme_from_query(st.query_params) == "dark", key="ui_dark_mode")
+if dark_on:
+    st.query_params["theme"] = "dark"
+elif "theme" in st.query_params:
+    del st.query_params["theme"]
+st.markdown(theme_css("dark" if dark_on else "light"), unsafe_allow_html=True)
+
 if os.getenv("HOSTED_DEMO") == "1":
     st.info("🔒 **Demo: no private data is stored** • Hosted demonstration instance. API key overrides, practitioner observations, and persistent ledger writes are disabled.")
+
+def _load_question(qid: str, text: str) -> None:
+    """Load Question callback: runs before the rerun, so it can set the Step 1 box (a keyed widget)."""
+    st.session_state["current_question"] = text
+    st.session_state["input_user_question"] = text
+    st.toast(f"Loaded {qid} into Step 1: {text[:80]}", icon="✅")
+
 
 def render_question_register() -> None:
     """The Gate 1 question register, shown in the question step before Run (S18)."""
@@ -1062,9 +1072,8 @@ def render_question_register() -> None:
                 with q_col1:
                     st.markdown(f"**`{q.id}`** ({q.scope.upper()}) — {q.text}")
                 with q_col2:
-                    if st.button("Load Question", key=f"load_q_{q.id}", use_container_width=True):
-                        st.session_state["current_question"] = q.text
-                        st.rerun()
+                    st.button("Load Question", key=f"load_q_{q.id}", use_container_width=True,
+                              on_click=_load_question, args=(q.id, q.text))
 
 
 # ==============================================================================
@@ -1367,6 +1376,13 @@ if results:
     # ==========================================================================
     with tab_evidence:
         st.markdown("### Evidence")
+        _map_html = evidence_map_html(results.get("report"), results.get("papers", []))
+        if _map_html:
+            # S19b: which paper backs which sub-question, before the full paper list.
+            st.markdown("#### Evidence map")
+            st.caption("Each row is a paper; a dot means that question's section cites it. Hover a Q heading to see "
+                       "the question. Papers marked 'not cited' were found but not used in the brief.")
+            st.markdown(_map_html, unsafe_allow_html=True)
         # Check A: on-topic evidence (DEC-016)
         check_a_info = results.get("check_a") or {}
         if check_a_info and results.get("stopped_at") != "check_a":
