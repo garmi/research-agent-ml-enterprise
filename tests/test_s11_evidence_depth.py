@@ -174,7 +174,8 @@ def test_queries_come_from_question_and_sub_questions():
     assert "orchestration" in qs[2] and "multi" in qs[2] and "agent" in qs[2]
     assert "measure" in qs[3] or "business" in qs[3]
     assert not qs[0].lower().startswith("what")
-    assert any("software engineering" in x for x in qs[3:])
+    # S19: generic expansions are domain-neutral.
+    assert any(x.endswith("case study") for x in qs[3:])
     assert research_queries("AI coding assistants and cycle time", None)[0] == "AI coding assistants cycle time"
 
 

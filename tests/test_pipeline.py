@@ -54,7 +54,9 @@ def test_build_topic_queries():
     from src.app import build_topic_queries
     queries = build_topic_queries("how Kiro is being used for development by engineering teams")
     assert any("kiro" in q.lower() for q in queries)
-    assert any("spec driven" in q.lower() for q in queries)
+    # S19: no topic-specific expansions; every question gets the same domain-neutral ones.
+    assert not any("spec driven" in q.lower() for q in queries)
+    assert any(q.lower().endswith("case study") for q in queries)
 
 
 def test_openalex_abstract_reconstruction():

@@ -150,6 +150,12 @@ def resolve_honest_venue_and_type(p: Dict[str, Any]) -> Tuple[str, str]:
     return v, s_type
 
 
+def build_report(*args: Any, **kwargs: Any) -> Optional[Dict[str, Any]]:
+    from src.synth.report import build_report as _build
+
+    return _build(*args, **kwargs)
+
+
 def labelled_venue(p: Dict[str, Any], grader: Any) -> Tuple[str, str, str]:
     """(venue, label, tier) for a paper (S14). A journal or conference whose venue is not verified says
     so, instead of passing as peer-reviewed; the venue name is unescaped (APIs send '&amp;')."""
@@ -580,6 +586,7 @@ class MultiLaneResearchRunner:
             academic_claims=academic_claims,
             enterprise_claims=enterprise_claims,
             practitioner_claims=practitioner_claims,
+            approved_package=approved_package,
         )
 
         gen_mode = executive_synthesis.get("generation_mode", "model")
@@ -1744,6 +1751,7 @@ class MultiLaneResearchRunner:
         academic_claims: List[Claim],
         enterprise_claims: List[Claim],
         practitioner_claims: List[Claim],
+        approved_package: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Generate high-level executive report, storylines, and packs."""
         import re
@@ -1765,7 +1773,8 @@ class MultiLaneResearchRunner:
             map_llm = build_llm(map_provider, cfg)
             reduce_llm = map_llm if reduce_provider == map_provider else build_llm(reduce_provider, cfg)
             synthesizer = AnalysisSynthesisEngine(map_llm, reduce_llm, on_progress=lambda _: None)
-            synth = synthesizer.analyze(topic, papers, tone=tone_key, length="detailed")
+            # S19: the approved package (sub-questions) shapes the report.
+            synth = synthesizer.analyze(topic, papers, tone=tone_key, length="detailed", package=approved_package)
             if map_provider == "stub" or reduce_provider == "stub":
                 generation_mode = "extractive_fallback"
                 if not synth.get("executive_summary") and not synth.get("key_findings"):
@@ -1777,10 +1786,17 @@ class MultiLaneResearchRunner:
                         enterprise_claims=enterprise_claims,
                         practitioner_claims=practitioner_claims,
                         error_details={"error_class": "OfflineEngine", "error_message": "Deterministic offline extractive engine active"},
+                        approved_package=approved_package,
                     )
                 synth["generation_mode"] = "extractive_fallback"
                 synth["is_fallback"] = True
             else:
+                # S19: a report reply with nothing usable (invalid JSON, empty sections) is a model failure, so the
+                # run falls back to the extractive report and says why, instead of showing a blank brief.
+                if (approved_package or {}).get("sub_questions") and not synth.get("answer") and not any(
+                    s.get("synthesis") or s.get("evidence") for s in synth.get("sections") or []
+                ):
+                    raise ValueError("The model's report reply had no usable content (invalid JSON or empty sections).")
                 synth["generation_mode"] = "model"
                 synth["is_fallback"] = False
         except Exception as e:
@@ -1803,6 +1819,7 @@ class MultiLaneResearchRunner:
                 enterprise_claims=enterprise_claims,
                 practitioner_claims=practitioner_claims,
                 error_details=error_details,
+                approved_package=approved_package,
             )
 
         synth["generation_mode"] = generation_mode
@@ -1828,9 +1845,12 @@ class MultiLaneResearchRunner:
         enterprise_claims: List[Claim],
         practitioner_claims: List[Claim],
         error_details: Dict[str, str],
+        approved_package: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Build strictly extractive claims list without inferred conclusions when model is unavailable."""
         from src.synth.generator import SynthesisEngine
+        from src.synth.report import group_by_sub_question
+
         temp_engine = SynthesisEngine(db_path=self.db_path)
 
         paper_id_map = {p.get("id"): f"P{idx}" for idx, p in enumerate(papers, 1)}
@@ -1887,6 +1907,8 @@ class MultiLaneResearchRunner:
                 for i, p in enumerate(papers, start=1)
             ],
             "citation_check": {"total_citations": len(extractive_findings), "invalid_ids": []},
+            # S19: one section per approved sub-question, evidence only (no model, so no synthesis).
+            "sections": group_by_sub_question(extractive_findings, (approved_package or {}).get("sub_questions") or []),
             "generation_mode": "extractive_fallback",
             "is_fallback": True,
             "error_details": error_details,
@@ -2114,6 +2136,12 @@ class MultiLaneResearchRunner:
             "breadth": dict(getattr(self, "_breadth", {}) or {}),
             "excluded_claims": excluded_formatted,
             "sentence_traces": sentence_traces,
+            # S19: the question-shaped report, built by rule from the checked sentences (None for older shapes).
+            "report": build_report(
+                sentences, papers_formatted, {c.id: c for c in all_q_claims},
+                executive_synthesis.get("paper_summaries") or [],
+                lambda p: self.grader.resolve_venue_tier(p.get("venue"), p.get("type")),
+            ),
             "generation_mode": executive_synthesis.get("generation_mode", "model"),
             "is_fallback": bool(executive_synthesis.get("is_fallback", False)),
             "error_details": executive_synthesis.get("error_details"),

@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ==============================================================================
+# Exit Script for Slice S19: a question-shaped report with synthesis sentences
+# ==============================================================================
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$REPO_ROOT"
+PY="${PY:-.venv/bin/python}"
+
+echo "======================================================================"
+echo "Executing Slice S19 Exit Verification Script"
+echo "======================================================================"
+
+PYTHONPATH=. "$PY" - << 'PYEOF'
+from src.analysis.queries import subject_terms
+from src.prompts.research_prompts import ResearchPromptLibrary as L
+from src.score.checker import SYNTHESIS_TYPES
+
+q = "What evidence exists on four-day work weeks and employee productivity?"
+pkg = {"sub_questions": ["How does a four-day week change employee productivity?", "What happens to wellbeing?"]}
+print("--- 1. Anchors come from the question:", subject_terms(q, pkg))
+p = L.report("t", [{"paper_id": "P1"}], pkg["sub_questions"], question=q)
+assert all(sq in p for sq in pkg["sub_questions"])
+print("--- 2. Report prompt lists every sub-question")
+print("--- 3. Synthesis-like types:", SYNTHESIS_TYPES)
+PYEOF
+
+echo -n "[1/2] Running Slice S19 tests... "
+PYTHONPATH=. "$PY" -m pytest tests/test_s19_question_shaped_report.py -q
+echo "OK"
+
+echo -n "[2/2] Running full regression test suite... "
+PYTHONPATH=. "$PY" -m pytest tests/ evals/ -q
+echo "OK"
+echo "Slice S19 Exit Verification: ALL CHECKS PASSED (EXIT 0)"

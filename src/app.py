@@ -31,25 +31,12 @@ def build_topic_queries(topic: str) -> List[str]:
     if cleaned_base.lower() != base.lower():
         queries.append(base)
 
-    lower = base.lower()
-    # Expand emerging AI developer tools and engineering topics
-    if "kiro" in lower:
-        queries.extend([
-            "spec driven development agentic software engineering",
-            "AI coding assistants developer productivity engineering teams",
-            "agentic software development LLM agile",
-        ])
-    elif any(k in lower for k in ["cursor", "copilot", "assistant", "agent", "coding"]):
-        queries.extend([
-            "AI coding assistants developer productivity software engineering",
-            "agentic software engineering LLM adoption enterprise",
-        ])
-
+    # Domain-neutral expansions (S19): the same for every question; no topic- or field-specific cases.
     queries.extend([
-        f"{cleaned_base} software engineering",
-        f"{cleaned_base} enterprise",
-        f"{cleaned_base} developer productivity",
+        f"{cleaned_base} empirical study",
+        f"{cleaned_base} case study",
         f"{cleaned_base} adoption",
+        f"{cleaned_base} enterprise",
     ])
 
     seen = set()
