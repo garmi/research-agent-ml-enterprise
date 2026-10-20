@@ -157,7 +157,7 @@ def report_blocks(report: Dict[str, Any], paper_map: Dict[str, Any], findings_by
         from src.ui.diagrams import diagram_svg
 
         blocks.insert(1, f'<div class="report-diagram"><h3>{plain_html(diagram.get("title"))}</h3>{diagram_svg(diagram)}'
-                         '<p class="line-tag">Each box names the papers it rests on.</p></div>')
+                         '<div class="line-tag" style="font-size:0.78rem;">Each box names the papers it rests on.</div></div>')
     card_no = 0
     for sec in report.get("sections") or []:
         blocks.append(f'<div class="report-section-head"><h3>{int(sec.get("index") or 0)}. '

@@ -1773,6 +1773,30 @@ class MultiLaneResearchRunner:
             return None
         return validate_diagram(raw, papers, claims_by_id)
 
+    def _thought_leadership(self, report: Optional[Dict[str, Any]], papers: List[Dict[str, Any]],
+                            claims_by_id: Dict[str, Claim], question: str) -> Optional[Dict[str, Any]]:
+        """S21: one summary call over the checked report; rules keep the takeaways that pass the synthesis gates
+        and write the reviewed-studies count. No model (extractive fallback) or no report means no summary."""
+        llm = getattr(self, "_reduce_llm", None)
+        if llm is None or not report or not report.get("sections"):
+            return None
+        from src.analysis.queries import subject_terms
+        from src.analysis.synthesizer import REDUCE_SYSTEM, SynthesisEngine as AnalysisSynthesisEngine
+        from src.prompts.research_prompts import ResearchPromptLibrary
+        from src.synth.thought_leadership import build_summary, evidence_profile
+
+        profile = evidence_profile(report)
+        try:
+            raw = AnalysisSynthesisEngine(llm, max_retries=0)._call_json(
+                llm, ResearchPromptLibrary.thought_leadership(question, self._report_lines(report), profile),
+                REDUCE_SYSTEM, temperature=0.5)
+        except Exception as e:  # a failed summary call never fails the run
+            logger.warning("Summary call failed: %s", type(e).__name__)
+            return None
+        package = getattr(self, "_approved_package", None) or {}
+        return build_summary(raw, report, papers, claims_by_id, self.checker, n_reviewed=len(papers),
+                             subject=subject_terms(question, package), question=package.get("refined_question") or question)
+
     def _generate_executive_deliverables(
         self,
         topic: str,
@@ -1803,6 +1827,7 @@ class MultiLaneResearchRunner:
         generation_mode = "model"
         # S20/S21: the model that wrote the report also drafts the diagram and summary; None means no model.
         self._reduce_llm = None
+        self._approved_package = dict(approved_package or {})
 
         try:
             map_llm = build_llm(map_provider, cfg)
@@ -2125,6 +2150,7 @@ class MultiLaneResearchRunner:
             lambda p: self.grader.resolve_venue_tier(p.get("venue"), p.get("type")),
         )
         diagram_obj = self._report_diagram(report_obj, papers_formatted, claim_by_id, question_obj.text)
+        summary_obj = self._thought_leadership(report_obj, papers_formatted, claim_by_id, question_obj.text)
 
         status_val = publish_res.get("status", score_results.get("band", "NOT_PUBLISHABLE"))
         # The bottom line shown is the gated summary sentence (S10), the same text the gates checked.
@@ -2182,6 +2208,7 @@ class MultiLaneResearchRunner:
             "sentence_traces": sentence_traces,
             "report": report_obj,
             "diagram": diagram_obj,
+            "summary": summary_obj,
             "generation_mode": executive_synthesis.get("generation_mode", "model"),
             "is_fallback": bool(executive_synthesis.get("is_fallback", False)),
             "error_details": executive_synthesis.get("error_details"),

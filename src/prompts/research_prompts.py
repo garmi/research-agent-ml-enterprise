@@ -169,6 +169,43 @@ Checked findings:
 """
 
     @classmethod
+    def thought_leadership(cls, question: str, report_lines: List[str], profile: Dict[str, Any]) -> str:
+        """The thought-leadership summary (S21): an executive post in the first person, drafted from the checked
+        report. Rules keep or drop each part; the reviewed-studies count is added by rule. Domain-neutral."""
+        lines = "\n".join(report_lines)
+        prof = (f"{profile.get('papers', 0)} papers cited; {profile.get('empirical', 0)} empirical, "
+                f"{profile.get('conceptual', 0)} conceptual, {profile.get('not_stated', 0)} method not stated")
+        return f"""
+You are a senior executive writing a thought-leadership post for a professional network, in the first person,
+about what the research says on one question. Write the way respected leaders post: plain words, short lines,
+one clear point of view.
+Approved question: {question}
+Evidence profile: {prof}
+
+Return valid JSON with exactly these keys:
+{{"hook": "one line of at most 20 words that makes a busy leader stop scrolling",
+  "opening": "1-2 short sentences on why this question matters now",
+  "takeaways": ["3-7 takeaways, each at most two sentences, each ending with its [P#] tags"],
+  "for_leaders": "1-2 sentences on what this means for leaders",
+  "nuance": "1-2 sentences stating plainly what the evidence does not settle",
+  "watch_next": "one sentence on what to watch next",
+  "question": "one question that invites readers to share their view",
+  "hashtags": ["3-5 hashtags on the subject"]}}
+
+Rules:
+- Every takeaway rests on the checked findings below and ends with their [P#] tags. A takeaway that combines
+  papers cites two or more; if it rests on one paper, say "one study reports".
+- Use only figures that appear in the findings. Match verb strength to the evidence.
+- Never invent experience: you have not run a team, a pilot or a rollout. Do not write "in my team",
+  "we found", "our company", "in my experience" or anything like it. Do not state how many studies you read.
+- The nuance must reflect the evidence profile: if few papers measured outcomes, say so.
+- No [P#] tags outside the takeaways.
+
+Checked findings:
+{lines}
+"""
+
+    @classmethod
     def recommendations(cls, topic: str, analysis: Dict[str, Any], compact: List[Dict[str, Any]], tone: str = "executive", length: str = "detailed") -> str:
         tone_guide = cls.TONE_INSTRUCTIONS.get(tone, cls.TONE_INSTRUCTIONS["executive"])
         length_guide = cls.LENGTH_INSTRUCTIONS.get(length, cls.LENGTH_INSTRUCTIONS["detailed"])

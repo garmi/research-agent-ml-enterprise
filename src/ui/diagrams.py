@@ -8,7 +8,7 @@ Markdown HTML block, and every label is escaped.
 from __future__ import annotations
 
 import html
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 NODE_W, NODE_H, GAP_X, GAP_Y, MARGIN = 200, 82, 64, 24, 16
 _FILL, _STROKE, _TEXT, _MUTED, _EDGE = "#EFF6FF", "#2563EB", "#0F172A", "#475569", "#64748B"
@@ -45,7 +45,9 @@ def _layers(spec: Dict[str, Any]) -> Dict[str, List[int]]:
     return pos
 
 
-def diagram_svg(spec: Optional[Dict[str, Any]], marker_id: str = "dg-arrow") -> str:
+def diagram_svg(spec: Optional[Dict[str, Any]], marker_id: str = "dg-arrow",
+                frame: Optional[Tuple[int, int, int, int]] = None) -> str:
+    """The diagram as an SVG; `frame` (x, y, width, height) places it inside another SVG, such as the share card."""
     if not spec or not spec.get("nodes"):
         return ""
     esc = lambda v: html.escape(str(v or ""), quote=True)
@@ -57,8 +59,10 @@ def diagram_svg(spec: Optional[Dict[str, Any]], marker_id: str = "dg-arrow") -> 
     xy = {nid: (MARGIN + c * (NODE_W + GAP_X), MARGIN + r * (NODE_H + GAP_Y)) for nid, (c, r) in pos.items()}
 
     parts = [
-        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" width="100%" '
-        f'style="max-width:{width}px;display:block;margin:0.4rem 0;" role="img" aria-label="{esc(spec.get("title"))}">',
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" '
+        + (f'x="{frame[0]}" y="{frame[1]}" width="{frame[2]}" height="{frame[3]}" ' if frame else
+           f'width="100%" style="max-width:{width}px;display:block;margin:0.4rem 0;" ')
+        + f'role="img" aria-label="{esc(spec.get("title"))}">',
         f'<defs><marker id="{esc(marker_id)}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" '
         f'orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="{_EDGE}"/></marker></defs>',
     ]
