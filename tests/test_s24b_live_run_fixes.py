@@ -74,9 +74,9 @@ def test_long_question_left_out_of_opening():
 
 def test_unchecked_study_counts_dropped():
     s = _summary({"nuance": "While six empirical studies capture early drops, the long run is unsettled.",
-                  "for_leaders": "Three papers suggest pairing tools with review."}, "Q?")
+                  "for_leaders": "Five papers suggest pairing tools with review."}, "Q?")
     assert "six empirical studies" not in s["nuance"]
-    assert s["for_leaders"] == "" or "Three papers" not in s["for_leaders"]
+    assert "Five papers" not in s["for_leaders"]
     assert any("count" in d for d in s["dropped"])
     ok = _summary({"for_leaders": "All 3 papers point the same way."}, "Q?")
     assert "All 3 papers point the same way." in ok["for_leaders"], "3 matches the profile (3 papers cited)"
