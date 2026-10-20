@@ -49,6 +49,7 @@ from src.ui.theme import (
     FONT_SIZE_XS,
 )
 from src.ui.components import disabled_reason, info_box
+from src.ui.experience_view import coverage_lines
 
 
 def render_s2_proposal_card_text(pkg: Dict[str, Any]) -> str:
@@ -309,6 +310,29 @@ def render_intake_view(before_run: Optional[Callable[[], None]] = None) -> Dict[
 
         # Feedback & Re-reasoning (S15): quick adjustments plus free text, each a numbered point that is
         # checked by rule against the new proposal after re-reasoning.
+        # S26: your practitioner experience, before feedback. Matched to the sub-questions by rule on this machine;
+        # it joins the run as Lane C field notes and is never sent to the model (DEC-013).
+        st.markdown("---")
+        st.markdown("##### Your experience (optional)")
+        experience_text = st.text_area(
+            "What you have seen in practice, one note per line. It stays on this machine and is never sent to the model.",
+            key="input_s2_experience",
+            height=80,
+            placeholder="e.g. AI review comments cut our first-review wait by about a day.",
+        )
+        experience_notes = [ln.strip() for ln in (experience_text or "").splitlines() if ln.strip()]
+        st.session_state["s2_experience_notes"] = experience_notes
+        if experience_notes:
+            st.caption("How your notes line up with the sub-questions (matched by shared terms, no model):")
+            for line in coverage_lines(experience_notes, chosen_sub_qs):
+                st.markdown(f"- {line}")
+            st.session_state["s2_experience_confirmed"] = st.checkbox(
+                "My notes name no clients, people or confidential systems", key="chk_s2_experience_abstract")
+            if not st.session_state["s2_experience_confirmed"]:
+                st.caption("Tick the box above to include these notes in the run as your field evidence.")
+        else:
+            st.session_state["s2_experience_confirmed"] = False
+
         st.markdown("---")
         st.markdown("##### Adjust the proposal (optional)")
         adjustments = st.multiselect("Quick adjustments", list(QUICK_ADJUSTMENTS), key="ms_s2_quick_adjustments")

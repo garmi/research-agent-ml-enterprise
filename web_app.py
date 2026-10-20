@@ -56,6 +56,7 @@ from src.engine.stub_mode import is_stub_mode
 from src.ui.safe_page import safe_page, format_error_payload, render_safe_error
 from src.ui.brand import buddha_svg
 from src.ui.claims_view import claims_overview_html
+from src.ui.experience_view import observations_by_section, practitioner_inputs
 from src.ui.evidence_view import evidence_map_html, finding_card_html, paper_card_html, render_sentence
 from src.output.share_pack import image_card_svg, post_text
 from src.ui.summary_view import card_preview_html, png_download_html, summary_html, summary_missing_reason
@@ -693,6 +694,7 @@ st.markdown(
     .tl-hook { font-size: 1.3rem; font-weight: 800; line-height: 1.35; margin-bottom: 0.5rem; }
     .tl-takeaways { padding-left: 1.4rem; }
     .cg-overview h4 { margin: 1rem 0 0.4rem 0; }
+    .obs-line { border-left: 3px solid #0D9488; background: var(--card-bg); padding: 0.45rem 0.8rem; margin: 0.4rem 0; }
     .cg-lanes { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.6rem; }
     .cg-lane { background: var(--card-bg); border: 1px solid var(--border-subtle); padding: 0.7rem 0.9rem; }
     .cg-lane-name { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); }
@@ -1212,6 +1214,14 @@ with st.expander(
                 )
                 allow_remote_prac_synth = False
 
+# S26: Lane C notes are the Step 3 field notes plus the Step 2 experience notes; confirmed only when every box with
+# notes was confirmed. Both stay on this machine.
+prac_notes, prac_abs_confirmed = practitioner_inputs(
+    custom_prac_input, prac_abs_confirmed,
+    st.session_state.get("s2_experience_notes", []) if os.getenv("HOSTED_DEMO") != "1" else [],
+    st.session_state.get("s2_experience_confirmed", False),
+)
+
 selected_provider = available_models.get(sel_model_label, "gemini").strip()
 # Re-runs (Feedback Loop 1, evidence board) resolve the engine the same way the main run does.
 rerun_provider = effective_provider(selected_provider, has_gemini_key=bool(os.getenv("GEMINI_API_KEY", "").strip()), ollama_ok=ollama_online)
@@ -1228,7 +1238,7 @@ if run_submitted:
         lane_urls = {
             "academic": [u.strip() for u in custom_acad_input.splitlines() if u.strip()],
             "enterprise": [u.strip() for u in custom_ent_input.splitlines() if u.strip()],
-            "practitioner": [u.strip() for u in custom_prac_input.splitlines() if u.strip()],
+            "practitioner": prac_notes,
         }
 
         target_provider = selected_provider
@@ -1313,7 +1323,8 @@ if results:
             findings_by_text = {str(f.get("text", "")).strip(): f for f in results.get("findings") or []}
             # One st.markdown per block (see report_blocks); report_html joins the same blocks for exports.
             for block in report_blocks(report, paper_map, findings_by_text, meta=brief_meta_line(results),
-                                       negatives=results.get("negative_findings"), diagram=results.get("diagram")):
+                                       negatives=results.get("negative_findings"), diagram=results.get("diagram"),
+                                       observations=observations_by_section(report, results.get("claims", []))):
                 st.markdown(block, unsafe_allow_html=True)
         else:
             # Runs saved before S19 keep the earlier layout.
