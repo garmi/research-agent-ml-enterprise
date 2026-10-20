@@ -138,7 +138,8 @@ def _evidence_table_html(rows: List[Dict[str, Any]]) -> str:
 
 
 def report_blocks(report: Dict[str, Any], paper_map: Dict[str, Any], findings_by_text: Dict[str, Dict[str, Any]],
-                  meta: str = "", negatives: Optional[List[str]] = None, diagram: Optional[Dict[str, Any]] = None) -> List[str]:
+                  meta: str = "", negatives: Optional[List[str]] = None, diagram: Optional[Dict[str, Any]] = None,
+                  observations: Optional[Dict[int, List[str]]] = None) -> List[str]:
     """The Brief tab for a question-shaped report, as separate HTML blocks (one st.markdown each: finding cards
     contain blank lines, which end a Markdown HTML block, so they cannot share one call). Model text is escaped by
     render_sentence; evidence sentences keep their click-to-see-the-quotes cards."""
@@ -175,6 +176,10 @@ def report_blocks(report: Dict[str, Any], paper_map: Dict[str, Any], findings_by
                               f'{render_sentence(s.get("text", ""), paper_map)}</div>')
         if sec.get("table"):
             blocks.append(_evidence_table_html(sec["table"]))
+        # S26: your field notes that match this section, by rule; shown in the app only, never in exports.
+        for obs in (observations or {}).get(int(sec.get("index") or 0), []):
+            blocks.append(f'<div class="obs-line"><span class="line-tag">Your observation · not peer-reviewed</span> '
+                          f'{plain_html(obs)}</div>')
     if report.get("tensions"):
         blocks.append('<h3 class="report-h">Where studies disagree</h3>' + "".join(
             f'<div class="sy-line">{render_sentence(t.get("text", ""), paper_map)}</div>' for t in report["tensions"]))
