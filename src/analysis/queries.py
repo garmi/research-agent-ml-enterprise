@@ -88,13 +88,35 @@ def anchor_terms(question: str, anchors: Optional[Sequence[str]] = None) -> List
     return out
 
 
+def _stem_match(a: str, b: str) -> bool:
+    a, b = a.lower(), b.lower()
+    return a == b or (min(len(a), len(b)) >= 4 and (a.startswith(b) or b.startswith(a)))
+
+
+def subject_terms(question: str, package: Optional[Dict[str, Any]] = None) -> List[str]:
+    """The question's subject (S19): its key terms that recur in the approved sub-questions or scope (a word
+    the whole package keeps coming back to), plus any configured anchor it contains. Derived per question, so
+    a question about four-day weeks anchors on 'week' and 'employee', not on a technology word list."""
+    pkg = package or {}
+    terms = _terms(question)
+    others = [t for text in list(pkg.get("sub_questions") or []) + list(pkg.get("in_scope") or [])
+              for t in _terms(str(text))]
+    configured = anchor_terms(question)
+    out: List[str] = []
+    for t in terms:
+        recurs = any(_stem_match(t, o) for o in others)
+        if (recurs or t in configured) and t.lower() not in (x.lower() for x in out):
+            out.append(t)
+    return out
+
+
 def research_queries(topic: str, approved_package: Optional[Dict[str, Any]] = None) -> List[str]:
     """Condensed main question, then the cleaned full question (the query that worked before S11),
-    then each sub-question with the main question's anchors, then the generic topic expansions."""
+    then each sub-question with the main question's subject terms, then the generic topic expansions."""
     pkg = approved_package or {}
     main = pkg.get("refined_question") or topic
-    anchors = _anchors()
-    main_anchors = anchor_terms(main, anchors)
+    main_anchors = subject_terms(main, pkg)
+    anchors = tuple(_anchors()) + tuple(a.lower() for a in main_anchors)
     topic_queries = build_topic_queries(topic)
     candidates = [condense(main, anchors=anchors)] + topic_queries[:1]
     for sq in pkg.get("sub_questions") or []:

@@ -87,6 +87,7 @@ class SynthesisEngine:
         papers: Iterable[Dict[str, Any]],
         tone: str = "executive",
         length: str = "detailed",
+        package: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         paper_list = list(papers)
         if not paper_list:
@@ -98,6 +99,11 @@ class SynthesisEngine:
 
         compact = [self._compact(s) for s in summaries]
         valid_ids = {s["paper_id"] for s in summaries}
+
+        sub_questions = [str(q).strip() for q in (package or {}).get("sub_questions") or [] if str(q).strip()]
+        if sub_questions:
+            return self._analyze_report(topic, paper_list, summaries, compact, valid_ids, sub_questions,
+                                        question=str((package or {}).get("refined_question") or topic), tone=tone, length=length)
 
         # Stage A: findings, themes, problems, gaps
         self.on_progress(f"  [reduce 1/4] analysis of {len(summaries)} papers (tone: {tone}, length: {length})")
@@ -176,11 +182,87 @@ class SynthesisEngine:
         data["citation_check"] = self._check_citations(data, valid_ids)
         return data
 
+    def _analyze_report(self, topic, paper_list, summaries, compact, valid_ids, sub_questions, question, tone, length):
+        """S19: one reduce call writes the question-shaped report; the old analysis, recommendations and roadmap
+        calls are not made. Legacy keys are filled from it so older consumers keep working."""
+        self.on_progress(f"  [reduce 1/2] report across {len(sub_questions)} sub-questions (tone: {tone})")
+        raw = self._call_json(
+            self.reduce_llm,
+            ResearchPromptLibrary.report(topic, compact, sub_questions, question=question, tone=tone, length=length),
+            REDUCE_SYSTEM,
+            temperature=0.2,
+        ) or {}
+        sections = self._sanitize_sections(raw.get("sections"), sub_questions)
+        evidence = [e for s in sections for e in s["evidence"]]
+        self.on_progress("  [reduce 2/2] content ideas")
+        ideas_raw = self._call_json(
+            self.reduce_llm, ResearchPromptLibrary.content_ideas(topic, evidence, tone=tone), REDUCE_SYSTEM, temperature=0.6,
+        ) or {}
+        answer = self._as_str_list(raw.get("answer"))
+        model = ResearchSynthesisModel(
+            executive_summary=" ".join(answer),
+            objective=question,
+            research_questions=sub_questions,
+            key_findings=evidence,
+            research_gaps=self._as_str_list(raw.get("gaps")),
+            content_ideas=self._as_str_list(ideas_raw.get("content_ideas")),
+            answer=answer,
+            sections=sections,
+            tensions=self._as_str_list(raw.get("tensions")),
+            gaps=self._as_str_list(raw.get("gaps")),
+            implications=self._sanitize_implications(raw.get("implications"), len(sections)),
+        )
+        data = model.to_dict()
+        data["topic"] = topic
+        data["sources"] = sorted({p.get("source", "") for p in paper_list if p.get("source")})
+        data["time_window"] = self._time_window(paper_list)
+        data["papers"] = paper_list
+        data["paper_summaries"] = summaries
+        data["references"] = [
+            f"[P{i}] {p.get('title', '')} ({p.get('year', 'n/a')}) {p.get('url') or p.get('link') or ''}".strip()
+            for i, p in enumerate(paper_list, start=1)
+        ]
+        data["citation_check"] = self._check_citations(data, valid_ids)
+        return data
+
+    @staticmethod
+    def _sanitize_sections(raw: Any, sub_questions: List[str]) -> List[Dict[str, Any]]:
+        """One section per approved sub-question, in order. A section the model skipped stays, empty, so the
+        report shows the sub-question had no evidence rather than dropping it."""
+        given = [s for s in (raw or []) if isinstance(s, dict)]
+        out = []
+        for i, sq in enumerate(sub_questions):
+            match = next((s for s in given if str(s.get("sub_question", "")).strip().lower() == sq.lower()), None)
+            if match is None and i < len(given):
+                match = given[i]
+            match = match or {}
+            out.append({
+                "sub_question": sq,
+                "synthesis": SynthesisEngine._as_str_list(match.get("synthesis")),
+                "evidence": SynthesisEngine._as_str_list(match.get("evidence")),
+            })
+        return out
+
+    @staticmethod
+    def _sanitize_implications(raw: Any, n_sections: int) -> List[Dict[str, Any]]:
+        out = []
+        for item in raw or []:
+            if isinstance(item, str):
+                item = {"text": item}
+            if not isinstance(item, dict) or not str(item.get("text", "")).strip():
+                continue
+            try:
+                section = int(item.get("section"))
+            except (TypeError, ValueError):
+                section = None
+            out.append({"text": str(item["text"]).strip(), "section": section if section and 1 <= section <= n_sections else None})
+        return out
+
     # ---------- helpers ----------
     @staticmethod
     def _compact(summary: Dict[str, Any], limit: int = 600) -> Dict[str, Any]:
         """Keep reduce prompts compact without cutting sentences mid-clause."""
-        keys = ["problem_statement", "key_findings", "business_relevance",
+        keys = ["problem_statement", "key_findings", "research_method", "business_relevance",
                 "gap_identified", "adoption_barrier", "limitations"]
         out: Dict[str, Any] = {"paper_id": summary["paper_id"], "title": str(summary.get("title", ""))[:180]}
         for key in keys:

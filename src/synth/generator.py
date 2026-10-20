@@ -300,7 +300,36 @@ class SynthesisEngine:
         )
         ordinal += 1
 
-        if executive_synthesis and executive_synthesis.get("key_findings"):
+        # S19: the question-shaped report. One heading per approved sub-question, then that section's
+        # synthesis and evidence sentences, each tagged with its section number.
+        report_sections = [s for s in ((executive_synthesis or {}).get("sections") or []) if isinstance(s, dict)]
+
+        def add(text: str, type_: str, section: Optional[int] = None) -> None:
+            nonlocal ordinal
+            cids, checks = bind(text) if type_ != "heading" else ([], None)
+            if section is not None:
+                checks = {**(checks or {}), "section": section}
+            sentences.append(OutputSentence(
+                id=f"{output_id}_{ordinal}", output_id=output_id, ordinal=ordinal, text=text.strip(), type=type_,
+                claim_ids_json=cids if type_ != "heading" else None, checks_json=checks,
+            ))
+            ordinal += 1
+
+        if report_sections:
+            for i, sec in enumerate(report_sections, 1):
+                add(str(sec.get("sub_question") or f"Section {i}"), "heading", i)
+                for t in sec.get("synthesis") or []:
+                    add(str(t), "synthesis", i)
+                for t in sec.get("evidence") or []:
+                    add(str(t), "assertive", i)
+            for t in (executive_synthesis or {}).get("tensions") or []:
+                add(str(t), "tension")
+            for t in (executive_synthesis or {}).get("gaps") or []:
+                add(str(t), "gap")
+            for imp in (executive_synthesis or {}).get("implications") or []:
+                if isinstance(imp, dict) and str(imp.get("text") or "").strip():
+                    add(str(imp["text"]), "implication", imp.get("section"))
+        elif executive_synthesis and executive_synthesis.get("key_findings"):
             for f_text in executive_synthesis["key_findings"]:
                 # Only the claims the sentence's own tags point to; an untagged sentence stays unbound.
                 cited_cids, checks = bind(f_text)
@@ -369,7 +398,8 @@ class SynthesisEngine:
         # Signals restate findings. Model findings carry their own tags; signals copied from the
         # drafted findings keep those findings' claims (their text has no tags to resolve).
         assertive_by_text = {x.text: (x.claim_ids_json or []) for x in sentences if x.type == "assertive"}
-        signals_candidates = (
+        # Signals restate findings; a sectioned report already presents its evidence, so it has none (S19).
+        signals_candidates = [] if report_sections else (
             (executive_synthesis.get("key_findings") or [])[:3]
             if executive_synthesis
             else list(assertive_by_text)[:3]

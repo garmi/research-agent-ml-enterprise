@@ -85,6 +85,12 @@ class ResearchSynthesisModel(BaseModel):
     strategic_roadmap: List[RoadmapPhase] = Field(default_factory=list)
     content_ideas: List[str] = Field(default_factory=list)
     references: List[str] = Field(default_factory=list)
+    # S19: the question-shaped report
+    answer: List[str] = Field(default_factory=list)
+    sections: List[Dict[str, Any]] = Field(default_factory=list)
+    tensions: List[str] = Field(default_factory=list)
+    gaps: List[str] = Field(default_factory=list)
+    implications: List[Dict[str, Any]] = Field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         return self.model_dump()

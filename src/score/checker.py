@@ -31,7 +31,10 @@ GATE_IDS = ("G1", "G2", "G3", "G4", "G5", "G6")
 # Sentence types whose claims must be grounded (G1-G4); "summary" is the brief's bottom line (S10).
 # Roadmap actions are recommendations:
 # they get G5/G6 only. Headings, opinions, field notes and negative findings are not assertions.
-GROUNDED_TYPES = ("summary", "assertive", "finding", "signal", "risk")
+# S19: sentences that reason across papers. They must cite, must rest on two or more sources (or say they rest
+# on one), may add no figure the cited claims lack, and are not failed for low word overlap with a quote.
+SYNTHESIS_TYPES = ("summary", "synthesis", "tension", "gap", "implication")
+GROUNDED_TYPES = ("assertive", "finding", "signal", "risk") + SYNTHESIS_TYPES
 
 
 def extract_numerals(text: str) -> List[str]:
@@ -276,6 +279,12 @@ class GateChecker:
                 else:
                     cited_claims.append(c)
 
+            if s.type == "implication" and not (s.checks_json or {}).get("section"):
+                result.g1_pass = False
+                result.violations["G1"].append(
+                    f"Sentence [{s.id}] (ordinal {s.ordinal}) is an implication that names no section it follows from"
+                )
+
             if not cited_claims:
                 continue
             # This sentence has valid evidence, so grounding, numbers and wording can be judged.
@@ -284,9 +293,20 @@ class GateChecker:
             if question is not None:
                 result.mark_evaluated("G3")
 
-            # Support Check (2): Excerpt overlap - sentence must share >= 2 non-stopword terms with claim excerpt
+            # S19: a synthesis-like sentence rests on two or more sources, or says it rests on one.
+            if s.type in SYNTHESIS_TYPES and len({c.source_id for c in cited_claims}) < 2 and not any(
+                _phrase_re(ph).search(s_text) for ph in self.single_source_phrases
+            ):
+                result.g4_pass = False
+                result.violations["G4"].append(
+                    f"Sentence [{s.id}] (ordinal {s.ordinal}) combines evidence but cites one source; it needs two or more "
+                    "sources, or must say it rests on one study"
+                )
+
+            # Support Check (2): Excerpt overlap - sentence must share >= 2 non-stopword terms with claim excerpt.
+            # Synthesis-like sentences reason across claims, so they are not held to a quote's wording (S19).
             s_words = support_terms(s_text)
-            for c in cited_claims:
+            for c in ([] if s.type in SYNTHESIS_TYPES else cited_claims):
                 e_words = claim_support_terms(c)
                 overlap = s_words.intersection(e_words)
                 if len(overlap) < 2:

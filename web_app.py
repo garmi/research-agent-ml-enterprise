@@ -58,7 +58,9 @@ from src.ui.intake_view import approved_question_text, effective_provider, rende
 from src.ui.rerun import board_editor_key, export_view, papers_for_rerun
 from src.ui.publish_view import gate_rows, gates_summary, publish_eligibility
 from src.ui.run_status import run_status, status_banner_html, status_code, step_rail, step_rail_html
-from src.ui.brief_view import brief_meta_line, distinct_signals, plain_html, roadmap_html, stopped_run_markdown
+from src.ui.brief_view import (
+    brief_meta_line, distinct_signals, plain_html, report_blocks, report_markdown, roadmap_html, stopped_run_markdown,
+)
 from src.ui.run_jobs import RunJobs
 from src.ui.theme_mode import theme_css, theme_from_query
 from src.llm.model_names import gemini_model_name
@@ -676,6 +678,21 @@ st.markdown(
     .paper-card-title { font-size: 0.98rem; font-weight: 700; margin-bottom: 0.25rem; }
     .paper-card-title a { color: #0F172A; text-decoration: none; }
     .paper-card-meta { font-size: 0.84rem; color: #64748B; overflow-wrap: anywhere; }
+    .report-answer { background: var(--card-bg); border: 1px solid var(--border-subtle); border-left: 4px solid #2563EB; border-radius: 0; padding: 0.9rem 1.1rem; margin-bottom: 0.6rem; }
+    .report-answer-head, .report-section-head { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; justify-content: space-between; }
+    .report-answer p { font-size: 1.02rem; line-height: 1.65; margin: 0.4rem 0 0 0; }
+    .report-section { margin: 1.4rem 0 0.6rem 0; }
+    .report-section-head h3, .report-answer h3, .report-h { font-size: 1.08rem !important; margin: 0.2rem 0 !important; }
+    .report-section-head { margin-top: 1.2rem; }
+    .conf-badge { font-size: 0.74rem; font-weight: 600; padding: 0.2rem 0.6rem; border-radius: 6px; background: #F1F5F9; color: #475569; }
+    .conf-high { background: #ECFDF5; color: #065F46; } .conf-moderate { background: #FFFBEB; color: #92400E; } .conf-low { background: #FEF2F2; color: #991B1B; }
+    .sy-line, .ev-line { border-left: 3px solid #93C5FD; border-radius: 0; padding: 0.15rem 0 0.15rem 0.7rem; margin: 0.45rem 0; font-size: 0.95rem; line-height: 1.6; }
+    .ev-line { border-left-color: #CBD5E1; }
+    .line-tag { font-size: 0.7rem; color: #64748B; font-weight: 600; margin-right: 0.4rem; text-transform: none; }
+    .ev-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin: 0.6rem 0 0.2rem 0; }
+    .ev-table th, .ev-table td { border-bottom: 1px solid var(--border-subtle); padding: 0.35rem 0.4rem; text-align: left; vertical-align: top; }
+    .report-list { margin: 0.2rem 0 0.8rem 1.1rem; font-size: 0.93rem; line-height: 1.6; }
+    .report-empty { color: #64748B; font-size: 0.9rem; }
     .roadmap-phase-head { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; margin: 0.8rem 0 0.4rem 0; }
     .roadmap-basis { font-size: 0.78rem; color: #1E40AF; font-weight: 600; margin-top: 0.15rem; }
     .roadmap-flag { font-size: 0.78rem; color: #B45309; font-weight: 600; margin-top: 0.15rem; }
@@ -1253,87 +1270,97 @@ if results:
     # BRIEF: the draft read as an executive brief
     # ==========================================================================
     with tab_brief:
-        verdict_text = results.get("verdict") or (
-            f"Empirical synthesis across {len(results.get('papers', []))} academic papers and "
-            f"{len(results.get('claims', []))} ledger claims."
-        )
-        verdict_formatted = format_citation_pills(verdict_text, paper_map)
+        report = results.get("report")
+        if report:
+            # S19: the question-shaped report (answer, a section per sub-question, tensions, gaps, implications).
+            findings_by_text = {str(f.get("text", "")).strip(): f for f in results.get("findings") or []}
+            # One st.markdown per block (see report_blocks); report_html joins the same blocks for exports.
+            for block in report_blocks(report, paper_map, findings_by_text, meta=brief_meta_line(results),
+                                       negatives=results.get("negative_findings")):
+                st.markdown(block, unsafe_allow_html=True)
+        else:
+            # Runs saved before S19 keep the earlier layout.
+            verdict_text = results.get("verdict") or (
+                f"Empirical synthesis across {len(results.get('papers', []))} academic papers and "
+                f"{len(results.get('claims', []))} ledger claims."
+            )
+            verdict_formatted = format_citation_pills(verdict_text, paper_map)
 
-        st.markdown(
-            f"""
-            <div class="verdict-banner">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                    <div class="verdict-banner-title">
-                        <span>Bottom line</span>
-                    </div>
-                    <span style="background: #1E3A8A; color: white; padding: 0.25rem 0.75rem; border-radius: 6px; font-size: 0.78rem; font-weight: 700;">
-                        {plain_html(gap_info.get('outcome_label', 'Outcome 1: Supported'))}
-                    </span>
-                </div>
-                <p class="verdict-banner-body">{verdict_formatted}</p>
-                <div style="margin-top: 0.65rem; padding-top: 0.65rem; border-top: 1px solid rgba(15,23,42,0.1); font-size: 0.85rem; color: #1E293B;">
-                    <strong>Research vs practice:</strong> {plain_html(gap_info.get('rationale', 'Empirical academic research is corroborated by active enterprise practice.'))}
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-        st.markdown(f'<div class="brief-meta">{plain_html(brief_meta_line(results))}</div>', unsafe_allow_html=True)
-
-        # Signals that add something beyond the findings below (signals copied from findings are dropped)
-        extra_signals = distinct_signals(results.get("signals") or [], results.get("findings") or [])
-        if extra_signals:
-            st.markdown('<div class="section-title"><span>Key signals</span></div>', unsafe_allow_html=True)
             st.markdown(
-                "<ul class=\"signal-list\">" + "".join(f"<li>{format_citation_pills(sig['text'], paper_map)}</li>" for sig in extra_signals[:3]) + "</ul>",
+                f"""
+                <div class="verdict-banner">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                        <div class="verdict-banner-title">
+                            <span>Bottom line</span>
+                        </div>
+                        <span style="background: #1E3A8A; color: white; padding: 0.25rem 0.75rem; border-radius: 6px; font-size: 0.78rem; font-weight: 700;">
+                            {plain_html(gap_info.get('outcome_label', 'Outcome 1: Supported'))}
+                        </span>
+                    </div>
+                    <p class="verdict-banner-body">{verdict_formatted}</p>
+                    <div style="margin-top: 0.65rem; padding-top: 0.65rem; border-top: 1px solid rgba(15,23,42,0.1); font-size: 0.85rem; color: #1E293B;">
+                        <strong>Research vs practice:</strong> {plain_html(gap_info.get('rationale', 'Empirical academic research is corroborated by active enterprise practice.'))}
+                    </div>
+                </div>
+                """,
                 unsafe_allow_html=True,
             )
 
-        st.markdown('<div class="section-title"><span>Findings</span></div>', unsafe_allow_html=True)
-        st.caption("Click a finding to see the quotes it rests on, their grade and any hedging.")
+            st.markdown(f'<div class="brief-meta">{plain_html(brief_meta_line(results))}</div>', unsafe_allow_html=True)
 
-        if results.get("findings"):
-            for idx_f, item in enumerate(results["findings"], start=1):
-                _render_traceable_finding_card(item, idx_f)
-        else:
-            st.info("No empirical findings met the threshold criteria for this question. Check 'What the Evidence Does Not Support' below.")
+            # Signals that add something beyond the findings below (signals copied from findings are dropped)
+            extra_signals = distinct_signals(results.get("signals") or [], results.get("findings") or [])
+            if extra_signals:
+                st.markdown('<div class="section-title"><span>Key signals</span></div>', unsafe_allow_html=True)
+                st.markdown(
+                    "<ul class=\"signal-list\">" + "".join(f"<li>{format_citation_pills(sig['text'], paper_map)}</li>" for sig in extra_signals[:3]) + "</ul>",
+                    unsafe_allow_html=True,
+                )
 
-        # Risks & Negative Findings side by side
-        r_col1, r_col2 = st.columns(2)
-        with r_col1:
-            st.markdown("##### Risks")
-            if results.get("risks"):
-                for risk in results["risks"]:
-                    st.markdown(
-                        f"""
-                        <div class="risk-item">
-                            <strong>•</strong> {format_citation_pills(risk, paper_map)}
-                        </div>
-                        """,
-                        unsafe_allow_html=True,
-                    )
+            st.markdown('<div class="section-title"><span>Findings</span></div>', unsafe_allow_html=True)
+            st.caption("Click a finding to see the quotes it rests on, their grade and any hedging.")
+
+            if results.get("findings"):
+                for idx_f, item in enumerate(results["findings"], start=1):
+                    _render_traceable_finding_card(item, idx_f)
             else:
-                st.caption("No specific delivery risk assertions recorded in the ledger for this run.")
+                st.info("No empirical findings met the threshold criteria for this question. Check 'What the Evidence Does Not Support' below.")
 
-        with r_col2:
-            st.markdown("##### What the evidence does not show")
-            if results.get("negative_findings"):
-                for nf in results["negative_findings"]:
-                    st.markdown(
-                        f"""
-                        <div style="background: #F8FAFC; border: 1px solid #CBD5E1; border-left: 4px solid #64748B; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 0.6rem; font-size: 0.88rem; color: #334155;">
-                            {plain_html(nf)}
-                        </div>
-                        """,
-                        unsafe_allow_html=True,
-                    )
-            else:
-                st.caption("No negative findings recorded.")
+            # Risks & Negative Findings side by side
+            r_col1, r_col2 = st.columns(2)
+            with r_col1:
+                st.markdown("##### Risks")
+                if results.get("risks"):
+                    for risk in results["risks"]:
+                        st.markdown(
+                            f"""
+                            <div class="risk-item">
+                                <strong>•</strong> {format_citation_pills(risk, paper_map)}
+                            </div>
+                            """,
+                            unsafe_allow_html=True,
+                        )
+                else:
+                    st.caption("No specific delivery risk assertions recorded in the ledger for this run.")
 
-        if results.get("roadmap"):
-            st.markdown("##### Recommended next steps")
-            st.markdown(roadmap_html(results.get("roadmap", [])), unsafe_allow_html=True)
+            with r_col2:
+                st.markdown("##### What the evidence does not show")
+                if results.get("negative_findings"):
+                    for nf in results["negative_findings"]:
+                        st.markdown(
+                            f"""
+                            <div style="background: #F8FAFC; border: 1px solid #CBD5E1; border-left: 4px solid #64748B; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 0.6rem; font-size: 0.88rem; color: #334155;">
+                                {plain_html(nf)}
+                            </div>
+                            """,
+                            unsafe_allow_html=True,
+                        )
+                else:
+                    st.caption("No negative findings recorded.")
+
+            if results.get("roadmap"):
+                st.markdown("##### Recommended next steps")
+                st.markdown(roadmap_html(results.get("roadmap", [])), unsafe_allow_html=True)
 
     # ==========================================================================
     # EVIDENCE: the three lanes' sources, Check A detail, exclude-and-re-draft
@@ -1680,7 +1707,13 @@ if results:
     syn_raw = results.get("synthesis", {})
     topic_str = st.session_state.get("current_question", results.get("strategic_question", "Executive Briefing"))
 
-    if perm.can_download_full:
+    if results.get("report") and (perm.can_download_full or perm.can_download_draft):
+        # S19: the brief download follows the report, built from the checked ledger sentences.
+        brief_content = report_markdown(results["report"], question=results.get("strategic_question", topic_str))
+        if not perm.can_download_full:
+            brief_content = "# DRAFT, NOT FOR PUBLICATION\n\n" + brief_content
+        json_content = json.dumps(export_view(results), indent=2, default=str)
+    elif perm.can_download_full:
         brief_content = builder.build_markdown(topic_str, syn_raw) if syn_raw else f"# Executive Research Brief\n\n**Topic:** {topic_str}\n\n## Verdict\n{results.get('verdict', '')}\n"
         json_content = json.dumps(syn_raw or export_view(results), indent=2)
     elif perm.can_download_draft and results.get("stopped_at"):

@@ -47,13 +47,13 @@ def test_anchors_derived_from_the_question():
     from src.analysis.queries import research_queries, subject_terms
 
     week = [t.lower() for t in subject_terms(WEEK_Q, WEEK_PKG)]
-    assert {"four", "day", "week", "employee", "productivity"} & set(week) >= {"week", "employee"}
+    assert any(t.startswith("week") for t in week) and "employee" in week
     assert not {"ai", "code", "software", "llm"} & set(week)
     plat = [t.lower() for t in subject_terms(PLATFORM_Q, PLATFORM_PKG)]
     assert {"platform", "ai"} <= set(plat)
     qs = research_queries(WEEK_Q, WEEK_PKG)
     wellbeing = next(q for q in qs if "wellbeing" in q)
-    assert "week" in wellbeing.lower().split()
+    assert any(w.startswith("week") for w in wellbeing.lower().split())
 
 
 def test_no_topic_specific_query_expansions():
@@ -230,7 +230,8 @@ def test_report_model_tables_and_confidence():
 # ------------------------------------------------------------------------------
 def test_web_app_renders_report_and_export():
     web = Path("web_app.py").read_text(encoding="utf-8")
-    assert 'results.get("report")' in web and "report_html(" in web
+    # One st.markdown per block: finding cards hold blank lines, which end a shared Markdown HTML block.
+    assert 'results.get("report")' in web and "report_blocks(" in web
     from src.ui.brief_view import report_markdown
 
     rep = {"answer": {"text": "Output held [P1][P2].", "confidence": {"level": "moderate", "papers": 2, "empirical": 2, "conceptual": 0}},

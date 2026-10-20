@@ -47,6 +47,11 @@ _DARK = """
 .paper-card-title a, .roadmap-action, .step-label, .studio-header h1 { color: #F1F5F9 !important; }
 .paper-tag { background: #1E293B !important; color: #CBD5E1 !important; }
 .run-status { filter: brightness(0.9); }
+.conf-badge { background: #1E293B !important; color: #CBD5E1 !important; }
+.conf-high { background: #0F2A22 !important; color: #6EE7B7 !important; }
+.conf-moderate { background: #2A2110 !important; color: #FCD34D !important; }
+.conf-low { background: #2A1215 !important; color: #FCA5A5 !important; }
+.line-tag { color: #94A3B8 !important; }
 /* Inline light backgrounds and dark text written directly into card HTML. Browsers keep inline colours
    as rgb(...), so both spellings are matched. */
 [style*="background: #FFFFFF"], [style*="background:#FFFFFF"], [style*="background: white"],

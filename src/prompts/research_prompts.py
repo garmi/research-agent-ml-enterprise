@@ -72,7 +72,7 @@ Analyse them and return valid JSON with exactly these keys:
   "executive_summary": "The bottom line in 2-3 sentences: what the evidence shows, how strong it is, and why it matters. Every sentence cites the paper ids it rests on, e.g. [P1][P3]",
   "objective": "one sentence",
   "research_questions": ["3 questions the evidence helps answer"],
-  "key_findings": ["4-6 complete descriptive findings, each followed by supporting paper ids, e.g. Two studies report higher deployment frequency under automated testing frameworks [P1][P3]"],
+  "key_findings": ["4-6 complete descriptive findings, each followed by supporting paper ids, e.g. Two studies report the same effect in different settings [P1][P3]"],
   "themes": [{{"name": "Theme Name", "description": "Complete description of the theme [P2]"}}],
   "market_trends": ["3-4 complete descriptive market trend statements, each citing paper ids"],
   "business_problems": ["3-5 complete descriptive problem statements explaining what goes wrong in the enterprise, each citing paper ids"],
@@ -86,6 +86,52 @@ Rules:
 - If evidence on a point is thin, explicitly state that evidence is limited.
 - When a figure rests on one paper, say so in the sentence: "One study reports that ... 41% ... [P2]". State a figure as general fact only when two or more papers report it.
 - executive_summary: describe what the evidence shows, not what leaders should do. Do not use "must", "should" or other directives (actions belong in the recommendations). Hedge claims that rest on a single study ("one study reports", "suggests"). Use only figures that appear in the summaries, and cite every sentence with its [P#] ids.
+
+Paper summaries:
+{json.dumps(compact, ensure_ascii=False, indent=1)}
+"""
+
+    @classmethod
+    def report(cls, topic: str, compact: List[Dict[str, Any]], sub_questions: List[str], question: str = "",
+               tone: str = "executive", length: str = "detailed") -> str:
+        """The question-shaped report (S19): an answer, one section per approved sub-question, tensions, gaps and
+        implications. Domain-neutral: no topic examples, so the model is not nudged toward any field."""
+        tone_guide = cls.TONE_INSTRUCTIONS.get(tone, cls.TONE_INSTRUCTIONS["executive"])
+        length_guide = cls.LENGTH_INSTRUCTIONS.get(length, cls.LENGTH_INSTRUCTIONS["detailed"])
+        numbered = "\n".join(f"{i}. {q}" for i, q in enumerate(sub_questions, 1))
+        return f"""
+You are a senior research analyst writing a brief that answers a question from the papers summarised below.
+Approved question: {question or topic}
+
+{tone_guide}
+{length_guide}
+
+Answer each sub-question below, in this order, as its own section:
+{numbered}
+
+Return valid JSON with exactly these keys:
+{{
+  "answer": ["2-4 sentences that answer the approved question directly, each ending with its [P#] tags"],
+  "sections": [
+    {{"sub_question": "the sub-question text exactly as given",
+      "synthesis": ["1-3 sentences that combine what two or more papers show, e.g. 'Taken together, ... [P1][P4]'"],
+      "evidence": ["2-4 sentences, each about one paper's own result, e.g. 'One study reports that ... [P2]'"]}}
+  ],
+  "tensions": ["sentences on where papers disagree, citing both sides"],
+  "gaps": ["sentences on what the papers do not answer, drawn from their stated limitations, with [P#] tags"],
+  "implications": [{{"text": "an action for leaders that follows from the evidence, with [P#] tags", "section": 1}}]
+}}
+
+Rules:
+- Every sentence ends with the [P#] tags of the papers it rests on. Use only the paper ids given.
+- A synthesis sentence combines two or more papers. If a point rests on one paper, put it under evidence and say "one study reports".
+- Use only figures that appear in the summaries. Never invent numbers, organisations or studies.
+- Match the strength of your verbs to the evidence: prefer "suggests", "reports", "indicates" over "shows" or "proves"
+  unless several strong studies agree. Avoid "significantly" and "substantially" unless a paper uses those words.
+- Sections answer only their own sub-question. If the papers say nothing on a sub-question, give it no synthesis and
+  one gap sentence saying so.
+- The answer and sections describe the evidence. Only implications may recommend actions; give 3-5, each naming the
+  section number it follows from.
 
 Paper summaries:
 {json.dumps(compact, ensure_ascii=False, indent=1)}
