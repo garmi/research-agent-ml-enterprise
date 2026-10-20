@@ -54,6 +54,7 @@ from src.engine.entry import start_run
 from src.engine.ids import resolve_question_id
 from src.engine.stub_mode import is_stub_mode
 from src.ui.safe_page import safe_page, format_error_payload, render_safe_error
+from src.ui.brand import buddha_svg
 from src.ui.claims_view import claims_overview_html
 from src.ui.evidence_view import evidence_map_html, finding_card_html, paper_card_html, render_sentence
 from src.output.share_pack import image_card_svg, post_text
@@ -124,7 +125,7 @@ def render_stub_banner_if_active() -> bool:
 # --- PAGE SETUP ---
 st.set_page_config(
     page_title="AI Guruji",
-    page_icon="🔬",
+    page_icon="🧘",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -975,15 +976,13 @@ with st.sidebar:
     st.markdown(
         """
         <div style="display: flex; align-items: center; gap: 0.65rem; margin-bottom: 1rem;">
-            <div style="background: linear-gradient(135deg, #2563EB, #1E40AF); color: white; width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.15rem; font-weight: bold; box-shadow: 0 2px 6px rgba(37,99,235,0.3);">
-                🔬
-            </div>
+            BUDDHA_MARK_SIDEBAR
             <div>
                 <div style="font-weight: 800; font-size: 1rem; color: #0F172A; line-height: 1.1;">AI Guruji</div>
                 <div style="font-size: 0.74rem; font-weight: 600; color: #64748B; letter-spacing: 0.04em;">EVIDENCE-BACKED RESEARCH</div>
             </div>
         </div>
-        """,
+        """.replace("BUDDHA_MARK_SIDEBAR", buddha_svg(36)),
         unsafe_allow_html=True,
     )
 
@@ -1055,7 +1054,7 @@ st.markdown(
     """
     <div class="studio-header">
         <div class="studio-title-group">
-            <h1>AI Guruji</h1>
+            <div style="display:flex;align-items:center;gap:0.7rem;">BUDDHA_MARK_HEADER<h1>AI Guruji</h1></div>
             <p>Evidence-backed research briefs: every finding traced to its source, every claim checked before you publish.</p>
         </div>
         <div class="meta-badge">
@@ -1063,7 +1062,7 @@ st.markdown(
             Academic, enterprise and field evidence
         </div>
     </div>
-    """,
+    """.replace("BUDDHA_MARK_HEADER", buddha_svg(52)),
     unsafe_allow_html=True,
 )
 

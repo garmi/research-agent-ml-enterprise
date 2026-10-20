@@ -1608,55 +1608,64 @@ class MultiLaneResearchRunner:
                 u_clean = u.strip()
                 if not u_clean:
                     continue
-                t, a, d = fetch_url_metadata(u_clean)
-                src_id = f"custom_ent_{hashlib.sha256(u_clean.encode()).hexdigest()[:10]}"
-                is_vendor = any(w in u_clean.lower() for w in ("blog", "aws", "microsoft", "google", "vendor"))
-                stake = "vendor" if is_vendor else "independent"
-                src_type = "filing" if "sec.gov" in u_clean else ("vendor_blog" if is_vendor else "customer_case_study")
-
-                source = Source(
-                    id=src_id,
-                    lane="enterprise",
-                    source_type=src_type,
-                    org=d,
-                    title=f"[Custom User Source] {t}",
-                    url=u_clean,
-                    venue=d,
-                    venue_tier="vendor" if is_vendor else "unverified",
-                    pub_date=str(datetime.datetime.now().year),
-                    commercial_stake=stake,
-                    status="active",
-                )
-                self._safe_insert_source(source)
-
-                extracted = extract_claims_from_paper(
-                    paper={"id": src_id, "title": t, "abstract": a, "url": u_clean},
-                    question_id=question_obj.id,
-                    target_entity="Enterprise AI Delivery",
-                )
-                if not extracted:
-                    extracted = [
-                        Claim(
-                            id=f"claim_{uuid.uuid4().hex[:10]}",
-                            question_id=question_obj.id,
-                            source_id=src_id,
-                            text=f"Custom enterprise source provides technical evidence: {a[:120]}",
-                            source_excerpt=a[:120],
-                            entity=t[:50],
-                            entity_match="topic_level",
-                            study_type="case_study" if not is_vendor else "vendor_assertion",
-                            claim_date=str(datetime.datetime.now().year),
-                            grade="vendor_claim" if is_vendor else "moderate",
-                            grade_reasons_json=["Ingested from user enterprise URL; commercial capping applied."],
-                            status="active",
-                            created_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                        )
-                    ]
-                for c in extracted:
-                    self._safe_insert_claim(c)
-                    claims.append(c)
+                # S25: one URL that cannot be read or stored is skipped and logged; it never fails the run.
+                try:
+                    claims.extend(self._ingest_custom_enterprise_url(u_clean, question_obj))
+                except Exception as e:
+                    logger.warning("Custom enterprise URL skipped (%s): %s", type(e).__name__, u_clean[:120])
 
         return claims
+
+    def _ingest_custom_enterprise_url(self, u_clean: str, question_obj: Question) -> List[Claim]:
+        """One operator-supplied enterprise URL as a source and its claims."""
+        t, a, d = fetch_url_metadata(u_clean)
+        src_id = f"custom_ent_{hashlib.sha256(u_clean.encode()).hexdigest()[:10]}"
+        is_vendor = any(w in u_clean.lower() for w in ("blog", "aws", "microsoft", "google", "vendor"))
+        stake = "vendor" if is_vendor else "unknown"  # S25: "independent" is not a CommercialStake
+        src_type = "filing" if "sec.gov" in u_clean else ("vendor_blog" if is_vendor else "customer_case_study")
+
+        source = Source(
+            id=src_id,
+            lane="enterprise",
+            source_type=src_type,
+            org=d,
+            title=f"[Custom User Source] {t}",
+            url=u_clean,
+            venue=d,
+            venue_tier="vendor" if is_vendor else "unverified",
+            pub_date=str(datetime.datetime.now().year),
+            commercial_stake=stake,
+            status="active",
+        )
+        self._safe_insert_source(source)
+
+        extracted = extract_claims_from_paper(
+            paper={"id": src_id, "title": t, "abstract": a, "url": u_clean},
+            question_id=question_obj.id,
+            target_entity="Enterprise AI Delivery",
+        )
+        if not extracted:
+            extracted = [
+                Claim(
+                    id=f"claim_{uuid.uuid4().hex[:10]}",
+                    question_id=question_obj.id,
+                    source_id=src_id,
+                    text=f"Custom enterprise source provides technical evidence: {a[:120]}",
+                    source_excerpt=a[:120],
+                    entity=t[:50],
+                    entity_match="topic_level",
+                    study_type="case_study" if not is_vendor else "vendor_assertion",
+                    claim_date=str(datetime.datetime.now().year),
+                    grade="vendor_claim" if is_vendor else "moderate",
+                    grade_reasons_json=["Ingested from user enterprise URL; commercial capping applied."],
+                    status="active",
+                    created_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                )
+            ]
+        for c in extracted:
+            self._safe_insert_claim(c)
+        return extracted
+
 
     def _harvest_practitioner_lane(
         self,
