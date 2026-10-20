@@ -111,10 +111,8 @@ def build_report(
                          "table": table, "confidence": _confidence(cited, methods, tiers)})
 
     summary = next((s for s in sentences if s.type == "summary"), None)
-    all_cited = []
-    for sec in sections:
-        all_cited += [r["paper"] for r in sec["table"] if r["paper"] not in all_cited]
-    answer_ids = [pid for pid, key in key_of.items() if key in all_cited]
+    # The answer's confidence rests on the papers the answer itself cites.
+    answer_ids = sources_of(summary) if summary else []
     gaps = [sentence_dict(s) for s in sentences if s.type == "gap"]
     for sec in sections:
         n = sec["confidence"]["papers"]

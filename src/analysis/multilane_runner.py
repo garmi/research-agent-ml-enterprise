@@ -1791,6 +1791,12 @@ class MultiLaneResearchRunner:
                 synth["generation_mode"] = "extractive_fallback"
                 synth["is_fallback"] = True
             else:
+                # S19: a report reply with nothing usable (invalid JSON, empty sections) is a model failure, so the
+                # run falls back to the extractive report and says why, instead of showing a blank brief.
+                if (approved_package or {}).get("sub_questions") and not synth.get("answer") and not any(
+                    s.get("synthesis") or s.get("evidence") for s in synth.get("sections") or []
+                ):
+                    raise ValueError("The model's report reply had no usable content (invalid JSON or empty sections).")
                 synth["generation_mode"] = "model"
                 synth["is_fallback"] = False
         except Exception as e:

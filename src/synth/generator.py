@@ -326,9 +326,23 @@ class SynthesisEngine:
                 add(str(t), "tension")
             for t in (executive_synthesis or {}).get("gaps") or []:
                 add(str(t), "gap")
+            # An implication that names no section gets the section whose papers it shares most (a rule, not a guess
+            # by the model); one sharing no paper with any section stays unassigned and fails G1.
+            section_sources: Dict[int, Set[str]] = {}
+            for s in sentences:
+                sec_no = (s.checks_json or {}).get("section")
+                if sec_no and s.type != "heading":
+                    section_sources.setdefault(sec_no, set()).update(
+                        claims_by_id[c].source_id for c in (s.claim_ids_json or []) if c in claims_by_id)
             for imp in (executive_synthesis or {}).get("implications") or []:
-                if isinstance(imp, dict) and str(imp.get("text") or "").strip():
-                    add(str(imp["text"]), "implication", imp.get("section"))
+                if not (isinstance(imp, dict) and str(imp.get("text") or "").strip()):
+                    continue
+                section = imp.get("section")
+                if not section:
+                    own = {claims_by_id[c].source_id for c in bind(str(imp["text"]))[0] if c in claims_by_id}
+                    best = max(section_sources.items(), key=lambda kv: (len(kv[1] & own), -kv[0]), default=(None, set()))
+                    section = best[0] if best[0] and best[1] & own else None
+                add(str(imp["text"]), "implication", section)
         elif executive_synthesis and executive_synthesis.get("key_findings"):
             for f_text in executive_synthesis["key_findings"]:
                 # Only the claims the sentence's own tags point to; an untagged sentence stays unbound.

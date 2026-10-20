@@ -94,20 +94,21 @@ def _stem_match(a: str, b: str) -> bool:
 
 
 def subject_terms(question: str, package: Optional[Dict[str, Any]] = None) -> List[str]:
-    """The question's subject (S19): its key terms that recur in the approved sub-questions or scope (a word
-    the whole package keeps coming back to), plus any configured anchor it contains. Derived per question, so
-    a question about four-day weeks anchors on 'week' and 'employee', not on a technology word list."""
+    """The question's subject (S19): its key terms that recur in two or more of the package's texts (sub-questions,
+    scope), i.e. the words the whole package keeps coming back to, plus any configured anchor it contains. Most
+    recurring first. Derived per question, so a question about four-day weeks anchors on 'week' and 'employee',
+    not on a technology word list."""
     pkg = package or {}
     terms = _terms(question)
-    others = [t for text in list(pkg.get("sub_questions") or []) + list(pkg.get("in_scope") or [])
-              for t in _terms(str(text))]
-    configured = anchor_terms(question)
-    out: List[str] = []
-    for t in terms:
-        recurs = any(_stem_match(t, o) for o in others)
-        if (recurs or t in configured) and t.lower() not in (x.lower() for x in out):
-            out.append(t)
-    return out
+    texts = [_terms(str(t)) for t in list(pkg.get("sub_questions") or []) + list(pkg.get("in_scope") or [])]
+    configured = {a.lower() for a in anchor_terms(question)}
+    need = 2 if len(texts) >= 2 else 1
+    scored: List[tuple] = []
+    for order, t in enumerate(terms):
+        hits = sum(1 for words in texts if any(_stem_match(t, w) for w in words))
+        if (hits >= need or t.lower() in configured) and t.lower() not in (x[2].lower() for x in scored):
+            scored.append((-hits, order, t))
+    return [t for _, _, t in sorted(scored)]
 
 
 def research_queries(topic: str, approved_package: Optional[Dict[str, Any]] = None) -> List[str]:
@@ -122,10 +123,11 @@ def research_queries(topic: str, approved_package: Optional[Dict[str, Any]] = No
     for sq in pkg.get("sub_questions") or []:
         if not isinstance(sq, str):
             continue
-        q = condense(sq, anchors=anchors)
-        present = {w.lower() for w in q.split()}
-        q = " ".join([q] + [a for a in main_anchors if a.lower() not in present])
-        candidates.append(q)
+        # The sub-question plus at most the three most-recurring subject terms it lacks, condensed again so the
+        # query stays at MAX_QUERY_TERMS (long keyword strings rank poorly in the search APIs).
+        own = {w.lower() for w in _terms(sq)}
+        missing = [a for a in main_anchors if not any(_stem_match(a, w) for w in own)][:3]
+        candidates.append(condense(f"{sq} {' '.join(missing)}", anchors=anchors))
     candidates += topic_queries[1:]
     out: List[str] = []
     seen = set()
