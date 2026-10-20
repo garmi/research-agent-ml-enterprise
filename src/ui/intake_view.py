@@ -11,7 +11,7 @@ from __future__ import annotations
 import hashlib
 
 import streamlit as st
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from src.engine.ids import (
     resolve_question_id,
@@ -77,6 +77,20 @@ def _load_proposal(pkg: Dict[str, Any]) -> None:
     st.session_state["s2_active_package"] = pkg
     st.session_state["_last_approved_id"] = None
     st.session_state["_last_approved_package_sha256"] = None
+
+
+def subquestion_choices(current: List[str], history: List[Dict[str, Any]]) -> List[Tuple[str, bool]]:
+    """Sub-questions to offer with an include tick (S25): the current ones ticked, then those earlier proposals had
+    and the model dropped, unticked. Duplicates (ignoring case and spacing) appear once."""
+    norm = lambda q: " ".join(str(q).lower().split())
+    seen: set = set()
+    out: List[Tuple[str, bool]] = []
+    for q, ticked in [(q, True) for q in current] + [(q, False) for pkg in history or [] for q in pkg.get("sub_questions") or []]:
+        q = str(q).strip()
+        if q and norm(q) not in seen:
+            seen.add(norm(q))
+            out.append((q, ticked))
+    return out
 
 
 def effective_provider(selected: str, has_gemini_key: bool, ollama_ok: bool) -> str:
@@ -257,9 +271,18 @@ def render_intake_view(before_run: Optional[Callable[[], None]] = None) -> Dict[
         edited_in_scope = [s.strip() for s in in_scope_input.splitlines() if s.strip()]
         edited_out_scope = [s.strip() for s in out_scope_input.splitlines() if s.strip()]
 
+        # S25: tick which sub-questions go into the run; ones the model dropped in earlier versions can be ticked
+        # back without re-reasoning. Keys carry the version, so ticks reset for each new proposal.
+        st.markdown("**Sub-questions in this run** (untick to leave one out; dropped ones from earlier versions are listed unticked)")
+        chosen_sub_qs = []
+        for q_text, ticked in subquestion_choices(edited_sub_qs, proposals_history[:-1]):
+            q_key = "chk_subq_v" + str(version_num) + "_" + hashlib.sha256(q_text.encode("utf-8")).hexdigest()[:10]
+            if st.checkbox(q_text, value=ticked, key=q_key):
+                chosen_sub_qs.append(q_text)
+
         current_package = dict(active_pkg)
         current_package["refined_question"] = refined_input.strip()
-        current_package["sub_questions"] = edited_sub_qs
+        current_package["sub_questions"] = chosen_sub_qs
         current_package["premises_to_test"] = edited_premises
         current_package["in_scope"] = edited_in_scope
         current_package["out_of_scope"] = edited_out_scope
