@@ -1740,6 +1740,39 @@ class MultiLaneResearchRunner:
 
         return graded
 
+    @staticmethod
+    def _report_lines(report: Optional[Dict[str, Any]]) -> List[str]:
+        """The checked report as numbered lines with their [P#] tags, for the diagram and summary prompts."""
+        if not report:
+            return []
+        lines = [f"Answer: {(report.get('answer') or {}).get('text', '')}"]
+        for sec in report.get("sections") or []:
+            lines.append(f"{sec.get('index')}. {sec.get('sub_question')}")
+            lines += [f"   - {s.get('text', '')}" for s in sec.get("sentences") or []]
+        lines += [f"Tension: {t.get('text', '')}" for t in report.get("tensions") or []]
+        return lines
+
+    def _report_diagram(self, report: Optional[Dict[str, Any]], papers: List[Dict[str, Any]],
+                        claims_by_id: Dict[str, Claim], question: str) -> Optional[Dict[str, Any]]:
+        """S20: one diagram call over the checked report, then rule validation (an invalid spec is dropped,
+        never repaired). No model (extractive fallback) or no report means no diagram."""
+        llm = getattr(self, "_reduce_llm", None)
+        if llm is None or not report or not report.get("sections"):
+            return None
+        from src.analysis.synthesizer import REDUCE_SYSTEM, SynthesisEngine as AnalysisSynthesisEngine
+        from src.prompts.research_prompts import ResearchPromptLibrary
+        from src.synth.diagram import validate_diagram
+
+        cited = sorted({k for sec in report["sections"] for row in sec.get("table") or [] for k in [row.get("paper")] if k},
+                       key=lambda k: int(k[1:]) if k[1:].isdigit() else 0)
+        try:
+            raw = AnalysisSynthesisEngine(llm, max_retries=0)._call_json(
+                llm, ResearchPromptLibrary.diagram(question, self._report_lines(report), cited), REDUCE_SYSTEM, temperature=0.2)
+        except Exception as e:  # a failed diagram call never fails the run
+            logger.warning("Diagram call failed: %s", type(e).__name__)
+            return None
+        return validate_diagram(raw, papers, claims_by_id)
+
     def _generate_executive_deliverables(
         self,
         topic: str,
@@ -1768,6 +1801,8 @@ class MultiLaneResearchRunner:
 
         error_details = None
         generation_mode = "model"
+        # S20/S21: the model that wrote the report also drafts the diagram and summary; None means no model.
+        self._reduce_llm = None
 
         try:
             map_llm = build_llm(map_provider, cfg)
@@ -1799,6 +1834,7 @@ class MultiLaneResearchRunner:
                     raise ValueError("The model's report reply had no usable content (invalid JSON or empty sections).")
                 synth["generation_mode"] = "model"
                 synth["is_fallback"] = False
+                self._reduce_llm = reduce_llm
         except Exception as e:
             exc_class = type(e).__name__
             raw_msg = str(e)
@@ -2082,6 +2118,14 @@ class MultiLaneResearchRunner:
                 "checks_json": s.checks_json or {},
             })
 
+        # S19: the question-shaped report, built by rule from the checked sentences (None for older shapes).
+        report_obj = build_report(
+            sentences, papers_formatted, {c.id: c for c in all_q_claims},
+            executive_synthesis.get("paper_summaries") or [],
+            lambda p: self.grader.resolve_venue_tier(p.get("venue"), p.get("type")),
+        )
+        diagram_obj = self._report_diagram(report_obj, papers_formatted, claim_by_id, question_obj.text)
+
         status_val = publish_res.get("status", score_results.get("band", "NOT_PUBLISHABLE"))
         # The bottom line shown is the gated summary sentence (S10), the same text the gates checked.
         summary_sentence = next((s for s in sentences if s.type == "summary"), None)
@@ -2136,12 +2180,8 @@ class MultiLaneResearchRunner:
             "breadth": dict(getattr(self, "_breadth", {}) or {}),
             "excluded_claims": excluded_formatted,
             "sentence_traces": sentence_traces,
-            # S19: the question-shaped report, built by rule from the checked sentences (None for older shapes).
-            "report": build_report(
-                sentences, papers_formatted, {c.id: c for c in all_q_claims},
-                executive_synthesis.get("paper_summaries") or [],
-                lambda p: self.grader.resolve_venue_tier(p.get("venue"), p.get("type")),
-            ),
+            "report": report_obj,
+            "diagram": diagram_obj,
             "generation_mode": executive_synthesis.get("generation_mode", "model"),
             "is_fallback": bool(executive_synthesis.get("is_fallback", False)),
             "error_details": executive_synthesis.get("error_details"),

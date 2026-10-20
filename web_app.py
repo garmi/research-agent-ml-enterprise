@@ -682,6 +682,8 @@ st.markdown(
     .report-answer-head, .report-section-head { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; justify-content: space-between; }
     .report-answer p { font-size: 1.02rem; line-height: 1.65; margin: 0.4rem 0 0 0; }
     .report-section { margin: 1.4rem 0 0.6rem 0; }
+    .report-diagram { background: var(--card-bg); border: 1px solid var(--border-subtle); padding: 0.8rem 1rem; margin: 0.4rem 0 1rem 0; overflow-x: auto; }
+    .report-diagram h3 { font-size: 1.02rem; margin: 0 0 0.3rem 0; }
     .report-section-head h3, .report-answer h3, .report-h { font-size: 1.08rem !important; margin: 0.2rem 0 !important; }
     .report-section-head { margin-top: 1.2rem; }
     .conf-badge { font-size: 0.74rem; font-weight: 600; padding: 0.2rem 0.6rem; border-radius: 6px; background: #F1F5F9; color: #475569; }
@@ -1285,7 +1287,7 @@ if results:
             findings_by_text = {str(f.get("text", "")).strip(): f for f in results.get("findings") or []}
             # One st.markdown per block (see report_blocks); report_html joins the same blocks for exports.
             for block in report_blocks(report, paper_map, findings_by_text, meta=brief_meta_line(results),
-                                       negatives=results.get("negative_findings")):
+                                       negatives=results.get("negative_findings"), diagram=results.get("diagram")):
                 st.markdown(block, unsafe_allow_html=True)
         else:
             # Runs saved before S19 keep the earlier layout.
@@ -1725,7 +1727,8 @@ if results:
 
     if results.get("report") and (perm.can_download_full or perm.can_download_draft):
         # S19: the brief download follows the report, built from the checked ledger sentences.
-        brief_content = report_markdown(results["report"], question=results.get("strategic_question", topic_str))
+        brief_content = report_markdown(results["report"], question=results.get("strategic_question", topic_str),
+                                        diagram=results.get("diagram"), papers=results.get("papers", []))
         if not perm.can_download_full:
             brief_content = "# DRAFT, NOT FOR PUBLICATION\n\n" + brief_content
         json_content = json.dumps(export_view(results), indent=2, default=str)

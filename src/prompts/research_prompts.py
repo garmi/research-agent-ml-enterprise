@@ -138,6 +138,37 @@ Paper summaries:
 """
 
     @classmethod
+    def diagram(cls, question: str, report_lines: List[str], paper_ids: List[str]) -> str:
+        """One diagram spec from the checked report (S20). Rules keep or drop it; the model is not asked again.
+        Domain-neutral: no topic examples."""
+        lines = "\n".join(report_lines)
+        return f"""
+You are drawing one simple diagram that helps a busy reader see how the findings below fit together.
+Approved question: {question}
+
+Choose the type that fits the evidence, or "none" if a diagram would not help:
+- "pathway": ordered steps or stages
+- "architecture": components and how they connect (only when two or more papers describe components)
+- "comparison": options set side by side
+- "cause_effect": factors and the outcomes they lead to
+- "none": the findings do not form a structure
+
+Return valid JSON with exactly these keys:
+{{"type": "pathway|architecture|comparison|cause_effect|none",
+  "title": "a short title of at most 8 words",
+  "nodes": [{{"id": "a", "label": "at most 40 characters", "cites": ["P1"]}}],
+  "edges": [{{"from": "a", "to": "b", "label": "optional, at most 30 characters"}}]}}
+
+Rules:
+- At most 6 nodes. Each label is at most 40 characters.
+- Every node cites the [P#] ids of the papers it rests on, taken from the findings below. Use only these ids: {", ".join(paper_ids)}.
+- Draw only what the findings say. Never add a step, component or link the findings do not support.
+
+Checked findings:
+{lines}
+"""
+
+    @classmethod
     def recommendations(cls, topic: str, analysis: Dict[str, Any], compact: List[Dict[str, Any]], tone: str = "executive", length: str = "detailed") -> str:
         tone_guide = cls.TONE_INSTRUCTIONS.get(tone, cls.TONE_INSTRUCTIONS["executive"])
         length_guide = cls.LENGTH_INSTRUCTIONS.get(length, cls.LENGTH_INSTRUCTIONS["detailed"])

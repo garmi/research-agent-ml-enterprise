@@ -138,7 +138,7 @@ def _evidence_table_html(rows: List[Dict[str, Any]]) -> str:
 
 
 def report_blocks(report: Dict[str, Any], paper_map: Dict[str, Any], findings_by_text: Dict[str, Dict[str, Any]],
-                  meta: str = "", negatives: Optional[List[str]] = None) -> List[str]:
+                  meta: str = "", negatives: Optional[List[str]] = None, diagram: Optional[Dict[str, Any]] = None) -> List[str]:
     """The Brief tab for a question-shaped report, as separate HTML blocks (one st.markdown each: finding cards
     contain blank lines, which end a Markdown HTML block, so they cannot share one call). Model text is escaped by
     render_sentence; evidence sentences keep their click-to-see-the-quotes cards."""
@@ -152,6 +152,12 @@ def report_blocks(report: Dict[str, Any], paper_map: Dict[str, Any], findings_by
     ]
     if meta:
         blocks.append(f'<div class="brief-meta">{plain_html(meta)}</div>')
+    if diagram:
+        # S20: the validated diagram sits right after the answer; each box names the papers it rests on.
+        from src.ui.diagrams import diagram_svg
+
+        blocks.insert(1, f'<div class="report-diagram"><h3>{plain_html(diagram.get("title"))}</h3>{diagram_svg(diagram)}'
+                         '<p class="line-tag">Each box names the papers it rests on.</p></div>')
     card_no = 0
     for sec in report.get("sections") or []:
         blocks.append(f'<div class="report-section-head"><h3>{int(sec.get("index") or 0)}. '
@@ -189,7 +195,8 @@ def report_html(*args: Any, **kwargs: Any) -> str:
     return "\n".join(report_blocks(*args, **kwargs))
 
 
-def report_markdown(report: Dict[str, Any], question: str = "") -> str:
+def report_markdown(report: Dict[str, Any], question: str = "", diagram: Optional[Dict[str, Any]] = None,
+                    papers: Optional[List[Dict[str, Any]]] = None) -> str:
     """The brief download for a question-shaped report, in the same order as the Brief tab."""
     lines = [f"# {question}" if question else "# Research brief", ""]
     answer = report.get("answer") or {}
@@ -198,6 +205,10 @@ def report_markdown(report: Dict[str, Any], question: str = "") -> str:
     if conf:
         lines.append(f"_Confidence: {conf.get('level')} · {conf.get('papers', 0)} papers · {conf.get('empirical', 0)} empirical_")
     lines.append("")
+    if diagram:
+        from src.synth.diagram import diagram_outline
+
+        lines += [f"## {diagram.get('title')}", ""] + [f"- {ln}" for ln in diagram_outline(diagram)] + [""]
     for sec in report.get("sections") or []:
         lines += [f"## {sec.get('index')}. {sec.get('sub_question')}", ""]
         for s in sec.get("sentences") or []:
@@ -217,4 +228,16 @@ def report_markdown(report: Dict[str, Any], question: str = "") -> str:
         lines += ["## Implications"] + [
             f"{n}. {i.get('text', '')}" + (f" _(from section {i['section']})_" if i.get("section") else "")
             for n, i in enumerate(report["implications"], 1)] + [""]
+    if papers:
+        from src.ui.evidence_view import evidence_map
+
+        m = evidence_map(report, papers)
+        if m["sections"]:
+            qs = [f"Q{sec['index']}" for sec in m["sections"]]
+            lines += ["## Evidence map", "", "| Paper | Title | Method | " + " | ".join(qs) + " |",
+                      "|---|---|---|" + "---|" * len(qs)]
+            lines += [f"| {_md_cell(r['paper'])} | {_md_cell(r['title'])} | {_md_cell(r['method'] or r['note'])} | "
+                      + " | ".join("●" if c else "" for c in r["cited"]) + " |" for r in m["rows"]]
+            lines += [""] + [f"- Q{sec['index']}: {sec['sub_question']}" + (" (thin: fewer than two papers)" if sec["index"] in m["thin"] else "")
+                             for sec in m["sections"]] + [""]
     return "\n".join(lines)
