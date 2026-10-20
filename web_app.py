@@ -54,6 +54,7 @@ from src.engine.entry import start_run
 from src.engine.ids import resolve_question_id
 from src.engine.stub_mode import is_stub_mode
 from src.ui.safe_page import safe_page, format_error_payload, render_safe_error
+from src.ui.claims_view import claims_overview_html
 from src.ui.evidence_view import evidence_map_html, finding_card_html, paper_card_html, render_sentence
 from src.output.share_pack import image_card_svg, post_text
 from src.ui.summary_view import card_preview_html, png_download_html, summary_html, summary_missing_reason
@@ -690,6 +691,22 @@ st.markdown(
     .tl-summary { background: var(--card-bg); border: 1px solid var(--border-subtle); border-left: 4px solid #7C3AED; padding: 1rem 1.2rem; margin-bottom: 1rem; }
     .tl-hook { font-size: 1.3rem; font-weight: 800; line-height: 1.35; margin-bottom: 0.5rem; }
     .tl-takeaways { padding-left: 1.4rem; }
+    .cg-overview h4 { margin: 1rem 0 0.4rem 0; }
+    .cg-lanes { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.6rem; }
+    .cg-lane { background: var(--card-bg); border: 1px solid var(--border-subtle); padding: 0.7rem 0.9rem; }
+    .cg-lane-name { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); }
+    .cg-lane-count { font-size: 1.05rem; font-weight: 700; margin: 0.15rem 0; }
+    .cg-lane-meaning { font-size: 0.86rem; color: var(--text-secondary); }
+    .cg-outcome { margin-top: 0.6rem; padding: 0.6rem 0.9rem; border-left: 4px solid #2563EB; background: var(--card-bg); }
+    .cg-missing li { margin: 0.2rem 0; }
+    .cg-group { border: 1px solid var(--border-subtle); background: var(--card-bg); padding: 0.5rem 0.9rem; margin-bottom: 0.5rem; }
+    .cg-group summary { cursor: pointer; }
+    .cg-mix { font-size: 0.8rem; color: var(--text-muted); margin-left: 0.4rem; }
+    .cg-claim { padding: 0.45rem 0; border-top: 1px solid var(--border-subtle); line-height: 1.5; }
+    .cg-src { font-size: 0.78rem; color: var(--text-muted); }
+    .cg-quote { font-size: 0.8rem; color: var(--text-secondary); font-style: italic; }
+    .cg-chip { display: inline-block; padding: 0.05rem 0.45rem; border-radius: 4px; font-size: 0.72rem; font-weight: 700; }
+    .cg-legend { font-size: 0.78rem; color: var(--text-muted); margin-top: 0.6rem; line-height: 2; }
     .tl-takeaways li { margin: 0.45rem 0; line-height: 1.55; }
     .tl-question { font-weight: 700; margin-top: 0.6rem; }
     .share-card svg { width: 100%; height: auto; max-width: 520px; border: 1px solid var(--border-subtle); display: block; margin: 0.6rem 0; }
@@ -1549,53 +1566,49 @@ if results:
     # ==========================================================================
     with tab_claims:
         st.markdown("### Claims & gaps")
-        st.markdown(
-            "Every extracted claim is stored in the evidence ledger with its full untruncated assertion, "
-            "verbatim source excerpt (≤ 25 words), deterministic evidence grade, and source paper link."
-        )
+        # S24: plain words first (each lane, the outcome, what's missing, claims by question); the full ledger
+        # with ids, rules and filters stays one click away for audit.
+        st.markdown(claims_overview_html(results), unsafe_allow_html=True)
 
-        # Strategic Gap Matrix Summary
-        gap_data = results.get("gap_matrix", {})
-        m_col1, m_col2, m_col3, m_col4 = st.columns(4)
-        m_col1.metric("Academic Lane State", gap_data.get("academic_state", "SUPPORTED").upper())
-        m_col2.metric("Enterprise Lane State", gap_data.get("enterprise_state", "SUPPORTED").upper())
-        m_col3.metric("Field Lane State", gap_data.get("field_state", "SUPPORTED").upper())
-        m_col4.metric("Strategic Outcome", f"Outcome {gap_data.get('outcome', 1)}")
-
-        st.markdown("---")
         claims_list = results.get("claims", [])
-        if claims_list:
-            c_filter_col1, c_filter_col2 = st.columns(2)
-            with c_filter_col1:
-                selected_lane_filter = st.selectbox("Filter by Evidence Lane", ["All Lanes", "ACADEMIC", "ENTERPRISE", "PRACTITIONER"])
-            with c_filter_col2:
-                selected_grade_filter = st.selectbox("Filter by Deterministic Grade", ["All Grades", "STRONG", "MODERATE", "WEAK", "VENDOR_CLAIM", "ANECDOTE"])
+        with st.expander("Full claim ledger (audit view: ids, grading rules, verbatim excerpts)"):
+            gap_data = results.get("gap_matrix", {})
+            st.caption(
+                f"Lane states: research {gap_data.get('academic_state', 'n/a')} · enterprise {gap_data.get('enterprise_state', 'n/a')} · "
+                f"field {gap_data.get('field_state', 'n/a')} · {gap_data.get('outcome_label') or ('Outcome ' + str(gap_data.get('outcome', '')))}"
+            )
+            if claims_list:
+                c_filter_col1, c_filter_col2 = st.columns(2)
+                with c_filter_col1:
+                    selected_lane_filter = st.selectbox("Filter by Evidence Lane", ["All Lanes", "ACADEMIC", "ENTERPRISE", "PRACTITIONER"])
+                with c_filter_col2:
+                    selected_grade_filter = st.selectbox("Filter by Deterministic Grade", ["All Grades", "STRONG", "MODERATE", "WEAK", "VENDOR_CLAIM", "ANECDOTE"])
 
-            filtered_claims = claims_list
-            if selected_lane_filter != "All Lanes":
-                filtered_claims = [c for c in filtered_claims if c["lane"] == selected_lane_filter]
-            if selected_grade_filter != "All Grades":
-                filtered_claims = [c for c in filtered_claims if c["grade"] == selected_grade_filter]
+                filtered_claims = claims_list
+                if selected_lane_filter != "All Lanes":
+                    filtered_claims = [c for c in filtered_claims if c["lane"] == selected_lane_filter]
+                if selected_grade_filter != "All Grades":
+                    filtered_claims = [c for c in filtered_claims if c["grade"] == selected_grade_filter]
 
-            st.caption(f"Displaying {len(filtered_claims)} of {len(claims_list)} atomic claim records (Zero character truncation applied)")
+                st.caption(f"Displaying {len(filtered_claims)} of {len(claims_list)} atomic claim records (Zero character truncation applied)")
 
-            claims_table_data = [
-                {
-                    "Claim ID": c["id"],
-                    "Source": f"[{c.get('source_key', 'SRC')}] {c.get('source_title', 'Unknown')}",
-                    "Venue & Year": f"{c.get('venue', 'Repo')} ({c.get('year', 'n/a')})",
-                    "Lane": c["lane"],
-                    "Grade": c["grade"],
-                    "Full Paraphrased Assertion": c["assertion"],
-                    "Verbatim Source Excerpt (<=25 words)": c["excerpt"],
-                    "Study Type": c["study_type"],
-                    "Rules Fired": c["rules"],
-                }
-                for c in filtered_claims
-            ]
-            render_safe_table(claims_table_data, use_container_width=True)
-        else:
-            st.info("No claims recorded in ledger for this run.")
+                claims_table_data = [
+                    {
+                        "Claim ID": c["id"],
+                        "Source": f"[{c.get('source_key', 'SRC')}] {c.get('source_title', 'Unknown')}",
+                        "Venue & Year": f"{c.get('venue', 'Repo')} ({c.get('year', 'n/a')})",
+                        "Lane": c["lane"],
+                        "Grade": c["grade"],
+                        "Full Paraphrased Assertion": c["assertion"],
+                        "Verbatim Source Excerpt (<=25 words)": c["excerpt"],
+                        "Study Type": c["study_type"],
+                        "Rules Fired": c["rules"],
+                    }
+                    for c in filtered_claims
+                ]
+                render_safe_table(claims_table_data, use_container_width=True)
+            else:
+                st.info("No claims recorded in ledger for this run.")
 
         # EVIDENCE BOARD (S4): choose the claims that go into the draft. Check B re-runs on re-draft.
         st.markdown("---")
