@@ -66,3 +66,32 @@ If you prefer deploying via terminal without installing anything on your Mac:
      --set-env-vars GEMINI_API_KEY="<your-gemini-api-key>",GEMINI_MODEL="gemini-3.8-flash"
    ```
 4. Cloud Build will build the container and output your live URL directly in the terminal!
+
+---
+
+## Keep runs across deploys (Cloud Storage volume)
+
+A Cloud Run container's disk is wiped on every new revision, so finished runs saved under
+`outputs/runs` disappear after each deploy. Point the app at a Cloud Storage bucket instead:
+
+1. **Create a bucket** (once): Cloud Storage → Buckets → Create, e.g. `ai-guruji-runs`, same region as
+   the service (`asia-south1`), standard storage, uniform access.
+2. **Let the service write to it:** in the bucket's Permissions, grant the Cloud Run service account
+   the role **Storage Object User**.
+3. **Mount it:** Cloud Run → your service → **Edit & deploy new revision** →
+   - **Volumes** → Add volume → type **Cloud Storage bucket** → pick the bucket, name it `runs`.
+   - **Container → Volume mounts** → mount `runs` at `/mnt/runs`.
+4. **Tell the app:** Container → Variables → add `RESEARCH_RUNS_DIR` = `/mnt/runs`.
+5. Deploy. New runs are now saved to the bucket and listed under Previous Research Runs after any redeploy.
+
+Runs saved before this change were on the old container disk and cannot be recovered.
+
+## Confidentiality denylist (gate G5)
+
+G5 fails until the app can read a denylist. Store it as a secret:
+
+1. Secret Manager → Create secret `ai-guruji-denylist` with one name per line (an empty file is fine).
+2. Grant the service account **Secret Manager Secret Accessor** on it.
+3. Cloud Run → Edit & deploy new revision → **Volumes** → Add volume → type **Secret** → that secret,
+   mounted at `/secrets` with file name `denylist.txt`.
+4. Container → Variables → add `RESEARCH_DENYLIST` = `/secrets/denylist.txt`.

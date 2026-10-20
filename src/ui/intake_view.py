@@ -11,7 +11,7 @@ from __future__ import annotations
 import hashlib
 
 import streamlit as st
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from src.engine.ids import (
     resolve_question_id,
@@ -104,7 +104,7 @@ def approved_question_text(package: Optional[Dict[str, Any]], results: Optional[
     return str((results or {}).get("strategic_question") or "")
 
 
-def render_intake_view() -> Dict[str, Any]:
+def render_intake_view(before_run: Optional[Callable[[], None]] = None) -> Dict[str, Any]:
     """Render the polished 3-step numbered intake UI in Streamlit for Slice S2."""
     # Inject styling for disabled button state and clean layout
     st.markdown(
@@ -403,6 +403,10 @@ def render_intake_view() -> Dict[str, Any]:
     else:
         st.markdown(info_box("Type your question in Step 1 and click Reason about my question to inspect proposals."), unsafe_allow_html=True)
         current_package = None
+
+    # S18: anything the page puts before the last step (the Gate 1 question register).
+    if before_run is not None:
+        before_run()
 
     # --------------------------------------------------------------------------
     # Step 3: Run

@@ -60,6 +60,7 @@ from src.ui.publish_view import gate_rows, gates_summary, publish_eligibility
 from src.ui.run_status import run_status, status_banner_html, status_code, step_rail, step_rail_html
 from src.ui.brief_view import brief_meta_line, distinct_signals, plain_html, roadmap_html, stopped_run_markdown
 from src.ui.run_jobs import RunJobs
+from src.ui.theme_mode import theme_css, theme_from_query
 from src.llm.model_names import gemini_model_name
 
 
@@ -116,7 +117,7 @@ def render_stub_banner_if_active() -> bool:
 
 # --- PAGE SETUP ---
 st.set_page_config(
-    page_title="Executive AI Research Studio",
+    page_title="AI Guruji",
     page_icon="🔬",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -127,12 +128,13 @@ st.markdown(
     """
     <style>
     /* -------------------------------------------------------------
-       EXECUTIVE AI RESEARCH STUDIO - ENTERPRISE DESIGN SYSTEM
+       AI GURUJI - DESIGN SYSTEM
        ------------------------------------------------------------- */
-    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
     :root {
-        --font-main: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        /* S18: Anthropic Sans where the viewer has it installed (it is not licensed for web serving), else Inter. */
+        --font-main: 'Anthropic Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         --font-mono: 'JetBrains Mono', monospace;
         --brand-primary: #1E3A8A;
         --brand-accent: #2563EB;
@@ -872,7 +874,8 @@ def get_run_jobs(base_dir: str) -> RunJobs:
     return RunJobs(base_dir, error_formatter=format_user_friendly_error)
 
 
-run_jobs = get_run_jobs(str(Path(default_outputs_dir()) / "runs"))
+# S18: on Cloud Run, point RESEARCH_RUNS_DIR at a mounted Cloud Storage volume so runs survive a redeploy.
+run_jobs = get_run_jobs(os.getenv("RESEARCH_RUNS_DIR") or str(Path(default_outputs_dir()) / "runs"))
 
 
 def launch_run_job(meta: Dict[str, Any], **pipeline_kwargs: Any) -> None:
@@ -931,13 +934,21 @@ with st.sidebar:
                 🔬
             </div>
             <div>
-                <div style="font-weight: 800; font-size: 1rem; color: #0F172A; line-height: 1.1;">Executive AI</div>
-                <div style="font-size: 0.74rem; font-weight: 600; color: #64748B; letter-spacing: 0.04em;">RESEARCH STUDIO</div>
+                <div style="font-weight: 800; font-size: 1rem; color: #0F172A; line-height: 1.1;">AI Guruji</div>
+                <div style="font-size: 0.74rem; font-weight: 600; color: #64748B; letter-spacing: 0.04em;">EVIDENCE-BACKED RESEARCH</div>
             </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
+
+    # S18: light / dark page theme, kept in the URL (?theme=dark) so a reload keeps it.
+    dark_on = st.toggle("🌙 Dark mode", value=theme_from_query(st.query_params) == "dark", key="ui_dark_mode")
+    if dark_on:
+        st.query_params["theme"] = "dark"
+    elif "theme" in st.query_params:
+        del st.query_params["theme"]
+    st.markdown(theme_css("dark" if dark_on else "light"), unsafe_allow_html=True)
 
     # 1. STEPS: where this run is, the same states the status banner reports (S8)
     st.markdown('<div class="sidebar-pod-title">Steps</div>', unsafe_allow_html=True)
@@ -1007,12 +1018,12 @@ st.markdown(
     """
     <div class="studio-header">
         <div class="studio-title-group">
-            <h1>Executive AI Research Studio</h1>
-            <p>Evidence-backed intelligence, traceable source citations, and deterministic governance audits.</p>
+            <h1>AI Guruji</h1>
+            <p>Evidence-backed research briefs: every finding traced to its source, every claim checked before you publish.</p>
         </div>
         <div class="meta-badge">
             <span class="pulse-dot"></span>
-            100% Traceable Evidence Engine • Multi-Repository Synthesis
+            Academic, enterprise and field evidence
         </div>
     </div>
     """,
@@ -1021,6 +1032,23 @@ st.markdown(
 
 if os.getenv("HOSTED_DEMO") == "1":
     st.info("🔒 **Demo: no private data is stored** • Hosted demonstration instance. API key overrides, practitioner observations, and persistent ledger writes are disabled.")
+
+def render_question_register() -> None:
+    """The Gate 1 question register, shown in the question step before Run (S18)."""
+    with st.expander("📋 Browse Registered Inquiries (Gate 1 Question Register)", expanded=False):
+        reg_questions = ledger_service.repo.list_questions()
+        if not reg_questions:
+            reg_questions = ledger_service.load_questions_from_yaml()
+        if reg_questions:
+            for q in reg_questions:
+                q_col1, q_col2 = st.columns([4.2, 0.8])
+                with q_col1:
+                    st.markdown(f"**`{q.id}`** ({q.scope.upper()}) — {q.text}")
+                with q_col2:
+                    if st.button("Load Question", key=f"load_q_{q.id}", use_container_width=True):
+                        st.session_state["current_question"] = q.text
+                        st.rerun()
+
 
 # ==============================================================================
 # PHASE 1: QUESTION FRAMING & SIMPLIFIED CONFIGURATION
@@ -1045,7 +1073,7 @@ with st.expander(
     st.session_state["selected_model_provider"] = effective_provider(
         _sel_provider, has_gemini_key=bool(os.getenv("GEMINI_API_KEY", "").strip()), ollama_ok=ollama_online
     )
-    intake_state = render_intake_view()
+    intake_state = render_intake_view(before_run=render_question_register)
     query_input = intake_state["question_text"]
     run_submitted = intake_state["run_submitted"]
     depth_option = intake_state["depth"]
@@ -1724,21 +1752,3 @@ if results:
             disabled=not perm.can_download_deck,
             use_container_width=True,
         )
-
-else:
-    # BEFORE A RUN: the question register
-    with st.expander("📋 Browse Registered Inquiries (Gate 1 Question Register)", expanded=False):
-        reg_questions = ledger_service.repo.list_questions()
-        if not reg_questions:
-            reg_questions = ledger_service.load_questions_from_yaml()
-        if reg_questions:
-            for q in reg_questions:
-                q_col1, q_col2 = st.columns([4.2, 0.8])
-                with q_col1:
-                    st.markdown(f"**`{q.id}`** ({q.scope.upper()}) — {q.text}")
-                with q_col2:
-                    if st.button("Load Question", key=f"load_q_{q.id}", use_container_width=True):
-                        st.session_state["current_question"] = q.text
-                        st.rerun()
-
-
