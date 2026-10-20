@@ -1,4 +1,4 @@
-"""Playwright UI smoke test for Executive AI Research Studio (web_app.py).
+"""Playwright UI smoke test for AI Guruji (web_app.py).
 
 Verifies presentation layer and multi-lane workflow:
 - Only skips if Playwright is not installed at all.
@@ -104,8 +104,9 @@ def test_executive_studio_ui_smoke():
                 time.sleep(2)
 
                 # 2. Assert Header & Status Badge
-                assert page.locator("text=Executive AI Research Studio").count() > 0
-                assert page.locator("text=100% Traceable Evidence Engine").count() > 0
+                # S18: rebranded as AI Guruji.
+                assert page.locator("text=AI Guruji").count() > 0
+                assert page.locator("text=Academic, enterprise and field evidence").count() > 0
 
                 # 3. S9 removed the pre-run three-lane readiness cards; the step rail shows instead.
                 assert page.locator("text=Active Three-Lane Architecture & Ingestion Readiness").count() == 0

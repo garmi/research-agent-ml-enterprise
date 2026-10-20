@@ -79,6 +79,7 @@ def test_dark_mode_css():
     for needed in ("--card-bg", "--text-primary", ".stApp", '[data-testid="stSidebar"]', '[data-baseweb="input"]',
                    '[data-baseweb="tab"]', ".paper-card", ".run-status"):
         assert needed in dark, needed
+    assert 'background: rgb(255, 255, 255)' in dark, "browsers keep inline colours as rgb()"
     assert theme_css("light") == ""
     assert theme_from_query({"theme": "dark"}) == "dark"
     assert theme_from_query({}) == "light" and theme_from_query({"theme": "x"}) == "light"
