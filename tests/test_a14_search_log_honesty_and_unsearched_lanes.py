@@ -155,5 +155,6 @@ def test_multilane_runner_negative_findings_honest_language_for_unsearched_lanes
                 )
 
         # 3. Academic sentence correctly says searched, nothing found
-        acad_negative = [t for t in all_sentence_texts if "academic" in t.lower() and "returned 0" in t.lower()]
+        # S17: one line per lane, "Academic searches that returned no records for '<key terms>': <sources>."
+        acad_negative = [t for t in all_sentence_texts if "academic" in t.lower() and "returned no records" in t.lower()]
         assert len(acad_negative) > 0, f"Expected academic lane negative finding with returned 0, got: {all_sentence_texts}"

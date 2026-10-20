@@ -40,6 +40,22 @@ class ExtractedClaimPayload(BaseModel):
     confidence: float = 1.0
 
 
+# The lead-ins this extractor (and older ledgers) put before a claim's source sentence (S17: one list).
+CLAIM_PREFIXES = (
+    "the study reports that ", "the study finds that ", "the authors find that ",
+    "empirical analysis shows that ", "research indicates that ",
+)
+
+
+def strip_claim_prefix(text: str) -> str:
+    """The claim's source sentence without the extractor's lead-in ('The study reports that ...')."""
+    t = (text or "").strip()
+    for prefix in CLAIM_PREFIXES:
+        if t.lower().startswith(prefix):
+            return t[len(prefix):]
+    return t
+
+
 def truncate_excerpt(excerpt: str, max_words: int = 25) -> str:
     """Ensure source excerpt does not exceed 25 words."""
     words = excerpt.strip().split()

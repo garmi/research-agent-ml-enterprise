@@ -1839,11 +1839,9 @@ class MultiLaneResearchRunner:
         for c in academic_claims:
             p_tag = paper_id_map.get(c.source_id, "P1")
             verb = temp_engine._select_verb_for_grade(c.grade)
-            c_text = c.text.strip().rstrip(".")
-            for prefix in ("the study reports that ", "the study finds that ", "the authors find that ", "empirical analysis shows that ", "research indicates that "):
-                if c_text.lower().startswith(prefix):
-                    c_text = c_text[len(prefix):]
-                    break
+            from src.extract.claim_extractor import strip_claim_prefix
+
+            c_text = strip_claim_prefix(c.text).rstrip(".")
             # S16: one claim, one source: a figure is attributed to one study.
             from src.score.checker import extract_numerals
 

@@ -24,7 +24,8 @@ from src.ledger.db import default_ledger_path
 from src.ledger.models import Claim, OutputDoc, OutputSentence, Question, Run, Source
 from src.ledger.repository import LedgerRepository
 from src.analysis.relevance import support_terms
-from src.score.checker import GateChecker, claim_has_numeral, extract_numerals
+from src.extract.claim_extractor import strip_claim_prefix
+from src.score.checker import GateChecker, claim_has_numeral, claim_support_terms, extract_numerals
 from src.score.scorer import QualityScorer
 
 logger = logging.getLogger(__name__)
@@ -35,21 +36,22 @@ MIN_SUPPORT_TERMS = 2  # the same overlap G2 requires between a sentence and eac
 
 
 def best_supporting_claims(text: str, candidates: List[Claim]) -> List[str]:
-    """The claims of one paper that support this sentence (S10). A claim qualifies when it shares at
-    least MIN_SUPPORT_TERMS content terms with the sentence; claims holding the sentence's own figures
-    rank first, then by overlap, at most MAX_CLAIMS_PER_TAG. With none qualifying, the single closest
-    claim is kept, so G2 reports the weak support rather than the sentence going unbound."""
+    """The claims of one paper that support this sentence (S10, S17). A claim qualifies when it shares at
+    least MIN_SUPPORT_TERMS content terms with the sentence (quote plus full source sentence), or holds
+    one of the sentence's own figures. Figure-holding claims rank first, then by overlap, at most
+    MAX_CLAIMS_PER_TAG. With none qualifying, the single closest claim is kept, so G2 reports the weak
+    support rather than the sentence going unbound."""
     if not candidates:
         return []
     s_terms = support_terms(text)
     numerals = extract_numerals(text)
     scored = []
     for order, c in enumerate(candidates):
-        overlap = len(s_terms & support_terms(c.source_excerpt or c.text or ""))
+        overlap = len(s_terms & claim_support_terms(c))
         figures = sum(1 for n in numerals if claim_has_numeral(c, n))
         scored.append((figures, overlap, -order, c.id))
     scored.sort(reverse=True)
-    qualified = [cid for figures, overlap, _, cid in scored if overlap >= MIN_SUPPORT_TERMS]
+    qualified = [cid for figures, overlap, _, cid in scored if overlap >= MIN_SUPPORT_TERMS or figures > 0]
     return qualified[:MAX_CLAIMS_PER_TAG] or [scored[0][3]]
 
 
@@ -63,14 +65,18 @@ def resolve_citations(
     paper that support the sentence (best_supporting_claims), [c_...] means that claim. No tag, or
     only unknown tags, means no claims."""
     cited: List[str] = []
-    # A bracket may hold one id or a group ("[P1, P3]", "[c_a; c_b]"); other brackets are ignored.
-    for group in re.findall(r"\[([^\[\]]+)\]", text or ""):
+    # S17: each tag is linked using the sentence that contains it, not the whole paragraph (a bottom
+    # line cites several papers, one sentence each). A bracket may hold one id or a group ("[P1, P3]",
+    # "[c_a; c_b]"); other brackets are ignored.
+    pairs = [(sentence, group) for sentence in re.split(r"(?<=[.!?])\s+", text or "")
+             for group in re.findall(r"\[([^\[\]]+)\]", sentence)]
+    for sentence, group in pairs:
         for token in re.split(r"[,;\s]+", group.strip()):
             p = re.fullmatch(r"P(\d+)", token)
             if p:
                 idx = int(p.group(1)) - 1
                 pid = papers[idx].get("id") if 0 <= idx < len(papers) else None
-                ids = best_supporting_claims(text, [c for c in eligible_claims if pid is not None and c.source_id == pid])
+                ids = best_supporting_claims(sentence, [c for c in eligible_claims if pid is not None and c.source_id == pid])
             elif token.startswith("c_") and token in claims_by_id:
                 ids = [token]
             else:
@@ -86,20 +92,25 @@ def search_log_negative_findings(slogs: List[Any]) -> List[Tuple[str, Dict[str, 
     out: List[Tuple[str, Dict[str, Any]]] = []
     seen: Set[str] = set()
 
-    def add(text: str, slog: Any) -> None:
-        # A retried harvest logs the same search twice; state each boundary once (first row cited).
+    from src.analysis.queries import condense
+
+    # Searches that returned nothing: one line per lane, naming each source and the question's key terms
+    # (S17; the full question was repeated on every line).
+    empty: Dict[str, List[Any]] = {}
+    for slog in searched_zero:
+        empty.setdefault(slog.lane, []).append(slog)
+    for lane, rows in empty.items():
+        names: List[str] = []
+        for r in rows:
+            if r.source_api not in names:
+                names.append(r.source_api)
+        text = f"{lane.capitalize()} searches that returned no records for '{condense(rows[0].query)}': {', '.join(names)}."
         if text not in seen:
             seen.add(text)
-            out.append((text, {"search_log_id": slog.id}))
-
-    for slog in searched_zero:
-        add((
-            f"Literature search in {slog.lane} lane ({slog.source_api}) for '{slog.query}' returned 0 matching records in evidence ledger."
-        ), slog)
+            out.append((text, {"search_log_id": rows[0].id, "search_log_ids": [r.id for r in rows]}))
     # Sources that were not searched: one line per lane and reason, naming the sources (S11). The
     # question appears as its key terms only (it differs per run, so two briefs never share the line);
     # each line keeps every search_log row it stands for.
-    from src.analysis.queries import condense
 
     groups: Dict[Tuple[str, str], List[Any]] = {}
     for slog in unsearched:
@@ -313,11 +324,7 @@ class SynthesisEngine:
             }
             for c in supported_claims[:8]:
                 verb = self._select_verb_for_grade(c.grade)
-                c_text = c.text.strip().rstrip(".")
-                for prefix in ("the study reports that ", "the study finds that ", "the authors find that ", "empirical analysis shows that ", "research indicates that "):
-                    if c_text.lower().startswith(prefix):
-                        c_text = c_text[len(prefix):]
-                        break
+                c_text = strip_claim_prefix(c.text).rstrip(".")
                 p_tag = paper_id_to_tag.get(c.source_id)
                 prefix_tag = f"[{p_tag}] " if p_tag else ""
                 # S16: each sentence rests on one claim, so a figure is attributed to one study.

@@ -674,6 +674,7 @@ st.markdown(
     .paper-card-title { font-size: 0.98rem; font-weight: 700; margin-bottom: 0.25rem; }
     .paper-card-title a { color: #0F172A; text-decoration: none; }
     .paper-card-meta { font-size: 0.84rem; color: #64748B; overflow-wrap: anywhere; }
+    .roadmap-phase-head { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; margin: 0.8rem 0 0.4rem 0; }
     .roadmap-basis { font-size: 0.78rem; color: #1E40AF; font-weight: 600; margin-top: 0.15rem; }
     .roadmap-flag { font-size: 0.78rem; color: #B45309; font-weight: 600; margin-top: 0.15rem; }
 
