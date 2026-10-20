@@ -118,6 +118,18 @@ def test_hook_question_hashtags():
     assert not any("[P" in s[k] for k in ("hook", "opening", "for_leaders", "nuance", "watch_next", "question"))
 
 
+def test_guard_catches_claimed_conversations_and_clients():
+    from src.synth.thought_leadership import invents_experience
+
+    for text in ("Every leadership team I talk to asks about this.", "Leaders I work with see this daily.",
+                 "When I advised a bank on this, it worked.", "Our clients report the same."):
+        assert invents_experience(text), text
+    for text in ("I reviewed 12 studies.", "Leaders ask whether this holds.", "I think the evidence is early."):
+        assert not invents_experience(text), text
+    s = _summary(dict(RAW, opening="Every leadership team I talk to asks about this. The answer matters now."))
+    assert "talk to" not in s["opening"] and "The answer matters now." in s["opening"]
+
+
 def test_nuance_reflects_profile():
     s = _summary()
     assert "conceptual" in s["nuance"].lower()
