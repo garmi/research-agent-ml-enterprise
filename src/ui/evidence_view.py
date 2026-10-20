@@ -134,3 +134,58 @@ def paper_card_html(p: Dict[str, Any]) -> str:
     ]
     return "".join(parts)
 
+
+
+def evidence_map(report: Optional[Dict[str, Any]], papers: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Which sub-question sections cite which papers (S19b), derived by rule from the report's tables.
+
+    One row per paper (in the run's order) with a cited flag per section, the paper's method, and a
+    "not cited" note when no section uses it; `thin` lists sections backed by fewer than two papers."""
+    sections = list((report or {}).get("sections") or [])
+    cited_by = [{row.get("paper") for row in sec.get("table") or []} for sec in sections]
+    method_of: Dict[str, str] = {}
+    for sec in sections:
+        for row in sec.get("table") or []:
+            method_of.setdefault(row.get("paper"), row.get("method") or "not stated")
+    rows = []
+    for p in papers or []:
+        key = p.get("key")
+        cited = [key in keys for keys in cited_by]
+        rows.append({"paper": key, "title": p.get("title", ""), "method": method_of.get(key, ""),
+                     "cited": cited, "note": "" if any(cited) else "not cited"})
+    thin = [sec.get("index", i + 1) for i, (sec, keys) in enumerate(zip(sections, cited_by)) if len(keys) < 2]
+    return {"sections": [{"index": s.get("index", i + 1), "sub_question": s.get("sub_question", "")}
+                         for i, s in enumerate(sections)], "rows": rows, "thin": thin}
+
+
+def evidence_map_html(report: Optional[Dict[str, Any]], papers: List[Dict[str, Any]]) -> str:
+    """The evidence map as one HTML table (no blank lines, escaped text); empty when the run has no sections."""
+    m = evidence_map(report, papers)
+    if not m["sections"]:
+        return ""
+    esc = lambda v: html.escape(str(v or ""))
+    cell = "padding:0.35rem 0.5rem;border-bottom:1px solid #E2E8F0;font-size:0.84rem;"
+    head = "".join(
+        f'<th style="{cell}text-align:center;" title="{esc(s["sub_question"])}">Q{esc(s["index"])}'
+        + (' <span style="color:#B45309;">(thin)</span>' if s["index"] in m["thin"] else "") + "</th>"
+        for s in m["sections"])
+    body = []
+    for r in m["rows"]:
+        marks = "".join(f'<td style="{cell}text-align:center;color:#047857;font-weight:700;">{"●" if c else ""}</td>'
+                        for c in r["cited"])
+        note = f' <span style="color:#94A3B8;font-style:italic;">({esc(r["note"])})</span>' if r["note"] else ""
+        body.append(f'<tr><td style="{cell}font-weight:700;">{esc(r["paper"])}</td>'
+                    f'<td style="{cell}color:#334155;">{esc(r["title"])}{note}</td>'
+                    f'<td style="{cell}color:#475569;">{esc(r["method"])}</td>{marks}</tr>')
+    legend = "".join(
+        f'<li><b>Q{esc(s["index"])}</b>: {esc(s["sub_question"])}'
+        + (' <span style="color:#B45309;">· thin: fewer than two papers</span>' if s["index"] in m["thin"] else "")
+        + "</li>" for s in m["sections"])
+    return (
+        '<div class="evidence-map" style="margin:0.4rem 0 1.2rem 0;">'
+        '<table style="width:100%;border-collapse:collapse;background:#FFFFFF;">'
+        f'<thead><tr><th style="{cell}text-align:left;">Paper</th><th style="{cell}text-align:left;">Title</th>'
+        f'<th style="{cell}text-align:left;">Method</th>{head}</tr></thead>'
+        f'<tbody>{"".join(body)}</tbody></table>'
+        f'<ul style="margin:0.5rem 0 0 1rem;font-size:0.84rem;color:#475569;">{legend}</ul></div>'
+    )

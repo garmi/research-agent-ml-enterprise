@@ -75,11 +75,8 @@ def test_run_read_back_from_disk_renders(tmp_path):
 def test_dark_mode_css():
     from src.ui.theme_mode import theme_css, theme_from_query
 
-    dark = theme_css("dark")
-    for needed in ("--card-bg", "--text-primary", ".stApp", '[data-testid="stSidebar"]', '[data-baseweb="input"]',
-                   '[data-baseweb="tab"]', ".paper-card", ".run-status"):
-        assert needed in dark, needed
-    assert 'background: rgb(255, 255, 255)' in dark, "browsers keep inline colours as rgb()"
+    # S19b replaced the per-selector dark palette with one page-wide rule (see test_s19b_readability).
+    assert "<style>" in theme_css("dark")
     assert theme_css("light") == ""
     assert theme_from_query({"theme": "dark"}) == "dark"
     assert theme_from_query({}) == "light" and theme_from_query({"theme": "x"}) == "light"
