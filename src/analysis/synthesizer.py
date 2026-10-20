@@ -185,7 +185,7 @@ class SynthesisEngine:
     def _analyze_report(self, topic, paper_list, summaries, compact, valid_ids, sub_questions, question, tone, length):
         """S19: one reduce call writes the question-shaped report; the old analysis, recommendations and roadmap
         calls are not made. Legacy keys are filled from it so older consumers keep working."""
-        self.on_progress(f"  [reduce 1/2] report across {len(sub_questions)} sub-questions (tone: {tone})")
+        self.on_progress(f"  [reduce] report across {len(sub_questions)} sub-questions (tone: {tone})")
         raw = self._call_json(
             self.reduce_llm,
             ResearchPromptLibrary.report(topic, compact, sub_questions, question=question, tone=tone, length=length),
@@ -194,10 +194,7 @@ class SynthesisEngine:
         ) or {}
         sections = self._sanitize_sections(raw.get("sections"), sub_questions)
         evidence = [e for s in sections for e in s["evidence"]]
-        self.on_progress("  [reduce 2/2] content ideas")
-        ideas_raw = self._call_json(
-            self.reduce_llm, ResearchPromptLibrary.content_ideas(topic, evidence, tone=tone), REDUCE_SYSTEM, temperature=0.6,
-        ) or {}
+        # S21: the thought-leadership summary (drafted after the report is checked) replaces content ideas.
         answer = self._as_str_list(raw.get("answer"))
         model = ResearchSynthesisModel(
             executive_summary=" ".join(answer),
@@ -205,7 +202,7 @@ class SynthesisEngine:
             research_questions=sub_questions,
             key_findings=evidence,
             research_gaps=self._as_str_list(raw.get("gaps")),
-            content_ideas=self._as_str_list(ideas_raw.get("content_ideas")),
+            content_ideas=[],
             answer=answer,
             sections=sections,
             tensions=self._as_str_list(raw.get("tensions")),

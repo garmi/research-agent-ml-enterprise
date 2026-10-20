@@ -24,6 +24,7 @@ if os.getenv("GEMINI_API_KEY"):
 from dotenv import load_dotenv
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 
 from src.analysis.business_context import detect_focus_areas
 from src.analysis.insight_builder import derive_business_signal, summarize_findings
@@ -54,6 +55,8 @@ from src.engine.ids import resolve_question_id
 from src.engine.stub_mode import is_stub_mode
 from src.ui.safe_page import safe_page, format_error_payload, render_safe_error
 from src.ui.evidence_view import evidence_map_html, finding_card_html, paper_card_html, render_sentence
+from src.output.share_pack import image_card_svg, post_text
+from src.ui.summary_view import card_preview_html, png_download_html, summary_html, summary_missing_reason
 from src.ui.intake_view import approved_question_text, effective_provider, render_intake_view
 from src.ui.rerun import board_editor_key, export_view, papers_for_rerun
 from src.ui.publish_view import gate_rows, gates_summary, publish_eligibility
@@ -682,6 +685,14 @@ st.markdown(
     .report-answer-head, .report-section-head { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; justify-content: space-between; }
     .report-answer p { font-size: 1.02rem; line-height: 1.65; margin: 0.4rem 0 0 0; }
     .report-section { margin: 1.4rem 0 0.6rem 0; }
+    .report-diagram { background: var(--card-bg); border: 1px solid var(--border-subtle); padding: 0.8rem 1rem; margin: 0.4rem 0 1rem 0; overflow-x: auto; }
+    .report-diagram h3 { font-size: 1.02rem; margin: 0 0 0.3rem 0; }
+    .tl-summary { background: var(--card-bg); border: 1px solid var(--border-subtle); border-left: 4px solid #7C3AED; padding: 1rem 1.2rem; margin-bottom: 1rem; }
+    .tl-hook { font-size: 1.3rem; font-weight: 800; line-height: 1.35; margin-bottom: 0.5rem; }
+    .tl-takeaways { padding-left: 1.4rem; }
+    .tl-takeaways li { margin: 0.45rem 0; line-height: 1.55; }
+    .tl-question { font-weight: 700; margin-top: 0.6rem; }
+    .share-card svg { width: 100%; height: auto; max-width: 520px; border: 1px solid var(--border-subtle); display: block; margin: 0.6rem 0; }
     .report-section-head h3, .report-answer h3, .report-h { font-size: 1.08rem !important; margin: 0.2rem 0 !important; }
     .report-section-head { margin-top: 1.2rem; }
     .conf-badge { font-size: 0.74rem; font-weight: 600; padding: 0.2rem 0.6rem; border-radius: 6px; background: #F1F5F9; color: #475569; }
@@ -1268,8 +1279,9 @@ if results:
         )
 
     # One tab per step after the question
-    tab_brief, tab_evidence, tab_claims, tab_checks = st.tabs([
+    tab_brief, tab_summary, tab_evidence, tab_claims, tab_checks = st.tabs([
         "Brief",
+        "Summary & share",
         "Evidence",
         "Claims & gaps",
         "Checks & publish",
@@ -1285,7 +1297,7 @@ if results:
             findings_by_text = {str(f.get("text", "")).strip(): f for f in results.get("findings") or []}
             # One st.markdown per block (see report_blocks); report_html joins the same blocks for exports.
             for block in report_blocks(report, paper_map, findings_by_text, meta=brief_meta_line(results),
-                                       negatives=results.get("negative_findings")):
+                                       negatives=results.get("negative_findings"), diagram=results.get("diagram")):
                 st.markdown(block, unsafe_allow_html=True)
         else:
             # Runs saved before S19 keep the earlier layout.
@@ -1370,6 +1382,50 @@ if results:
             if results.get("roadmap"):
                 st.markdown("##### Recommended next steps")
                 st.markdown(roadmap_html(results.get("roadmap", [])), unsafe_allow_html=True)
+
+    # ==========================================================================
+    # SUMMARY & SHARE (S21): the thought-leadership summary, the post to paste and the image card
+    # ==========================================================================
+    with tab_summary:
+        summary = results.get("summary")
+        if not summary:
+            st.info(summary_missing_reason(results))
+        else:
+            share_published = str(results.get("status", "")).upper() == "PUBLISHED"
+            share_blocked = str(results.get("status", "")).upper() == "BLOCKED"
+            st.markdown("### Thought-leadership summary")
+            st.caption(f"Drafted by the model from the checked brief; each takeaway passed the same checks as the brief. "
+                       f"{len(summary.get('dropped') or [])} draft line(s) were dropped by the rules.")
+            st.markdown(summary_html(summary, paper_map), unsafe_allow_html=True)
+            if summary.get("dropped"):
+                with st.expander("What the rules dropped, and why"):
+                    for why in summary["dropped"]:
+                        st.markdown(f"- {plain_html(why)}", unsafe_allow_html=True)
+            st.markdown("### Share pack")
+            if share_blocked:
+                st.warning("Downloads are off while the brief is blocked by the checks. Fix the failing gate on "
+                           "**Checks & publish** and re-draft; you can still read and copy the post below.")
+            elif not share_published:
+                st.caption("Draft until the brief is published on **Checks & publish**: the post opens with a draft line "
+                           "and the card carries a watermark.")
+            post = post_text(summary, results.get("papers", []), published=share_published)
+            st.caption("The post, ready to paste (copy button at the top right). The sources go in the first comment.")
+            st.code(post, language=None, wrap_lines=True)
+            card_svg = image_card_svg(summary, results.get("diagram"), published=share_published)
+            st.markdown(card_preview_html(card_svg), unsafe_allow_html=True)
+            sp1, sp2, sp3, sp4 = st.columns(4)
+            with sp1:
+                st.download_button("📝 Post (.md)", data=post, file_name="share_post.md", mime="text/markdown",
+                                   disabled=share_blocked, use_container_width=True)
+            with sp2:
+                st.download_button("📄 Post (.txt)", data=post, file_name="share_post.txt", mime="text/plain",
+                                   disabled=share_blocked, use_container_width=True)
+            with sp3:
+                st.download_button("🖼️ Image card (.svg)", data=card_svg, file_name="share_card.svg", mime="image/svg+xml",
+                                   disabled=share_blocked, use_container_width=True)
+            with sp4:
+                if not share_blocked:
+                    components.html(png_download_html(card_svg), height=48)
 
     # ==========================================================================
     # EVIDENCE: the three lanes' sources, Check A detail, exclude-and-re-draft
@@ -1725,7 +1781,8 @@ if results:
 
     if results.get("report") and (perm.can_download_full or perm.can_download_draft):
         # S19: the brief download follows the report, built from the checked ledger sentences.
-        brief_content = report_markdown(results["report"], question=results.get("strategic_question", topic_str))
+        brief_content = report_markdown(results["report"], question=results.get("strategic_question", topic_str),
+                                        diagram=results.get("diagram"), papers=results.get("papers", []))
         if not perm.can_download_full:
             brief_content = "# DRAFT, NOT FOR PUBLICATION\n\n" + brief_content
         json_content = json.dumps(export_view(results), indent=2, default=str)
@@ -1785,11 +1842,12 @@ if results:
         )
     with export_col4:
         st.download_button(
-            label="📱 LinkedIn Pack (.md)",
-            data=linkedin_pack,
-            file_name="LinkedIn_Executive_Pack.md",
+            label="📱 Share post (.md)" if results.get("summary") else "📱 LinkedIn Pack (.md)",
+            data=post_text(results["summary"], results.get("papers", []), published=str(status).upper() == "PUBLISHED")
+            if results.get("summary") else linkedin_pack,
+            file_name="share_post.md" if results.get("summary") else "LinkedIn_Executive_Pack.md",
             mime="text/markdown",
-            disabled=not perm.can_download_linkedin,
+            disabled=(str(status).upper() == "BLOCKED") if results.get("summary") else not perm.can_download_linkedin,
             use_container_width=True,
         )
     with export_col5:
