@@ -140,3 +140,11 @@ def test_claims_tab_shows_overview_first():
     assert tab.index("claims_overview_html(") < tab.index("render_safe_table(claims_table_data")
     assert 'st.expander("Full claim ledger' in tab
     assert 'm_col1.metric("Academic Lane State"' not in web
+
+
+def test_quote_drops_location_tag():
+    from src.ui.claims_view import claims_by_question
+
+    res = dict(RESULTS, claims=[dict(CLAIMS[0], excerpt="cut review time by 30% (Location: Abstract)")], report=REPORT)
+    c = claims_by_question(res)[0]["claims"][0]
+    assert c["excerpt"] == "cut review time by 30%" and c["where"] == "from the abstract"
