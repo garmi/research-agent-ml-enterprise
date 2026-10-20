@@ -41,6 +41,14 @@ def extract_numerals(text: str) -> List[str]:
     return [t.lower() for t in raw_tokens if not re.match(r"^(19|20)\d{2}$", t)]
 
 
+def claim_support_terms(claim: Any) -> Set[str]:
+    """Content terms a claim can support a sentence with (S17): its quote plus its full source sentence,
+    without the extractor's 'The study reports that' lead-in (it would match every 'one study reports')."""
+    from src.extract.claim_extractor import strip_claim_prefix
+
+    return support_terms(claim.source_excerpt or "") | support_terms(strip_claim_prefix(str(claim.text or "")))
+
+
 def claim_has_numeral(claim: Any, num: str) -> bool:
     """G2's numeric rule: the figure appears in the claim's value, its quote, or its full source sentence
     (the claim text). S16: the quote is capped at 25 words for copyright, so a figure later in the same
@@ -279,7 +287,7 @@ class GateChecker:
             # Support Check (2): Excerpt overlap - sentence must share >= 2 non-stopword terms with claim excerpt
             s_words = support_terms(s_text)
             for c in cited_claims:
-                e_words = support_terms(c.source_excerpt or c.text or "")
+                e_words = claim_support_terms(c)
                 overlap = s_words.intersection(e_words)
                 if len(overlap) < 2:
                     result.g2_pass = False

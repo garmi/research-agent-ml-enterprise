@@ -34,15 +34,13 @@ def distinct_signals(signals: List[Dict[str, Any]], findings: List[Dict[str, Any
 
 
 def _roadmap_basis(step: Dict[str, Any]) -> str:
-    """What a step rests on: the findings it builds on, its KPI, and figures not in its evidence (S10)."""
+    """What a step rests on: the findings it builds on and figures not in its evidence (S10)."""
     builds_on = step.get("builds_on") or []
     parts = [
         f'<div class="roadmap-basis">Builds on finding{"s" if len(builds_on) > 1 else ""} '
         f'{plain_html(", ".join(str(n) for n in builds_on))}</div>'
         if builds_on else '<div class="roadmap-flag">⚠ Not tied to a finding</div>'
     ]
-    if step.get("measure"):
-        parts.append(f'<div class="roadmap-impact">Measure: {plain_html(step["measure"])}</div>')
     parts += [
         f'<div class="roadmap-flag">⚠ {plain_html(n)} is not a figure from the cited evidence</div>'
         for n in step.get("unsupported_numbers") or []
@@ -51,14 +49,26 @@ def _roadmap_basis(step: Dict[str, Any]) -> str:
 
 
 def roadmap_html(roadmap: List[Dict[str, Any]]) -> str:
-    """Roadmap steps, labelled as recommendations: they are not checked against evidence (G1-G4),
-    so each one shows what it rests on instead."""
-    items = "".join(
-        f'<div class="roadmap-item"><span class="roadmap-phase">{plain_html(s.get("phase"))}</span>'
-        f'<div><div class="roadmap-action">{plain_html(s.get("action"))}</div>{_roadmap_basis(s)}</div></div>'
-        for s in roadmap or []
-    )
-    return f'<div class="roadmap-note">Recommendations, not evidence: these steps are not checked against sources.</div>{items}'
+    """Roadmap steps, labelled as recommendations: they are not checked against evidence (G1-G4), so
+    each one shows what it rests on instead. Steps are grouped by phase, and each phase's KPI is shown
+    once at its head (S17; it is a phase target, not a per-step one)."""
+    groups: List[Dict[str, Any]] = []
+    for s in roadmap or []:
+        if not groups or groups[-1]["phase"] != s.get("phase"):
+            groups.append({"phase": s.get("phase"), "measure": s.get("measure") or "", "steps": []})
+        groups[-1]["steps"].append(s)
+    html_parts = ['<div class="roadmap-note">Recommendations, not evidence: these steps are not checked against sources.</div>']
+    for g in groups:
+        measure = f'<span class="roadmap-impact">Measure: {plain_html(g["measure"])}</span>' if g["measure"] else ""
+        html_parts.append(
+            f'<div class="roadmap-phase-head"><span class="roadmap-phase">{plain_html(g["phase"])}</span>{measure}</div>'
+        )
+        html_parts += [
+            f'<div class="roadmap-item"><div><div class="roadmap-action">{plain_html(s.get("action"))}</div>'
+            f'{_roadmap_basis(s)}</div></div>'
+            for s in g["steps"]
+        ]
+    return "".join(html_parts)
 
 
 _STOP_TITLE = {
