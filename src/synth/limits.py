@@ -13,6 +13,8 @@ import re
 _FIGURE = re.compile(r"(?<![\w.])\$?\d+(?:\.\d+)?(?:%|x|×|k|m|b)?(?![\w.])", re.IGNORECASE)
 
 _GRADE_ORDER = ("anecdote", "vendor_claim", "weak", "moderate", "strong")
+_PREFERRED = ["shows", "finds", "suggests", "indicates", "observes", "reports", "describes", "proposes", "argues",
+              "states", "according to", "claims", "notes", "in one case"]
 
 
 def paper_evidence_limits(papers: List[Dict[str, Any]], claims: List[Any], checker: Any) -> Dict[str, Dict[str, List[str]]]:
@@ -29,16 +31,22 @@ def paper_evidence_limits(papers: List[Dict[str, Any]], claims: List[Any], check
         weakest = min((c.grade for c in cs), key=lambda g: _GRADE_ORDER.index(g) if g in _GRADE_ORDER else 0)
         cap = checker.get_max_allowed_rank(weakest)
         verbs: List[str] = []
+        rank_of: Dict[str, int] = {}
         for info in sorted(checker.verbs_cfg.values(), key=lambda v: -v.get("rank", 0)):
             if info.get("rank", 0) <= cap:
-                verbs += [v for v in info.get("verbs", []) if v not in verbs]
+                for v in info.get("verbs", []):
+                    if v not in verbs:
+                        verbs.append(v)
+                        rank_of[v] = info.get("rank", 0)
         figures: List[str] = []
         for c in cs:
             for n in _FIGURE.findall(f"{c.text} {c.source_excerpt or ''}"):
                 n = n.lower()
                 if not re.fullmatch(r"(19|20)\d{2}", n) and n not in figures:
                     figures.append(n)
-        out[p.get("key") or f"P{i}"] = {"allowed_verbs": verbs, "figures": figures}
+        # S22c: at most six verbs, the most useful first (strongest allowed rank, then plain reporting verbs).
+        verbs.sort(key=lambda v: (-rank_of[v], _PREFERRED.index(v) if v in _PREFERRED else len(_PREFERRED)))
+        out[p.get("key") or f"P{i}"] = {"allowed_verbs": verbs[:6], "figures": figures[:12]}
     return out
 
 
