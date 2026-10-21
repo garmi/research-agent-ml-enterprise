@@ -115,7 +115,7 @@ Return valid JSON with exactly these keys:
   "sections": [
     {{"sub_question": "the sub-question text exactly as given",
       "synthesis": ["1-3 sentences that combine what two or more papers show, e.g. 'Taken together, ... [P1][P4]'"],
-      "evidence": ["2-4 sentences, each about one paper's own result, e.g. 'One study reports that ... [P2]'"]}}
+      "evidence": ["2-4 sentences, each about one source's own result, e.g. 'One study reports that ... [P2]' or 'According to one vendor, ... [E1]'"]}}
   ],
   "tensions": ["sentences on where papers disagree, citing both sides"],
   "gaps": ["sentences on what the papers do not answer, drawn from their stated limitations, with [P#] tags"],
@@ -129,9 +129,11 @@ Rules:
   uses only that paper's allowed verbs; a sentence citing several papers uses only verbs allowed for the weakest of
   them (the shortest list). Use only figures listed in a cited paper's "figures"; never take a number from elsewhere.
 - Entries with ids E# are enterprise practice sources (their source_type says vendor, industry report, news,
-  filing or practitioner write-up); cite them with [E#] beside the [P#] papers.
+  filing or practitioner write-up). In each section, use the E# sources that speak to its sub-question: give at
+  least one evidence sentence citing [E#] when one is relevant, beside the [P#] papers.
 - Call a practice a pattern only when two or more independent organisations report it; otherwise write
-  "one organisation reports", or "one vendor reports" for a vendor. Say when an E# source is older than 24 months.
+  "according to one vendor" for a vendor and "one organisation reports" for other practice sources. Say when an
+  E# source is older than 24 months.
 - Never invent numbers, organisations or studies. Avoid "significantly" and "substantially" unless a paper uses
   those words.
 - Sections answer only their own sub-question. If the papers say nothing on a sub-question, give it no synthesis and

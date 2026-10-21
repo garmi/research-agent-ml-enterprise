@@ -55,6 +55,36 @@ def best_supporting_claims(text: str, candidates: List[Claim]) -> List[str]:
     return qualified[:MAX_CLAIMS_PER_TAG] or [scored[0][3]]
 
 
+_SOFT_TARGET = {3: "reports", 2: "states", 1: "notes"}
+_SOFT_SPECIAL = {"correlates": "is linked", "measured": "reported", "points to": "reports"}
+
+
+def soften_verbs(text: str, cited_claims: List[Claim], checker: Any) -> Tuple[str, List[List[str]]]:
+    """S22b: replace verbs stronger than the weakest cited claim allows with the strongest allowed one, by rule
+    ("observes" -> "reports" for weak claims, -> "states" for vendor claims). Returns (text, [[from, to], ...]).
+    Only verbs above level 3 are softened, so a noun such as "review reports" is never rewritten."""
+    if not cited_claims:
+        return text, []
+    cap = min(checker.get_max_allowed_rank(c.grade) for c in cited_claims)
+    target = _SOFT_TARGET.get(cap, "reports" if cap >= 3 else "notes")
+    changes: List[List[str]] = []
+    for info in checker.verbs_cfg.values():
+        rank = info.get("rank", 0)
+        if rank <= cap or rank < 4:
+            continue
+        for verb in info.get("verbs", []):
+            repl = _SOFT_SPECIAL.get(verb, target) if cap >= 3 else target
+
+            def sub(m: "re.Match[str]", repl: str = repl) -> str:
+                return repl[:1].upper() + repl[1:] if m.group(0)[:1].isupper() else repl
+
+            new = re.sub(r"\b" + re.escape(verb) + r"\b", sub, text, flags=re.IGNORECASE)
+            if new != text:
+                changes.append([verb, repl])
+                text = new
+    return text, changes
+
+
 def resolve_citations(
     text: str,
     papers: List[Dict[str, Any]],
@@ -646,6 +676,14 @@ class SynthesisEngine:
                 )
             )
             ordinal += 1
+
+        # S22b: verbs stronger than the cited evidence allows are softened by rule before the gates check them.
+        for s in sentences:
+            cited = [claims_by_id[c] for c in (s.claim_ids_json or []) if c in claims_by_id]
+            new_text, changes = soften_verbs(s.text, cited, self.checker)
+            if changes:
+                s.text = new_text
+                s.checks_json = {**(s.checks_json or {}), "verb_softened": changes}
 
         # 4. Lint sentences against boilerplate / raw topic string
         is_lint_clean, lint_issues = lint_output_text(sentences, raw_topic=question.text)
