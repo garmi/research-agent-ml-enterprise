@@ -103,6 +103,10 @@ class SynthesisEngine:
         # S27: each paper's allowed verbs and figures, from its claims, so the draft meets G4 and G2 as written.
         for c in compact:
             c.update((evidence_limits or {}).get(c["paper_id"], {}))
+            if c.get("quotes"):
+                # S28c: with quotes to cite, the writer gets no narrative summary to borrow details from.
+                for key in ("key_findings", "problem_statement", "business_relevance", "gap_identified", "adoption_barrier"):
+                    c.pop(key, None)
         # S22: enterprise documents (E#) sit beside the papers, with the same limits.
         compact += [dict(e) for e in extra_entries or []]
         valid_ids = {s["paper_id"] for s in summaries} | {e["paper_id"] for e in extra_entries or []}

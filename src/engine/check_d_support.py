@@ -30,6 +30,11 @@ PROMPT = """You are Check D, a strict fact-checker. For each sentence below, rea
 - "unsupported": the quotes do not support the sentence's main claim, or a figure in it is not in the quotes.
 Judge only against the quotes; do not use your own knowledge. Wording such as "one study reports" or
 "according to one vendor" is attribution, not a claim.
+Each sentence shows its type in brackets:
+- (implication): a recommendation for leaders. Judge only the evidence it rests on; the recommendation wording
+  itself ("leaders should ...") is not a claim the quotes must state.
+- (gap): says what the evidence does not settle. It is supported when the quotes show that limitation, say the
+  matter is open, or describe a study design that leaves it untested.
 
 Return valid JSON only: {{"verdicts": [{{"id": "S1", "verdict": "supported|partial|unsupported", "reason": "one short sentence"}}]}}
 
@@ -86,7 +91,7 @@ def run_check_d(sentences: List[Any], claims_by_id: Dict[str, Any], lanes: Dict[
             for k, it in enumerate(batch, 1):
                 quotes = "\n".join(f"   - {q}" for q in it["quotes"])
                 sentence = re.sub(r"\s+", " ", it["text"])
-                blocks.append(f"[S{k}] {sentence}\n   Quotes:\n{quotes}")
+                blocks.append(f"[S{k}] ({it['type']}) {sentence}\n   Quotes:\n{quotes}")
             try:
                 raw = llm.generate(PROMPT.format(items="\n\n".join(blocks)), system_prompt="Output valid JSON only.",
                                    temperature=0.0, json_mode=True)
@@ -131,8 +136,8 @@ def apply_check_d(result: Dict[str, Any], check_d: Dict[str, Any]) -> None:
             if v.get("verdict") == "unsupported":
                 removed.append({"text": e.get("text"), "reason": v.get("reason", ""), "where": where})
                 continue
-            if v.get("verdict") == "partial":
-                e["support"] = "partial"
+            if v.get("verdict") in ("supported", "partial", "unchecked"):
+                e["support"] = v["verdict"]
             out.append(e)
         return out
 
@@ -179,12 +184,96 @@ def check_takeaways(summary: Optional[Dict[str, Any]], claims_by_id: Dict[str, A
     kept = []
     for i, t in enumerate(summary["takeaways"], 1):
         v = verdict.get(f"tk{i}") or {}
-        if v.get("verdict") == "unsupported":
-            summary.setdefault("dropped", []).append(f"Takeaway dropped (Check D: {v.get('reason', 'not supported')}): {t['text']}")
+        if v.get("verdict") in ("unsupported", "partial"):
+            # S28c: the share post carries only fully supported takeaways.
+            summary.setdefault("dropped", []).append(
+                f"Takeaway dropped (Check D, {v.get('verdict')}: {v.get('reason', 'not supported')}): {t['text']}")
             continue
-        if v.get("verdict") == "partial":
-            t["support"] = "partial"
         kept.append(t)
     summary["takeaways"] = kept
     summary["check_d"] = {k: res[k] for k in ("checked", "supported", "partial", "unsupported", "rate")}
     return summary if kept else None
+
+
+REPAIR_PROMPT = """Rewrite each sentence below so that it says only what its quotes state. Keep its attribution wording
+(such as "one study reports" or "according to one vendor") and keep the tags at the end exactly as given. Remove
+anything the quotes do not state; add nothing. If the quotes cannot support the sentence's point, return "".
+Return valid JSON only: {{"rewrites": [{{"id": "S1", "text": "..."}}]}}
+
+{items}
+"""
+_TAGS_AT_END = re.compile(r"((?:\s*\[[PE]\d+[^\]]*\])+)\s*[.!?]?\s*$")
+
+
+def repair_partials(result: Dict[str, Any], claims_by_id: Dict[str, Any], lanes: Dict[str, str], llm: Optional[Any],
+                    checker: Any) -> None:
+    """S28c: one repair pass. Each partly supported brief sentence is rewritten once to say only what its quotes say,
+    then judged again: supported replaces it (marked repaired); otherwise it is removed and listed with the reason.
+    The answer is not rewritten; a partly supported answer stays, marked. Records the support rate of the brief."""
+    from types import SimpleNamespace
+
+    from src.synth.generator import soften_verbs
+
+    report = result.get("report") or {}
+    cd = result.setdefault("check_d", {})
+    removed = cd.setdefault("removed", [])
+    groups = [(sec, "sentences", f"Section {sec.get('index')}") for sec in report.get("sections") or []]
+    groups += [(report, k, w) for k, w in (("tensions", "Where studies disagree"), ("gaps", "What we don't know"),
+                                           ("implications", "Implications")) if k in report]
+    targets = [(holder, key, where, e) for holder, key, where in groups for e in holder.get(key) or []
+               if e.get("support") == "partial"]
+
+    rewrites: Dict[int, str] = {}
+    if llm is not None:
+        for start in range(0, len(targets), BATCH_SIZE):
+            batch = targets[start:start + BATCH_SIZE]
+            blocks = []
+            for k, (_, _, _, e) in enumerate(batch, 1):
+                quotes = "\n".join(f"   - {_quote(claims_by_id[c])}" for c in e.get("claim_ids") or [] if c in claims_by_id)
+                blocks.append(f"[S{k}] ({e.get('type', 'assertive')}) {e.get('text')}\n   Quotes:\n{quotes}")
+            try:
+                raw = llm.generate(REPAIR_PROMPT.format(items="\n\n".join(blocks)), system_prompt="Output valid JSON only.",
+                                   temperature=0.0, json_mode=True)
+                start_j, end_j = raw.find("{"), raw.rfind("}")
+                got = {str(r.get("id", "")).upper(): str(r.get("text", "")).strip()
+                       for r in (json.loads(raw[start_j:end_j + 1]).get("rewrites") or []) if isinstance(r, dict)}
+            except Exception as e:  # a failed repair call means those sentences are removed below
+                logger.warning("Check D repair failed (%s)", type(e).__name__)
+                got = {}
+            for k in range(1, len(batch) + 1):
+                text = got.get(f"S{k}", "")
+                if text:
+                    orig_tags = _TAGS_AT_END.search(batch[k - 1][3].get("text", ""))
+                    if orig_tags and not re.search(r"\[[PE]\d+", text):
+                        text = text.rstrip(" .") + " " + orig_tags.group(1).strip() + "."
+                    cited = [claims_by_id[c] for c in batch[k - 1][3].get("claim_ids") or [] if c in claims_by_id]
+                    text, _ = soften_verbs(text, cited, checker)
+                    rewrites[start + k - 1] = text
+
+    rejudge = [SimpleNamespace(id=f"r{i}", ordinal=i, text=t, type=targets[i][3].get("type", "assertive"),
+                               claim_ids_json=targets[i][3].get("claim_ids") or []) for i, t in rewrites.items()]
+    verdicts = {it["sentence_id"]: it for it in run_check_d(rejudge, claims_by_id, lanes, llm)["items"]} if rejudge else {}
+    drop = set()
+    for i, (holder, key, where, e) in enumerate(targets):
+        v = verdicts.get(f"r{i}") or {}
+        if i in rewrites and v.get("verdict") == "supported":
+            e["text"], e["support"] = rewrites[i], "repaired"
+        else:
+            removed.append({"text": e.get("text"), "where": where,
+                            "reason": "Still not fully supported after one rewrite: " + str(v.get("reason") or "no supported rewrite")})
+            drop.add(id(e))
+    for holder, key, _ in groups:
+        holder[key] = [e for e in holder.get(key) or [] if id(e) not in drop]
+
+    in_brief = [report.get("answer") or {}] + [e for holder, key, _ in groups for e in holder.get(key) or []]
+    in_brief = [e for e in in_brief if e.get("text")]
+    cd["in_brief"] = len(in_brief)
+    cd["supported_in_brief"] = sum(1 for e in in_brief if e.get("support") in (None, "supported", "repaired"))
+    cd["rate_in_brief"] = round(cd["supported_in_brief"] / cd["in_brief"], 3) if cd["in_brief"] else 0.0
+    first_reason = ((result.get("publish_res") or {}).get("reasons") or [""])[0]
+    if removed and not first_reason.startswith("Check D: the answer"):
+        pr = result.setdefault("publish_res", {})
+        reasons = [r for r in pr.get("reasons") or [] if not r.startswith("Check D:")]
+        pr["reasons"] = [f"Check D: {len(removed)} sentence(s) not fully supported were removed from the brief "
+                         "(listed on Checks & publish)."] + reasons
+        pr["reason"] = " ".join(pr["reasons"])
