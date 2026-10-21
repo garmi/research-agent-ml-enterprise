@@ -55,6 +55,35 @@ def best_supporting_claims(text: str, candidates: List[Claim]) -> List[str]:
     return qualified[:MAX_CLAIMS_PER_TAG] or [scored[0][3]]
 
 
+_CROSS_LEADIN = re.compile(r"^(taken together|together|across (the )?(studies|papers|sources)|combined|overall|"
+                           r"cross-study evidence (shows|suggests|indicates|reports) that),?\s+", re.IGNORECASE)
+_TRAILING_TAGS = re.compile(r"(\s*(?:\[[^\]]+\])+)\s*([.!?]?)\s*$")
+
+
+def mark_single_source(text: str, typ: str, cited_claims: List[Claim], checker: Any,
+                       labels: Optional[Dict[str, str]] = None) -> Tuple[str, str]:
+    """S28: a synthesis-like sentence resting on one source says so. Its cross-study lead-in is dropped and
+    ", according to one study" (one vendor / one organisation for enterprise sources) goes before its tags.
+    Returns (text, mark) with mark "" when nothing changed."""
+    from src.score.checker import SYNTHESIS_TYPES, _phrase_re
+
+    sources = {c.source_id for c in cited_claims or []}
+    if typ not in SYNTHESIS_TYPES or len(sources) != 1:
+        return text, ""
+    if any(_phrase_re(ph).search(text) for ph in checker.single_source_phrases):
+        return text, ""
+    label = (labels or {}).get(next(iter(sources)), "")
+    mark = "one vendor" if label == "Vendor says" else ("one organisation" if label else "one study")
+    body = _CROSS_LEADIN.sub("", text.strip())
+    body = body[:1].upper() + body[1:]
+    m = _TRAILING_TAGS.search(body)
+    if m:
+        head, tags, end = body[:m.start()].rstrip(" .,;"), m.group(1).strip(), m.group(2) or "."
+    else:
+        head, tags, end = body.rstrip(" .!?,;"), "", "."
+    return f"{head}, according to {mark}" + (f" {tags}" if tags else "") + end, mark
+
+
 _SOFT_TARGET = {3: "reports", 2: "states", 1: "notes"}
 _SOFT_SPECIAL = {"correlates": "is linked", "measured": "reported", "points to": "reports"}
 
@@ -678,8 +707,14 @@ class SynthesisEngine:
             ordinal += 1
 
         # S22b: verbs stronger than the cited evidence allows are softened by rule before the gates check them.
+        # S28: a synthesis sentence resting on one source is marked as such.
+        labels = {d.get("id"): d.get("label", "") for d in (executive_synthesis or {}).get("enterprise_docs") or []}
         for s in sentences:
             cited = [claims_by_id[c] for c in (s.claim_ids_json or []) if c in claims_by_id]
+            marked, mark = mark_single_source(s.text, s.type, cited, self.checker, labels)
+            if mark:
+                s.text = marked
+                s.checks_json = {**(s.checks_json or {}), "single_source_marked": mark}
             new_text, changes = soften_verbs(s.text, cited, self.checker)
             if changes:
                 s.text = new_text

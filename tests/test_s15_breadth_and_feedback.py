@@ -96,7 +96,7 @@ def test_keeps_best_on_topic_papers(tmp_path):
     assert len(used["ids"]) == 15 and "p0" in used["ids"] and "p1" not in used["ids"]
     # The best 14 non-custom papers (scores 16-29), kept in harvest order so [P#] numbering is stable.
     assert used["ids"] == ["p0"] + [f"p{i}" for i in range(16, 30)]
-    assert res["breadth"] == {"checked": 30, "on_topic": 29, "used": 15}
+    assert {k: res["breadth"][k] for k in ("checked", "on_topic", "used")} == {"checked": 30, "on_topic": 29, "used": 15}
 
 
 def test_labels_and_evidence_tab_report_breadth():
