@@ -771,8 +771,12 @@ class MultiLaneResearchRunner:
         from src.engine.check_d_support import apply_check_d, run_check_d
 
         lanes = {sid: src.lane for sid, src in (self._ephemeral_sources or {}).items()}
-        apply_check_d(result, run_check_d(sentences, {c.id: c for c in self._ephemeral_claims}, lanes,
-                                          getattr(self, "_reduce_llm", None)))
+        all_claims = {c.id: c for c in self._ephemeral_claims}
+        apply_check_d(result, run_check_d(sentences, all_claims, lanes, getattr(self, "_reduce_llm", None)))
+        # S28b: the share post's takeaways are checked too; unsupported ones are dropped.
+        from src.engine.check_d_support import check_takeaways
+
+        result["summary"] = check_takeaways(result.get("summary"), all_claims, lanes, getattr(self, "_reduce_llm", None))
         reasons = (pub_res or {}).get("reasons") or []
         self._safe_set_run_status(run_id, result["status"], "; ".join(str(r) for r in reasons) or None)
         return result

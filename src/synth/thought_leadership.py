@@ -143,7 +143,8 @@ def build_summary(raw: Any, report: Optional[Dict[str, Any]], papers: List[Dict[
             dropped.append(f"Takeaway dropped ({why}): {strip_tags(text)}")
             continue
         keys = [k for k in dict.fromkeys(re.findall(r"[PE]\d+", " ".join(re.findall(r"\[[^\]]+\]", text)))) if k in key_of]
-        takeaways.append({"text": text, "papers": keys, "basis": _basis(keys, profile["methods"])})
+        cids = resolve_citations(text, papers, list(claims_by_id.values()), claims_by_id)
+        takeaways.append({"text": text, "papers": keys, "basis": _basis(keys, profile["methods"]), "claim_ids": cids})
         if len(takeaways) == MAX_TAKEAWAYS:
             break
     if not takeaways:

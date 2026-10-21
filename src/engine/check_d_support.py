@@ -162,3 +162,29 @@ def apply_check_d(result: Dict[str, Any], check_d: Dict[str, Any]) -> None:
         result["status"] = "BLOCKED"
     if pr.get("reasons"):
         pr["reason"] = " ".join(pr["reasons"])
+
+
+def check_takeaways(summary: Optional[Dict[str, Any]], claims_by_id: Dict[str, Any], lanes: Dict[str, str],
+                    llm: Optional[Any]) -> Optional[Dict[str, Any]]:
+    """S28b: the share post's takeaways go through Check D too; unsupported ones are dropped (and noted).
+    Returns the summary, or None when no takeaway survives."""
+    from types import SimpleNamespace
+
+    if not summary or not summary.get("takeaways"):
+        return summary
+    sents = [SimpleNamespace(id=f"tk{i}", ordinal=i, text=t["text"], type="synthesis", claim_ids_json=t.get("claim_ids") or [])
+             for i, t in enumerate(summary["takeaways"], 1)]
+    res = run_check_d(sents, claims_by_id, lanes, llm)
+    verdict = {i["sentence_id"]: i for i in res["items"]}
+    kept = []
+    for i, t in enumerate(summary["takeaways"], 1):
+        v = verdict.get(f"tk{i}") or {}
+        if v.get("verdict") == "unsupported":
+            summary.setdefault("dropped", []).append(f"Takeaway dropped (Check D: {v.get('reason', 'not supported')}): {t['text']}")
+            continue
+        if v.get("verdict") == "partial":
+            t["support"] = "partial"
+        kept.append(t)
+    summary["takeaways"] = kept
+    summary["check_d"] = {k: res[k] for k in ("checked", "supported", "partial", "unsupported", "rate")}
+    return summary if kept else None
