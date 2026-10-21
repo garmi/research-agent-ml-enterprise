@@ -60,6 +60,16 @@ _CROSS_LEADIN = re.compile(r"^(taken together|together|across (the )?(studies|pa
 _TRAILING_TAGS = re.compile(r"(\s*(?:\[[^\]]+\])+)\s*([.!?]?)\s*$")
 
 
+_ABSENCE = re.compile(r"\b(say|says|said) nothing\b|\bno (study|paper|source|evidence)\b|\b(do|does|did) not (address|cover|report|examine|measure)\b|"
+                      r"\b(is|are) (not addressed|absent|missing)\b|\bnone of the (papers|studies|sources)\b", re.IGNORECASE)
+_ANY_TAG = re.compile(r"\[(?:[PE]\d+|c_)")
+
+
+def is_absence_statement(text: str) -> bool:
+    """S28e: a sentence that only says the evidence is silent on something."""
+    return bool(_ABSENCE.search(text or ""))
+
+
 def display_tags(text: str) -> str:
     """S28b: quote tags shown at source level ([P1.2][P1.3] -> [P1]); adjacent repeats collapse."""
     out = re.sub(r"\[([^\[\]]+)\]", lambda m: "[" + re.sub(r"\b([PE]\d+)\.\d+\b", r"\1", m.group(1)) + "]", text or "")
@@ -398,6 +408,10 @@ class SynthesisEngine:
 
         def add(text: str, type_: str, section: Optional[int] = None) -> None:
             nonlocal ordinal
+            # S28e: an uncited "the papers say nothing on X" sentence cannot be grounded; the report's rule gap line
+            # ("Section N has no evidence from the papers found") says it instead.
+            if type_ != "heading" and not _ANY_TAG.search(text or "") and is_absence_statement(text):
+                return
             cids, checks = bind(text) if type_ != "heading" else ([], None)
             if section is not None:
                 checks = {**(checks or {}), "section": section}
