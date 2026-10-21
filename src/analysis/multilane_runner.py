@@ -78,6 +78,9 @@ def readable_text(page: str) -> str:
     return _html.unescape(meta.group(1)).strip() if meta else ""
 
 
+MAX_E_ENTRIES = 8  # S22c: enterprise entries given to the writer
+
+
 def fetch_url_metadata(url: str, max_chars: int = 6000) -> Tuple[str, str, str]:
     """Fetch or infer title, readable text excerpt, and domain from a web URL."""
     import urllib.request
@@ -1635,6 +1638,13 @@ class MultiLaneResearchRunner:
         for c in enterprise_claims or []:
             if c.source_id not in order:
                 order.append(c.source_id)
+        # S22c: newer sources first, at most MAX_E_ENTRIES, so the writer's prompt stays within the model's time limit.
+        older = {c.source_id for c in enterprise_claims or [] if (c.context_json or {}).get("older_than_window")}
+        order = sorted(order, key=lambda sid: sid in older)[:MAX_E_ENTRIES]
+
+        def short(text: str, n: int = 240) -> str:
+            return text if len(text) <= n else text[:n].rsplit(" ", 1)[0] + "…"
+
         labels = {"vendor_blog": "Vendor says", "analyst_survey": "Industry report", "regulator_standard": "Standard or regulator",
                   "filing": "Company filing", "incident_report": "News", "customer_case_study": "Practitioner write-up"}
         docs, entries = [], []
@@ -1651,7 +1661,7 @@ class MultiLaneResearchRunner:
                          "older": bool(ctx.get("older_than_window"))})
             entries.append({"paper_id": key, "title": src.title, "source_type": label, "organisation": src.org or "",
                             "date": src.pub_date or "not dated", "older_than_24_months": bool(ctx.get("older_than_window")),
-                            "passages": [strip_claim_prefix(c.text) for c in cs][:6]})
+                            "passages": [short(strip_claim_prefix(c.text)) for c in cs][:3]})
         return docs, entries
 
     def _enterprise_coverage(self) -> List[str]:

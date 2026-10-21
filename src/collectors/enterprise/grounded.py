@@ -53,7 +53,12 @@ def _matches(host: str, domains: Tuple[str, ...]) -> bool:
     return any(host == d or host.endswith("." + d) for d in domains)
 
 
-def classify_source(url: str, title: str, text: str) -> Optional[Dict[str, str]]:
+def page_is_selling(page: str) -> bool:
+    """S22c: sales cues anywhere in the page, navigation and footer included (the article text drops them)."""
+    return bool(_SALES_CUES.search(re.sub(r"<[^>]+>", " ", page or "")))
+
+
+def classify_source(url: str, title: str, text: str, selling: bool = False) -> Optional[Dict[str, str]]:
     """source_type, grade (the cap for its claims), commercial stake and a reader label; None for a blocked site."""
     host = _host(url)
     if not host or _matches(host, BLOCKED):
@@ -66,7 +71,7 @@ def classify_source(url: str, title: str, text: str) -> Optional[Dict[str, str]]
         if not _matches(host, VENDORS):
             return {"source_type": "analyst_survey", "grade": "moderate", "stake": "unknown", "label": "Industry report"}
     # S22b: a page that sells (demo, trial, pricing) is a vendor page even when its domain is not listed.
-    if _matches(host, VENDORS) or "vendor" in host or _SALES_CUES.search(text or ""):
+    if _matches(host, VENDORS) or "vendor" in host or selling or _SALES_CUES.search(text or ""):
         return {"source_type": "vendor_blog", "grade": "vendor_claim", "stake": "vendor", "label": "Vendor says"}
     if _matches(host, NEWS):
         return {"source_type": "incident_report", "grade": "weak", "stake": "unknown", "label": "News"}
@@ -127,8 +132,8 @@ def select_passages(text: str, terms: List[str], max_sentences: int = 8) -> List
     return out
 
 
-def fetch_page(url: str) -> Tuple[str, str, str, str]:
-    """(title, readable text, YYYY-MM-DD or '', 'html' | 'pdf') for a page; empty text when it cannot be read."""
+def fetch_page(url: str) -> Tuple[Any, ...]:
+    """(title, readable text, YYYY-MM-DD or '', 'html' | 'pdf', selling) for a page; empty text when unreadable."""
     from src.analysis.multilane_runner import readable_text
 
     r = requests.get(url, timeout=15, headers=UA)
@@ -141,13 +146,13 @@ def fetch_page(url: str) -> Tuple[str, str, str, str]:
         reader = PdfReader(io.BytesIO(r.content[:15_000_000]))
         text = " ".join((p.extract_text() or "") for p in reader.pages[:30])
         title = str((reader.metadata or {}).get("/Title") or "") if reader.metadata else ""
-        return title or url.rsplit("/", 1)[-1], " ".join(text.split())[:20000], "", "pdf"
+        return title or url.rsplit("/", 1)[-1], " ".join(text.split())[:20000], "", "pdf", False
     page = r.text[:2_000_000]
     m = re.search(r"<title[^>]*>(.*?)</title>", page, re.IGNORECASE | re.DOTALL)
     import html as _html
 
     title = " ".join(_html.unescape(m.group(1)).split()) if m else url
-    return title[:160], readable_text(page)[:20000], page_date(page), "html"
+    return title[:160], readable_text(page)[:20000], page_date(page), "html", page_is_selling(page)
 
 
 SEARCH_PROMPT = (
@@ -187,31 +192,44 @@ class GroundedSearch:
                 if chunk["uri"] not in seen:
                     seen.add(chunk["uri"])
                     found.append(chunk)
-        docs: List[Dict[str, Any]] = []
-        real = set()
-        for chunk in found:
-            if len(docs) >= self.max_docs:
-                break
+        # S22c: pages are resolved and read side by side (5 at a time); results keep the search order.
+        from concurrent.futures import ThreadPoolExecutor
+
+        def read(chunk: Dict[str, str]) -> Optional[Dict[str, Any]]:
             url = resolve_redirect(chunk["uri"])
-            if url in real:
-                continue
-            real.add(url)
-            kind = classify_source(url, chunk.get("title", ""), "")
-            if kind is None:
-                continue
+            if classify_source(url, chunk.get("title", ""), "") is None:
+                return None
             try:
-                title, text, date, fmt = fetch_page(url)
+                res = fetch_page(url)
             except Exception as e:
                 logger.warning("Could not read %s (%s)", _host(url), type(e).__name__)
-                continue
+                return None
+            title, text, date, fmt = res[:4]
+            selling = bool(res[4]) if len(res) > 4 else False
             if is_paywalled(url, text):
-                self.coverage.append(f"Paywalled page not read: {_host(url)}")
-                continue
+                return {"paywalled": _host(url)}
             passages = select_passages(text, terms)
             if not passages:
+                return None
+            kind = classify_source(url, title, text, selling=selling)
+            if kind is None:
+                return None
+            return {"url": url, "title": title or chunk.get("title", ""), "host": _host(url), "date": date,
+                    "format": fmt, "passages": passages, "older": older_than(date, self.recency_months), **kind}
+
+        with ThreadPoolExecutor(max_workers=5) as pool:
+            results = list(pool.map(read, found[: self.max_docs * 2]))
+        docs: List[Dict[str, Any]] = []
+        real = set()
+        for d in results:
+            if d is None:
                 continue
-            kind = classify_source(url, title, text) or kind
-            docs.append({"url": url, "title": title or chunk.get("title", ""), "host": _host(url), "date": date,
-                         "format": fmt, "passages": passages, "older": older_than(date, self.recency_months), **kind})
+            if "paywalled" in d:
+                self.coverage.append(f"Paywalled page not read: {d['paywalled']}")
+                continue
+            if d["url"] in real or len(docs) >= self.max_docs:
+                continue
+            real.add(d["url"])
+            docs.append(d)
         docs.sort(key=lambda d: (d["older"], d["date"] == ""), reverse=False)
         return docs

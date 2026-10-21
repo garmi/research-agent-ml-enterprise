@@ -12,7 +12,7 @@ from src.llm.model_names import gemini_model_name
 class GeminiClient:
     """Minimal Gemini REST client (Google AI Studio key). Same interface as OllamaClient."""
 
-    def __init__(self, model: Optional[str] = None, api_key: Optional[str] = None, retries: int = 2, timeout: int = 120):
+    def __init__(self, model: Optional[str] = None, api_key: Optional[str] = None, retries: int = 2, timeout: int = 300):
         self.api_key = (api_key or os.getenv("GEMINI_API_KEY", "")).strip()
         if not self.api_key:
             raise RuntimeError("GEMINI_API_KEY is not set. Add it to .env (AI Studio key).")
