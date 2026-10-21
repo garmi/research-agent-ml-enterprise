@@ -122,10 +122,13 @@ def test_check_d_rules_without_model():
 
 
 def test_unsupported_blocks_publishing():
+    # S28b: unsupported sentences are removed from the brief; an unsupported answer still blocks publishing.
     from src.engine.check_d_support import apply_check_d
 
-    result = {"status": "PUBLISH_READY", "publish_res": {"status": "PUBLISH_READY", "allowed": True, "reasons": ["ok"]}}
-    apply_check_d(result, {"checked": 3, "supported": 1, "partial": 1, "unsupported": 1, "rate": 0.333, "items": []})
+    result = {"status": "PUBLISH_READY", "report": {"answer": {"text": "A [P1]."}, "sections": []},
+              "publish_res": {"status": "PUBLISH_READY", "allowed": True, "reasons": ["ok"]}}
+    apply_check_d(result, {"checked": 3, "supported": 1, "partial": 1, "unsupported": 1, "rate": 0.333,
+                           "items": [{"text": "A [P1].", "verdict": "unsupported", "reason": "r"}]})
     assert result["status"] == "BLOCKED" and result["publish_res"]["allowed"] is False
     assert "Check D" in result["publish_res"]["reasons"][0]
     ok = {"status": "PUBLISH_READY", "publish_res": {"status": "PUBLISH_READY", "allowed": True, "reasons": ["ok"]}}
