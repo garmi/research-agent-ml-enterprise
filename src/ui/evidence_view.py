@@ -31,7 +31,7 @@ def render_sentence(text: str, paper_map: Optional[Dict[str, Any]] = None) -> st
         title = html.escape(f"{paper.get('title') or 'Academic Paper'} ({paper.get('year', '')})", quote=True)
         return f'<a href="{url}" target="_blank" title="{title}" class="cite-pill">[{key}]</a>'
 
-    return re.sub(r"\[(P\d+)\]", pill, escaped)
+    return re.sub(r"\[([PE]\d+)\]", pill, escaped)
 
 
 def _chip(text: str, bg: str, fg: str) -> str:
@@ -188,4 +188,26 @@ def evidence_map_html(report: Optional[Dict[str, Any]], papers: List[Dict[str, A
         f'<th style="{cell}text-align:left;">Method</th>{head}</tr></thead>'
         f'<tbody>{"".join(body)}</tbody></table>'
         f'<ul style="margin:0.5rem 0 0 1rem;font-size:0.84rem;color:#475569;">{legend}</ul></div>'
+    )
+
+
+def enterprise_card_html(es: Dict[str, Any], doc: Optional[Dict[str, Any]] = None) -> str:
+    """One Evidence-tab enterprise source (S22): escaped text (titles come from web pages), http(s)-only links,
+    its E# key and reader label when the brief can cite it, and an 'older than 24 months' mark."""
+    esc = lambda v: html.escape(str(v or ""))
+    doc = doc or {}
+    date = es.get("pub_date")
+    date_str = date if (date and str(date).lower() not in ("none", "null")) else "Date unknown"
+    key = f'<b style="margin-right:0.4rem;">[{esc(doc.get("key"))}]</b>' if doc.get("key") else ""
+    label = doc.get("label") or str(es.get("source_type") or "enterprise").replace("_", " ")
+    older = ' <span style="color:#B45309;font-weight:700;">· older than 24 months</span>' if doc.get("older") else ""
+    return (
+        '<div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:10px;padding:0.9rem 1.15rem;margin-bottom:0.65rem;">'
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">'
+        f'<span>{key}<span style="font-size:0.78rem;font-weight:700;color:#6D28D9;background:#F5F3FF;padding:0.15rem 0.5rem;border-radius:4px;">{esc(label)}</span></span>'
+        f'<span style="font-size:0.74rem;color:#64748B;">Commercial stake: <strong>{esc(es.get("commercial_stake") or "unknown")}</strong></span></div>'
+        f'<div style="font-weight:700;font-size:0.94rem;margin-bottom:0.25rem;"><a href="{html.escape(safe_url(es.get("url")), quote=True)}" '
+        f'target="_blank" style="color:#0F172A;text-decoration:none;">{esc(es.get("title"))} ↗</a></div>'
+        f'<div style="font-size:0.8rem;color:#64748B;">Organisation: <strong>{esc(es.get("venue"))}</strong> · Date: <strong>{esc(date_str)}</strong>{older}</div>'
+        "</div>"
     )

@@ -38,7 +38,7 @@ def paper_evidence_limits(papers: List[Dict[str, Any]], claims: List[Any], check
                 n = n.lower()
                 if not re.fullmatch(r"(19|20)\d{2}", n) and n not in figures:
                     figures.append(n)
-        out[f"P{i}"] = {"allowed_verbs": verbs, "figures": figures}
+        out[p.get("key") or f"P{i}"] = {"allowed_verbs": verbs, "figures": figures}
     return out
 
 

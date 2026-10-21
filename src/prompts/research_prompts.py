@@ -128,6 +128,10 @@ Rules:
 - Each paper lists its "allowed_verbs" and "figures", set by the strength of its evidence. A sentence citing a paper
   uses only that paper's allowed verbs; a sentence citing several papers uses only verbs allowed for the weakest of
   them (the shortest list). Use only figures listed in a cited paper's "figures"; never take a number from elsewhere.
+- Entries with ids E# are enterprise practice sources (their source_type says vendor, industry report, news,
+  filing or practitioner write-up); cite them with [E#] beside the [P#] papers.
+- Call a practice a pattern only when two or more independent organisations report it; otherwise write
+  "one organisation reports", or "one vendor reports" for a vendor. Say when an E# source is older than 24 months.
 - Never invent numbers, organisations or studies. Avoid "significantly" and "substantially" unless a paper uses
   those words.
 - Sections answer only their own sub-question. If the papers say nothing on a sub-question, give it no synthesis and

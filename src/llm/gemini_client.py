@@ -64,3 +64,24 @@ class GeminiClient:
         if last_exc:
             raise last_exc
         raise RuntimeError("Gemini request failed: unknown error.")
+
+    def search_sources(self, prompt: str) -> dict:
+        """S22: one Google Search grounded call. Returns only the grounding metadata: the sources Google found
+        ({"uri", "title"} from groundingChunks), the queries it ran (webSearchQueries) and the Search Suggestions
+        markup (searchEntryPoint, which must be shown wherever grounded results are used). Gemini's answer text is
+        discarded, so nothing it writes reaches the brief."""
+        import re
+
+        body = {"contents": [{"role": "user", "parts": [{"text": prompt}]}], "tools": [{"google_search": {}}],
+                "generationConfig": {"temperature": 0.0}}
+        url = f"{self.base_url}/{self.model.strip()}:generateContent"
+        headers = {"x-goog-api-key": self.api_key, "Content-Type": "application/json"}
+        response = requests.post(url, json=body, headers=headers, timeout=self.timeout)
+        if not response.ok:
+            err = re.sub(r"AIza[0-9A-Za-z-_]{35}", "[REDACTED_KEY]", response.text)
+            raise requests.HTTPError(f"HTTP {response.status_code} ({response.reason}): {err[:300]}", response=response)
+        meta = ((response.json().get("candidates") or [{}])[0]).get("groundingMetadata") or {}
+        chunks = [{"uri": (c.get("web") or {}).get("uri", ""), "title": (c.get("web") or {}).get("title", "")}
+                  for c in meta.get("groundingChunks") or [] if (c.get("web") or {}).get("uri")]
+        return {"chunks": chunks, "queries": list(meta.get("webSearchQueries") or []),
+                "entry_point": (meta.get("searchEntryPoint") or {}).get("renderedContent", "")}

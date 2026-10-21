@@ -458,6 +458,8 @@ class MultiLaneResearchRunner:
             run_id=run_id,
             custom_urls=lane_urls.get("enterprise", []),
             enterprise_feed_override=enterprise_feed_override,
+            grounded_package=approved_package,
+            provider=map_provider,
         )
 
         # Lane C: Practitioner Lane (Local Only)
@@ -1570,19 +1572,27 @@ class MultiLaneResearchRunner:
         run_id: str,
         custom_urls: Optional[List[str]] = None,
         enterprise_feed_override: Optional[Dict[str, List[Dict[str, Any]]]] = None,
+        grounded_package: Optional[Dict[str, Any]] = None,
+        provider: str = "",
     ) -> List[Claim]:
-        """Harvest enterprise lane evidence from sources registry and curated industry feeds."""
+        """Harvest enterprise lane evidence: Google Search grounding when available (S22), else the registry feeds."""
         ent_collector = EnterpriseCollector(
             registry_path=self.sources_registry_path,
             db_path=self.db_path,
         )
 
-        claims = ent_collector.search_and_ingest(
-            question=question_obj,
-            query=topic,
-            run_id=run_id,
-            feed_data_override=enterprise_feed_override,
-        )
+        claims: List[Claim] = []
+        self._grounded = {"status": "not_searched", "queries": [], "entry_point": "", "coverage": [], "error": ""}
+        searcher = self._build_grounded_search(provider) if enterprise_feed_override is None else None
+        if searcher is not None:
+            claims = self._harvest_grounded(searcher, topic, question_obj, run_id, grounded_package or {})
+        if self._grounded["status"] != "searched_ok":
+            claims += ent_collector.search_and_ingest(
+                question=question_obj,
+                query=topic,
+                run_id=run_id,
+                feed_data_override=enterprise_feed_override,
+            )
         for src_cfg in ent_collector.registry_sources:
             src_id = src_cfg.get("id")
             if src_id and src_id not in self._ephemeral_sources:
@@ -1616,6 +1626,118 @@ class MultiLaneResearchRunner:
                     logger.warning("Custom enterprise URL skipped (%s): %s", type(e).__name__, u_clean[:120])
 
         return claims
+
+    def _enterprise_entries(self, enterprise_claims: List[Claim]) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+        """(docs, writer entries) for the run's enterprise sources, keyed E1..En in harvest order (newest first)."""
+        from src.extract.claim_extractor import strip_claim_prefix
+
+        order: List[str] = []
+        for c in enterprise_claims or []:
+            if c.source_id not in order:
+                order.append(c.source_id)
+        labels = {"vendor_blog": "Vendor says", "analyst_survey": "Industry report", "regulator_standard": "Standard or regulator",
+                  "filing": "Company filing", "incident_report": "News", "customer_case_study": "Practitioner write-up"}
+        docs, entries = [], []
+        for n, sid in enumerate(order, 1):
+            src = self._source(sid)
+            if src is None or src.lane != "enterprise":
+                continue
+            cs = [c for c in enterprise_claims if c.source_id == sid]
+            ctx = cs[0].context_json or {}
+            label = ctx.get("source_label") or labels.get(src.source_type, "Practice source")
+            key = f"E{len(docs) + 1}"
+            docs.append({"id": sid, "key": key, "title": src.title, "url": src.url or "", "label": label, "lane": "enterprise",
+                         "venue": src.org or src.venue or "", "year": (src.pub_date or "")[:4] or "n.d.", "type": label,
+                         "older": bool(ctx.get("older_than_window"))})
+            entries.append({"paper_id": key, "title": src.title, "source_type": label, "organisation": src.org or "",
+                            "date": src.pub_date or "not dated", "older_than_24_months": bool(ctx.get("older_than_window")),
+                            "passages": [strip_claim_prefix(c.text) for c in cs][:6]})
+        return docs, entries
+
+    def _enterprise_coverage(self) -> List[str]:
+        """Plain lines on what the enterprise search could not cover (S22)."""
+        g = getattr(self, "_grounded", None) or {}
+        lines = list(g.get("coverage") or [])
+        if g.get("status") == "searched_error":
+            lines.append(f"Enterprise web search failed ({g.get('error') or 'error'}); only the fallback feeds were read.")
+        elif g.get("status") == "not_searched":
+            lines.append("Enterprise web search did not run (it needs Gemini); only the fallback feeds were read.")
+        return lines
+
+    def _grounded_cfg(self) -> Dict[str, Any]:
+        return (((self.config or {}).get("enterprise") or {}).get("grounded_search") or {})
+
+    def _build_grounded_search(self, provider: str) -> Optional[Any]:
+        """S22: Google Search grounding through Gemini; None without a Gemini key, when disabled, or offline."""
+        cfg = self._grounded_cfg()
+        if not cfg.get("enabled", True) or str(provider).lower() != "gemini" or not os.getenv("GEMINI_API_KEY", "").strip():
+            return None
+        try:
+            from src.collectors.enterprise.grounded import GroundedSearch
+            from src.llm.gemini_client import GeminiClient
+
+            return GroundedSearch(GeminiClient(), max_calls=int(cfg.get("max_calls", 5)), max_per_call=int(cfg.get("max_per_call", 5)),
+                                  max_docs=int(cfg.get("max_docs", 15)), recency_months=int(cfg.get("recency_months", 24)))
+        except Exception as e:
+            logger.warning("Grounded search unavailable (%s)", type(e).__name__)
+            return None
+
+    def _harvest_grounded(self, searcher: Any, topic: str, question_obj: Question, run_id: str,
+                          package: Dict[str, Any]) -> List[Claim]:
+        from src.analysis.relevance import support_terms
+
+        questions = [package.get("refined_question") or topic] + [q for q in package.get("sub_questions") or [] if q]
+        texts = [str(q) for q in questions + list(package.get("in_scope") or [])]
+        terms = {t for q in texts for t in support_terms(q)}
+        if re.search(r"\bAI\b", " ".join(texts), re.IGNORECASE):
+            terms.add("ai")  # two letters, so support_terms leaves it out; on an AI question it is the subject
+        terms = sorted(terms)
+        docs = searcher.run(questions, terms)
+        self._grounded = {"status": searcher.status, "queries": list(searcher.queries), "entry_point": searcher.entry_point,
+                          "coverage": list(searcher.coverage), "error": searcher.error}
+        max_claims = int(self._grounded_cfg().get("max_claims_per_doc", 8))
+        claims: List[Claim] = []
+        for d in docs:
+            try:
+                claims += self._ingest_grounded_doc(d, question_obj, max_claims)
+            except Exception as e:  # one page never fails the run
+                logger.warning("Grounded page skipped (%s): %s", type(e).__name__, d.get("host"))
+        self._safe_insert_search_log(SearchLog(
+            id=f"slog_ent_grounded_{uuid.uuid4().hex[:10]}", run_id=run_id, question_id=question_obj.id, lane="enterprise",
+            query=" | ".join(questions)[:500], source_api="google_search_grounding", result_count=len(docs),
+            status=searcher.status if searcher.status in ("searched_ok", "searched_error") else "not_searched",
+            details_json={"queries": searcher.queries[:20], "coverage": searcher.coverage, "error": searcher.error},
+        ))
+        return claims
+
+    def _ingest_grounded_doc(self, doc: Dict[str, Any], question_obj: Question, max_claims: int) -> List[Claim]:
+        """One grounded page as its own enterprise source; its question-term passages become claims, capped by type."""
+        src_id = f"ent_{hashlib.sha256(doc['url'].encode()).hexdigest()[:12]}"
+        source = Source(
+            id=src_id, lane="enterprise", source_type=doc["source_type"], org=doc["host"], title=doc["title"][:200],
+            url=doc["url"], venue=doc["host"], venue_tier="vendor" if doc["stake"] == "vendor" else "unverified",
+            pub_date=doc.get("date") or None, commercial_stake=doc["stake"], extraction_depth="full_text", status="active",
+        )
+        self._ephemeral_sources[src_id] = source
+        self._safe_insert_source(source)
+        extracted = extract_claims_from_paper(
+            paper={"id": src_id, "title": doc["title"], "abstract": " ".join(doc["passages"]), "url": doc["url"]},
+            question_id=question_obj.id, target_entity="Enterprise practice",
+        )[:max_claims]
+        where = "PDF" if doc.get("format") == "pdf" else "Web page"
+        study = {"vendor_blog": "vendor_assertion", "filing": "filing_disclosure", "analyst_survey": "survey_with_method",
+                 "regulator_standard": "position_paper"}.get(doc["source_type"], "case_study")
+        out = []
+        for c in extracted:
+            c.grade = doc["grade"]
+            c.study_type = study
+            c.source_excerpt = c.source_excerpt.replace("(Location: Abstract)", f"(Location: {where})")
+            c.context_json = {**(c.context_json or {}), "source_label": doc["label"], "older_than_window": bool(doc.get("older")),
+                              "grade_cap": doc["grade"]}
+            c.grade_reasons_json = [f"{doc['label']} found by grounded search; graded by source type (cap: {doc['grade']})."]
+            self._safe_insert_claim(c)
+            out.append(c)
+        return out
 
     def _ingest_custom_enterprise_url(self, u_clean: str, question_obj: Question) -> List[Claim]:
         """One operator-supplied enterprise URL as a source and its claims."""
@@ -1875,8 +1997,14 @@ class MultiLaneResearchRunner:
             from src.synth.limits import paper_evidence_limits
 
             self._evidence_limits = paper_evidence_limits(papers, academic_claims, self.checker)
+            # S22: on-topic enterprise documents as E# entries beside the papers, with their own limits.
+            ent_docs, ent_entries = self._enterprise_entries(enterprise_claims)
+            self._evidence_limits.update(paper_evidence_limits(ent_docs, enterprise_claims, self.checker))
+            for e in ent_entries:
+                e.update(self._evidence_limits.get(e["paper_id"], {}))
             synth = synthesizer.analyze(topic, papers, tone=tone_key, length="detailed", package=approved_package,
-                                        evidence_limits=self._evidence_limits)
+                                        evidence_limits=self._evidence_limits, extra_entries=ent_entries)
+            synth["enterprise_docs"] = ent_docs
             if map_provider == "stub" or reduce_provider == "stub":
                 generation_mode = "extractive_fallback"
                 if not synth.get("executive_summary") and not synth.get("key_findings"):
@@ -2186,13 +2314,15 @@ class MultiLaneResearchRunner:
             })
 
         # S19: the question-shaped report, built by rule from the checked sentences (None for older shapes).
+        ent_docs = list(executive_synthesis.get("enterprise_docs") or [])
+        cite_list = papers_formatted + ent_docs
         report_obj = build_report(
-            sentences, papers_formatted, {c.id: c for c in all_q_claims},
+            sentences, cite_list, {c.id: c for c in all_q_claims},
             executive_synthesis.get("paper_summaries") or [],
             lambda p: self.grader.resolve_venue_tier(p.get("venue"), p.get("type")),
         )
-        diagram_obj = self._report_diagram(report_obj, papers_formatted, claim_by_id, question_obj.text)
-        summary_obj = self._thought_leadership(report_obj, papers_formatted, claim_by_id, question_obj.text)
+        diagram_obj = self._report_diagram(report_obj, cite_list, claim_by_id, question_obj.text)
+        summary_obj = self._thought_leadership(report_obj, cite_list, claim_by_id, question_obj.text)
 
         status_val = publish_res.get("status", score_results.get("band", "NOT_PUBLISHABLE"))
         # The bottom line shown is the gated summary sentence (S10), the same text the gates checked.
@@ -2250,6 +2380,10 @@ class MultiLaneResearchRunner:
             "sentence_traces": sentence_traces,
             "report": report_obj,
             "diagram": diagram_obj,
+            "enterprise_docs": ent_docs,
+            "search_entry_point": (getattr(self, "_grounded", {}) or {}).get("entry_point", ""),
+            "grounded_queries": (getattr(self, "_grounded", {}) or {}).get("queries", []),
+            "enterprise_coverage": self._enterprise_coverage(),
             "summary": summary_obj,
             "generation_mode": executive_synthesis.get("generation_mode", "model"),
             "is_fallback": bool(executive_synthesis.get("is_fallback", False)),

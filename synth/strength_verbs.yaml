@@ -88,3 +88,8 @@ single_source_phrases:
   - "one evaluation"
   - "one experiment"
   - "its authors report"
+  # S22: one enterprise source
+  - "one vendor"
+  - "one organisation"
+  - "one organization"
+  - "one company"
