@@ -244,7 +244,7 @@ def test_report_prompt_has_enterprise_entries_and_wording():
     compact = [{"paper_id": "P1", "title": "T"},
                {"paper_id": "E1", "title": "AI reviews at scale", "source_type": "Vendor says", "passages": ["x"]}]
     p = ResearchPromptLibrary.report("t", compact, ["Q1?"], question="Q?")
-    assert "[E#]" in p and "one vendor reports" in p and "one organisation reports" in p and "independent" in p
+    assert "[E#]" in p and "according to one vendor" in p and "one organisation reports" in p and "independent" in p
 
 
 def test_e_tags_resolve_and_report_lists_them():

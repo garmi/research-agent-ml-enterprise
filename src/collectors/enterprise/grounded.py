@@ -38,6 +38,9 @@ NEWS = ("reuters.com", "bloomberg.com", "ft.com", "wsj.com", "nytimes.com", "the
 BLOCKED = ("pinterest.com", "quora.com", "facebook.com", "instagram.com", "tiktok.com", "x.com", "twitter.com",
            "slideshare.net", "scribd.com", "coursehero.com", "studocu.com", "chegg.com", "youtube.com", "reddit.com")
 PAYWALLED = ("gartner.com", "forrester.com", "idc.com", "ft.com", "wsj.com", "bloomberg.com", "hbr.org")
+_SALES_CUES = re.compile(r"\b(book a demo|request a demo|schedule a demo|get a demo|start (your |a )?free trial|"
+                         r"try (it )?(for )?free|sign up (for )?free|get started (for )?free|see pricing|pricing plans?|"
+                         r"view pricing|contact sales|talk to sales)\b", re.IGNORECASE)
 _PAYWALL_CUES = re.compile(r"\b(subscribe to (continue|read)|become a client|log ?in to (read|continue)|sign in to (read|continue)|"
                            r"for subscribers only|this content is for (clients|members))\b", re.IGNORECASE)
 
@@ -62,7 +65,8 @@ def classify_source(url: str, title: str, text: str) -> Optional[Dict[str, str]]
     if _matches(host, INDUSTRY) or re.search(r"\b(state of|survey|benchmark report|industry report)\b", title or "", re.IGNORECASE):
         if not _matches(host, VENDORS):
             return {"source_type": "analyst_survey", "grade": "moderate", "stake": "unknown", "label": "Industry report"}
-    if _matches(host, VENDORS) or "vendor" in host:
+    # S22b: a page that sells (demo, trial, pricing) is a vendor page even when its domain is not listed.
+    if _matches(host, VENDORS) or "vendor" in host or _SALES_CUES.search(text or ""):
         return {"source_type": "vendor_blog", "grade": "vendor_claim", "stake": "vendor", "label": "Vendor says"}
     if _matches(host, NEWS):
         return {"source_type": "incident_report", "grade": "weak", "stake": "unknown", "label": "News"}
