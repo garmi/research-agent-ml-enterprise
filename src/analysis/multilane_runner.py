@@ -771,8 +771,12 @@ class MultiLaneResearchRunner:
         from src.engine.check_d_support import apply_check_d, run_check_d
 
         lanes = {sid: src.lane for sid, src in (self._ephemeral_sources or {}).items()}
-        apply_check_d(result, run_check_d(sentences, {c.id: c for c in self._ephemeral_claims}, lanes,
-                                          getattr(self, "_reduce_llm", None)))
+        all_claims = {c.id: c for c in self._ephemeral_claims}
+        apply_check_d(result, run_check_d(sentences, all_claims, lanes, getattr(self, "_reduce_llm", None)))
+        # S28b: the share post's takeaways are checked too; unsupported ones are dropped.
+        from src.engine.check_d_support import check_takeaways
+
+        result["summary"] = check_takeaways(result.get("summary"), all_claims, lanes, getattr(self, "_reduce_llm", None))
         reasons = (pub_res or {}).get("reasons") or []
         self._safe_set_run_status(run_id, result["status"], "; ".join(str(r) for r in reasons) or None)
         return result
@@ -2040,11 +2044,24 @@ class MultiLaneResearchRunner:
             # S22: on-topic enterprise documents as E# entries beside the papers, with their own limits.
             ent_docs, ent_entries = self._enterprise_entries(enterprise_claims)
             self._evidence_limits.update(paper_evidence_limits(ent_docs, enterprise_claims, self.checker))
+            # S28b: numbered quotes per source; the writer cites quote ids, so each sentence binds to exact quotes.
+            from src.analysis.relevance import support_terms
+            from src.synth.limits import source_quotes
+
+            pkg = approved_package or {}
+            q_terms = sorted({t for q in [pkg.get("refined_question") or topic] + list(pkg.get("sub_questions") or [])
+                              for t in support_terms(str(q))})
+            p_quotes, p_map = source_quotes(papers, academic_claims, q_terms)
+            e_quotes, e_map = source_quotes(ent_docs, enterprise_claims, q_terms, max_per=3)
+            for key, qs in {**p_quotes, **e_quotes}.items():
+                self._evidence_limits.setdefault(key, {})["quotes"] = qs
             for e in ent_entries:
                 e.update(self._evidence_limits.get(e["paper_id"], {}))
+                e.pop("passages", None)
             synth = synthesizer.analyze(topic, papers, tone=tone_key, length="detailed", package=approved_package,
                                         evidence_limits=self._evidence_limits, extra_entries=ent_entries)
             synth["enterprise_docs"] = ent_docs
+            synth["quote_map"] = {**p_map, **e_map}
             if map_provider == "stub" or reduce_provider == "stub":
                 generation_mode = "extractive_fallback"
                 if not synth.get("executive_summary") and not synth.get("key_findings"):

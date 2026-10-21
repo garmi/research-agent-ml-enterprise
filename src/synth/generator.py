@@ -60,6 +60,15 @@ _CROSS_LEADIN = re.compile(r"^(taken together|together|across (the )?(studies|pa
 _TRAILING_TAGS = re.compile(r"(\s*(?:\[[^\]]+\])+)\s*([.!?]?)\s*$")
 
 
+def display_tags(text: str) -> str:
+    """S28b: quote tags shown at source level ([P1.2][P1.3] -> [P1]); adjacent repeats collapse."""
+    out = re.sub(r"\[([^\[\]]+)\]", lambda m: "[" + re.sub(r"\b([PE]\d+)\.\d+\b", r"\1", m.group(1)) + "]", text or "")
+    prev = None
+    while prev != out:
+        prev, out = out, re.sub(r"\[([PE]\d+)\]\[\1\]", r"[\1]", out)
+    return out
+
+
 def mark_single_source(text: str, typ: str, cited_claims: List[Claim], checker: Any,
                        labels: Optional[Dict[str, str]] = None) -> Tuple[str, str]:
     """S28: a synthesis-like sentence resting on one source says so. Its cross-study lead-in is dropped and
@@ -120,6 +129,7 @@ def resolve_citations(
     eligible_claims: List[Claim],
     claims_by_id: Dict[str, Claim],
     enterprise: Optional[List[Dict[str, Any]]] = None,
+    quote_map: Optional[Dict[str, str]] = None,
 ) -> List[str]:
     """Claim ids a sentence cites through its own tags, in order: [P#] means the claims from that
     paper that support the sentence (best_supporting_claims), [c_...] means that claim. No tag, or
@@ -134,7 +144,12 @@ def resolve_citations(
         for token in re.split(r"[,;\s]+", group.strip()):
             p = re.fullmatch(r"P(\d+)", token)
             e = re.fullmatch(r"E\d+", token)
-            if e:
+            q = re.fullmatch(r"[PE]\d+\.\d+", token)
+            if q:
+                # S28b: a quote id is exactly one claim.
+                cid = (quote_map or {}).get(token)
+                ids = [cid] if cid and cid in claims_by_id else []
+            elif e:
                 # S22: [E#] is an enterprise document, found by key among the enterprise entries (or the papers list).
                 entry = next((d for d in list(enterprise or []) + list(papers) if d.get("key") == token), None)
                 sid = entry.get("id") if entry else None
@@ -318,7 +333,8 @@ class SynthesisEngine:
 
         def bind(text: str) -> Tuple[List[str], Optional[Dict[str, Any]]]:
             cids = resolve_citations(text, papers or [], eligible_claims, claims_by_id,
-                                     enterprise=(executive_synthesis or {}).get("enterprise_docs"))
+                                     enterprise=(executive_synthesis or {}).get("enterprise_docs"),
+                                     quote_map=(executive_synthesis or {}).get("quote_map"))
             return cids, (None if cids else {"binding": "unbound"})
 
         output_id = f"out_{uuid.uuid4().hex[:12]}"
@@ -710,6 +726,7 @@ class SynthesisEngine:
         # S28: a synthesis sentence resting on one source is marked as such.
         labels = {d.get("id"): d.get("label", "") for d in (executive_synthesis or {}).get("enterprise_docs") or []}
         for s in sentences:
+            s.text = display_tags(s.text)  # S28b: bound to exact quotes above; shown at source level
             cited = [claims_by_id[c] for c in (s.claim_ids_json or []) if c in claims_by_id]
             marked, mark = mark_single_source(s.text, s.type, cited, self.checker, labels)
             if mark:

@@ -27,7 +27,9 @@ def test_prompt_uses_practice_sources_within_caps():
     p = ResearchPromptLibrary.report("t", compact, ["Q1?"], question="Q?")
     assert "according to one vendor" in p and "one organisation reports" in p
     assert "one vendor reports" not in p
-    assert "[E1]" in p or "[E2]" in p, "an evidence example cites an E# source"
+    import re
+
+    assert re.search(r"\[E\d+(\.\d+)?\]", p), "an evidence example cites an E# source (S28b: as a quote id)"
     assert "each section" in p.lower() and "E#" in p
 
 

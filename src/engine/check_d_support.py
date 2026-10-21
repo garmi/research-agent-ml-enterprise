@@ -117,13 +117,74 @@ def run_check_d(sentences: List[Any], claims_by_id: Dict[str, Any], lanes: Dict[
 
 
 def apply_check_d(result: Dict[str, Any], check_d: Dict[str, Any]) -> None:
-    """Record Check D on the run; any unsupported sentence blocks publishing."""
+    """Record Check D on the run (S28) and act on it (S28b): unsupported sentences are removed from the brief and
+    listed with their reasons; partly supported ones stay, marked. Only an unsupported answer blocks publishing."""
     result["check_d"] = check_d
-    n = int(check_d.get("unsupported") or 0)
-    if n:
-        pr = result.setdefault("publish_res", {})
-        reason = (f"Check D: {n} sentence{'s are' if n != 1 else ' is'} not supported by the quotes cited; "
-                  "fix the wording or exclude the evidence, then re-draft.")
+    verdicts = {i.get("text"): i for i in check_d.get("items") or []}
+    report = result.get("report") or {}
+    removed: List[Dict[str, Any]] = []
+
+    def keep(entries: List[Dict[str, Any]], where: str) -> List[Dict[str, Any]]:
+        out = []
+        for e in entries or []:
+            v = verdicts.get(e.get("text")) or {}
+            if v.get("verdict") == "unsupported":
+                removed.append({"text": e.get("text"), "reason": v.get("reason", ""), "where": where})
+                continue
+            if v.get("verdict") == "partial":
+                e["support"] = "partial"
+            out.append(e)
+        return out
+
+    for sec in report.get("sections") or []:
+        sec["sentences"] = keep(sec.get("sentences"), f"Section {sec.get('index')}")
+    for key, where in (("tensions", "Where studies disagree"), ("gaps", "What we don't know"), ("implications", "Implications")):
+        if key in report:
+            report[key] = keep(report[key], where)
+    answer = report.get("answer") or {}
+    a_verdict = (verdicts.get(answer.get("text")) or {}).get("verdict")
+    if a_verdict in ("unsupported", "partial"):
+        answer["support"] = a_verdict
+    check_d["removed"] = removed
+
+    pr = result.setdefault("publish_res", {})
+    if a_verdict == "unsupported":
+        reason = "Check D: the answer in brief is not supported by the quotes it cites; re-draft before sharing."
         pr.update(status="BLOCKED", allowed=False, reasons=[reason] + list(pr.get("reasons") or []))
-        pr["reason"] = " ".join(pr["reasons"])
         result["status"] = "BLOCKED"
+    elif removed:
+        n = len(removed)
+        pr["reasons"] = [f"Check D: {n} unsupported sentence{'s were' if n != 1 else ' was'} removed from the brief "
+                         "(listed on Checks & publish)."] + list(pr.get("reasons") or [])
+    elif int(check_d.get("unsupported") or 0) and not report:
+        reason = "Check D: some sentences are not supported by the quotes cited; re-draft before sharing."
+        pr.update(status="BLOCKED", allowed=False, reasons=[reason] + list(pr.get("reasons") or []))
+        result["status"] = "BLOCKED"
+    if pr.get("reasons"):
+        pr["reason"] = " ".join(pr["reasons"])
+
+
+def check_takeaways(summary: Optional[Dict[str, Any]], claims_by_id: Dict[str, Any], lanes: Dict[str, str],
+                    llm: Optional[Any]) -> Optional[Dict[str, Any]]:
+    """S28b: the share post's takeaways go through Check D too; unsupported ones are dropped (and noted).
+    Returns the summary, or None when no takeaway survives."""
+    from types import SimpleNamespace
+
+    if not summary or not summary.get("takeaways"):
+        return summary
+    sents = [SimpleNamespace(id=f"tk{i}", ordinal=i, text=t["text"], type="synthesis", claim_ids_json=t.get("claim_ids") or [])
+             for i, t in enumerate(summary["takeaways"], 1)]
+    res = run_check_d(sents, claims_by_id, lanes, llm)
+    verdict = {i["sentence_id"]: i for i in res["items"]}
+    kept = []
+    for i, t in enumerate(summary["takeaways"], 1):
+        v = verdict.get(f"tk{i}") or {}
+        if v.get("verdict") == "unsupported":
+            summary.setdefault("dropped", []).append(f"Takeaway dropped (Check D: {v.get('reason', 'not supported')}): {t['text']}")
+            continue
+        if v.get("verdict") == "partial":
+            t["support"] = "partial"
+        kept.append(t)
+    summary["takeaways"] = kept
+    summary["check_d"] = {k: res[k] for k in ("checked", "supported", "partial", "unsupported", "rate")}
+    return summary if kept else None

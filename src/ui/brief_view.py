@@ -150,7 +150,12 @@ def report_blocks(report: Dict[str, Any], paper_map: Dict[str, Any], findings_by
     blocks = [
         '<div class="report-answer"><div class="report-answer-head"><h3>Answer in brief</h3>'
         f'{_confidence_badge(answer.get("confidence") or {})}</div>'
-        f'<p>{render_sentence(answer.get("text", ""), paper_map)}</p></div>'
+        f'<p>{render_sentence(answer.get("text", ""), paper_map)}</p>'
+        + ('<p class="line-tag" style="color:#B45309;">Check D: this answer is only partly supported by the quotes it cites.</p>'
+           if answer.get("support") == "partial" else "")
+        + ('<p class="line-tag" style="color:#991B1B;">Check D: this answer is not supported by the quotes it cites.</p>'
+           if answer.get("support") == "unsupported" else "")
+        + '</div>'
     ]
     if meta:
         blocks.append(f'<div class="brief-meta">{plain_html(meta)}</div>')
@@ -168,13 +173,15 @@ def report_blocks(report: Dict[str, Any], paper_map: Dict[str, Any], findings_by
             blocks.append('<p class="report-empty">The papers found say nothing on this sub-question.</p>')
         for s in sec.get("sentences") or []:
             item = findings_by_text.get(str(s.get("text", "")).strip())
-            if s.get("type") == "assertive" and item:
+            if s.get("type") == "assertive" and item and s.get("support") != "partial":
                 card_no += 1
                 blocks.append(finding_card_html(item, card_no, item.get("text", ""), paper_map=paper_map))
             else:
                 label = "Synthesis" if s.get("type") == "synthesis" else "Evidence"
+                partial = ('<span class="line-tag" style="color:#B45309;">Partly supported</span>'
+                           if s.get("support") == "partial" else "")
                 blocks.append(f'<div class="{"sy-line" if label == "Synthesis" else "ev-line"}"><span class="line-tag">{label}</span>'
-                              f'{render_sentence(s.get("text", ""), paper_map)}</div>')
+                              f'{partial}{render_sentence(s.get("text", ""), paper_map)}</div>')
         if sec.get("table"):
             blocks.append(_evidence_table_html(sec["table"]))
         # S26: your field notes that match this section, by rule; shown in the app only, never in exports.
