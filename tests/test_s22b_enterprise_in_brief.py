@@ -95,3 +95,17 @@ def test_field_note_sentences_softened_before_gates(tmp_path):
     assert (ev.checks_json or {}).get("verb_softened") == [["observes", "reports"]]
     g4 = (summary.get("gate_results") or {}).get("violations", {}).get("G4") or []
     assert not any("observes" in v or "indicates" in v for v in g4)
+
+
+def test_level_three_verbs_softened_for_vendor_claims():
+    # S28d: live run job_aa28544e29ed failed G4 on 'asserts' (level 3) citing a vendor claim (cap 2).
+    from src.score.checker import GateChecker
+    from src.synth.generator import soften_verbs
+
+    v = [_claims()["v"]]
+    text, changes = soften_verbs("One vendor asserts its bot catches bugs [E1].", v, GateChecker())
+    assert text == "One vendor states its bot catches bugs [E1]." and changes == [["asserts", "states"]]
+    text, _ = soften_verbs("One vendor reports that bugs fell [E1].", v, GateChecker())
+    assert text == "One vendor states that bugs fell [E1]."
+    text, _ = soften_verbs("Its review reports show fewer bugs [E1].", v, GateChecker())
+    assert "review reports" in text, "the noun is left alone"

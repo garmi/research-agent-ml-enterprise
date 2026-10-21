@@ -95,12 +95,14 @@ def mark_single_source(text: str, typ: str, cited_claims: List[Claim], checker: 
 
 _SOFT_TARGET = {3: "reports", 2: "states", 1: "notes"}
 _SOFT_SPECIAL = {"correlates": "is linked", "measured": "reported", "points to": "reports"}
+_NOUN_LIKE = {"reports", "claims", "describes"}
 
 
 def soften_verbs(text: str, cited_claims: List[Claim], checker: Any) -> Tuple[str, List[List[str]]]:
     """S22b: replace verbs stronger than the weakest cited claim allows with the strongest allowed one, by rule
     ("observes" -> "reports" for weak claims, -> "states" for vendor claims). Returns (text, [[from, to], ...]).
-    Only verbs above level 3 are softened, so a noun such as "review reports" is never rewritten."""
+    Level-3 verbs that can be nouns ("reports", "claims") are softened only before "that", so a noun such as
+    "review reports" is never rewritten (S28d)."""
     if not cited_claims:
         return text, []
     cap = min(checker.get_max_allowed_rank(c.grade) for c in cited_claims)
@@ -108,15 +110,22 @@ def soften_verbs(text: str, cited_claims: List[Claim], checker: Any) -> Tuple[st
     changes: List[List[str]] = []
     for info in checker.verbs_cfg.values():
         rank = info.get("rank", 0)
-        if rank <= cap or rank < 4:
+        if rank <= cap:
             continue
         for verb in info.get("verbs", []):
+            if rank < 4 and verb in _NOUN_LIKE:
+                # S28d: "reports" is also a noun ("review reports"); only "reports that" is softened.
+                pattern = r"\b" + re.escape(verb) + r"(?= that\b)"
+            elif rank < 4 and " " in verb:
+                continue
+            else:
+                pattern = r"\b" + re.escape(verb) + r"\b"
             repl = _SOFT_SPECIAL.get(verb, target) if cap >= 3 else target
 
             def sub(m: "re.Match[str]", repl: str = repl) -> str:
                 return repl[:1].upper() + repl[1:] if m.group(0)[:1].isupper() else repl
 
-            new = re.sub(r"\b" + re.escape(verb) + r"\b", sub, text, flags=re.IGNORECASE)
+            new = re.sub(pattern, sub, text, flags=re.IGNORECASE)
             if new != text:
                 changes.append([verb, repl])
                 text = new
