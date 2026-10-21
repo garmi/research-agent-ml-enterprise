@@ -206,8 +206,11 @@ def test_run_uses_grounded_search(tmp_path, monkeypatch):
     monkeypatch.setattr(col.EnterpriseCollector, "search_and_ingest", lambda self, **kw: (_ for _ in ()).throw(AssertionError("feeds must not run")))
     gem = FakeGemini()
     r = _runner(tmp_path, GroundedSearch(gem, max_calls=3, max_per_call=5, max_docs=6))
+    from src.ledger.models import Run
+
     q = Question(id="q1", text=Q)
     r.repo.insert_question(q)
+    r.repo.insert_run(Run(id="run1", question_ids=["q1"]))
     claims = r._harvest_enterprise_lane(topic=Q, question_obj=q, run_id="run1", grounded_package=PKG, provider="gemini")
     assert len(gem.calls) == 3, "main question + 2 sub-questions"
     sources = {c.source_id for c in claims}
