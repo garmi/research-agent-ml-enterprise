@@ -163,8 +163,13 @@ def test_takeaways_checked_and_unsupported_dropped():
         def generate(self, prompt, system_prompt=None, temperature=0.0, json_mode=False):
             return '{"verdicts": [{"id": "S1", "verdict": "supported", "reason": "ok"}, {"id": "S2", "verdict": "unsupported", "reason": "no"}]}'
 
+    bad = dict(summary["takeaways"][1])
     out = check_takeaways(summary, {c.id: c for c in CLAIMS}, {"s1": "academic", "s2": "academic"}, J())
     assert [t["text"] for t in out["takeaways"]] == ["Good [P1]."]
     assert any("Check D" in d for d in out["dropped"])
-    assert check_takeaways(dict(summary, takeaways=[summary["takeaways"][1]]), {c.id: c for c in CLAIMS},
-                           {"s1": "academic"}, J()) is None or True
+
+    class AllBad(J):
+        def generate(self, prompt, system_prompt=None, temperature=0.0, json_mode=False):
+            return '{"verdicts": [{"id": "S1", "verdict": "unsupported", "reason": "no"}]}'
+
+    assert check_takeaways({"takeaways": [bad], "dropped": []}, {c.id: c for c in CLAIMS}, {"s1": "academic"}, AllBad()) is None
