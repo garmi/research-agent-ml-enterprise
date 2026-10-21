@@ -114,8 +114,8 @@ Return valid JSON with exactly these keys:
   "answer": ["2-4 sentences that answer the approved question directly, each ending with its [P#] tags"],
   "sections": [
     {{"sub_question": "the sub-question text exactly as given",
-      "synthesis": ["1-3 sentences that combine what two or more papers show, e.g. 'Taken together, ... [P1][P4]'"],
-      "evidence": ["2-4 sentences, each about one source's own result, e.g. 'One study reports that ... [P2]' or 'According to one vendor, ... [E1]'"]}}
+      "synthesis": ["1-3 sentences that combine what two or more papers show, e.g. 'Taken together, ... [P1.2][P4.1]'"],
+      "evidence": ["2-4 sentences, each about one source's own result, e.g. 'One study reports that ... [P2.1]' or 'According to one vendor, ... [E1.2]'"]}}
   ],
   "tensions": ["sentences on where papers disagree, citing both sides"],
   "gaps": ["sentences on what the papers do not answer, drawn from their stated limitations, with [P#] tags"],
@@ -123,7 +123,9 @@ Return valid JSON with exactly these keys:
 }}
 
 Rules:
-- Every sentence ends with the [P#] tags of the papers it rests on. Use only the paper ids given.
+- Each source lists numbered "quotes". End every sentence with the quote ids it rests on, e.g. [P2.1] or
+  [P1.3][E2.1], and write only what those quotes say: never cite a quote for something it does not state, and
+  never combine quotes into a claim none of them makes. Use only the quote ids given.
 - A synthesis sentence combines two or more papers. If a point rests on one paper, put it under evidence and say "one study reports".
 - Each paper lists its "allowed_verbs" and "figures", set by the strength of its evidence. A sentence citing a paper
   uses only that paper's allowed verbs; a sentence citing several papers uses only verbs allowed for the weakest of

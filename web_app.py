@@ -55,7 +55,7 @@ from src.engine.ids import resolve_question_id
 from src.engine.stub_mode import is_stub_mode
 from src.ui.safe_page import safe_page, format_error_payload, render_safe_error
 from src.ui.brand import buddha_svg
-from src.ui.claims_view import claims_overview_html
+from src.ui.claims_view import check_d_items_html, claims_overview_html
 from src.ui.experience_view import observations_by_section, practitioner_inputs
 from src.ui.evidence_view import enterprise_card_html, evidence_map_html, finding_card_html, paper_card_html, render_sentence
 from src.output.share_pack import image_card_svg, post_text
@@ -1702,7 +1702,12 @@ if results:
             cd_df = pd.DataFrame([{"Verdict": i["verdict"], "Sentence": i["text"], "Why": i["reason"],
                                    "Quotes": " | ".join(i.get("quotes") or [])[:600], "Verified by me": False}
                                   for i in cd.get("items") or []])
-            with st.expander("Check each sentence against its quotes (unsupported and partial first)", expanded=bool(cd.get("unsupported"))):
+            if cd.get("removed"):
+                with st.expander(f"Removed from the brief: {len(cd['removed'])} unsupported sentence(s), with Check D's reasons"):
+                    st.markdown(check_d_items_html(cd, "removed"), unsafe_allow_html=True)
+            with st.expander("Every verdict, with its reason and quotes"):
+                st.markdown(check_d_items_html(cd), unsafe_allow_html=True)
+            with st.expander("Check each sentence against its quotes (unsupported and partial first)", expanded=False):
                 edited_cd = st.data_editor(cd_df, key=f"check_d_{results.get('run_id', '')}", hide_index=True,
                                            use_container_width=True, disabled=["Verdict", "Sentence", "Why", "Quotes"])
                 n_ver = int(edited_cd["Verified by me"].sum()) if not edited_cd.empty else 0

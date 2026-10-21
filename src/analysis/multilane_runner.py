@@ -2040,11 +2040,24 @@ class MultiLaneResearchRunner:
             # S22: on-topic enterprise documents as E# entries beside the papers, with their own limits.
             ent_docs, ent_entries = self._enterprise_entries(enterprise_claims)
             self._evidence_limits.update(paper_evidence_limits(ent_docs, enterprise_claims, self.checker))
+            # S28b: numbered quotes per source; the writer cites quote ids, so each sentence binds to exact quotes.
+            from src.analysis.relevance import support_terms
+            from src.synth.limits import source_quotes
+
+            pkg = approved_package or {}
+            q_terms = sorted({t for q in [pkg.get("refined_question") or topic] + list(pkg.get("sub_questions") or [])
+                              for t in support_terms(str(q))})
+            p_quotes, p_map = source_quotes(papers, academic_claims, q_terms)
+            e_quotes, e_map = source_quotes(ent_docs, enterprise_claims, q_terms, max_per=3)
+            for key, qs in {**p_quotes, **e_quotes}.items():
+                self._evidence_limits.setdefault(key, {})["quotes"] = qs
             for e in ent_entries:
                 e.update(self._evidence_limits.get(e["paper_id"], {}))
+                e.pop("passages", None)
             synth = synthesizer.analyze(topic, papers, tone=tone_key, length="detailed", package=approved_package,
                                         evidence_limits=self._evidence_limits, extra_entries=ent_entries)
             synth["enterprise_docs"] = ent_docs
+            synth["quote_map"] = {**p_map, **e_map}
             if map_provider == "stub" or reduce_provider == "stub":
                 generation_mode = "extractive_fallback"
                 if not synth.get("executive_summary") and not synth.get("key_findings"):

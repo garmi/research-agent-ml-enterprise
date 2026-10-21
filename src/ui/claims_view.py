@@ -192,3 +192,22 @@ def claims_overview_html(results: Dict[str, Any]) -> str:
         f'<h4>Claims by question</h4>{"".join(groups) or "<p>No claims recorded for this run.</p>"}'
         f'<div class="cg-legend">{legend}</div></div>'
     )
+
+
+_CD_STYLE = {"supported": ("#DCFCE7", "#166534"), "partial": ("#FEF3C7", "#92400E"), "unsupported": ("#FEE2E2", "#991B1B"),
+             "unchecked": ("#F1F5F9", "#334155")}
+
+
+def check_d_items_html(check_d: Dict[str, Any], items_key: str = "items") -> str:
+    """Check D verdicts as readable text (S28b): verdict, sentence, reason and the quotes it was judged against."""
+    esc = lambda v: html.escape(str(v or ""))
+    rows = []
+    for i in check_d.get(items_key) or []:
+        verdict = i.get("verdict") or "removed"
+        bg, fg = _CD_STYLE.get(verdict, ("#F1F5F9", "#334155"))
+        quotes = "".join(f"<li>{esc(q)}</li>" for q in i.get("quotes") or [])
+        where = f' <span class="cg-src">· {esc(i["where"])}</span>' if i.get("where") else ""
+        rows.append(f'<div class="cg-claim"><span class="cg-chip" style="background:{bg};color:{fg};">{esc(verdict)}</span> '
+                    f'{esc(i.get("text"))}{where}<div class="cg-src">{esc(i.get("reason"))}</div>'
+                    + (f'<ul class="cg-quote">{quotes}</ul>' if quotes else "") + "</div>")
+    return '<div class="cg-overview">' + "".join(rows) + "</div>" if rows else ""

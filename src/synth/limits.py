@@ -6,7 +6,7 @@ not hold. Telling the writer those limits up front, per paper, keeps the gates s
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 import re
 
@@ -54,3 +54,33 @@ def limits_lines(limits: Dict[str, Dict[str, List[str]]]) -> List[str]:
     """The limits as short prompt lines, one per paper."""
     return [f"{k}: Allowed verbs: {', '.join(v['allowed_verbs'][:8])}. Figures: {', '.join(v['figures']) or 'none'}."
             for k, v in limits.items()]
+
+
+def source_quotes(papers: List[Dict[str, Any]], claims: List[Any], terms: List[str], max_per: int = 6
+                  ) -> "Tuple[Dict[str, List[Dict[str, str]]], Dict[str, str]]":
+    """S28b: numbered quotes per source for the writer ({"P1": [{"id": "P1.1", "text": ...}]}) and the map from
+    quote id to claim id. Claims with figures come first, then those sharing the most question terms."""
+    from src.extract.claim_extractor import strip_claim_prefix
+
+    want = {t.lower() for t in terms or []}
+    by_source: Dict[str, List[Any]] = {}
+    for c in claims or []:
+        if getattr(c, "status", "") != "rejected":
+            by_source.setdefault(c.source_id, []).append(c)
+    quotes: Dict[str, List[Dict[str, str]]] = {}
+    qmap: Dict[str, str] = {}
+    for i, p in enumerate(papers or [], 1):
+        key = p.get("key") or f"P{i}"
+        cs = by_source.get(p.get("id")) or []
+        scored = sorted(enumerate(cs), key=lambda ic: (
+            0 if _FIGURE.search(ic[1].text or "") else 1,
+            -len({w.lower() for w in re.findall(r"[A-Za-z0-9-]+", ic[1].text or "")} & want), ic[0]))
+        out = []
+        for n, (_, c) in enumerate(scored[:max_per], 1):
+            qid = f"{key}.{n}"
+            text = re.sub(r"\s+", " ", strip_claim_prefix(c.text or "")).strip()
+            out.append({"id": qid, "text": text[:300]})
+            qmap[qid] = c.id
+        if out:
+            quotes[key] = out
+    return quotes, qmap
