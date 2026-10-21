@@ -210,6 +210,21 @@ def best_on_topic(papers: List[Dict[str, Any]], keep: int) -> List[Dict[str, Any
     return [p for p in papers if id(p) in chosen]
 
 
+def set_aside_unverified(papers: List[Dict[str, Any]], min_keep: int = 3) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], str]:
+    """S28: (kept, set_aside, note). Papers whose journal, conference or publication venue is not verified are set
+    aside; preprints (labelled as such) and operator-added papers stay. When fewer than `min_keep` would remain, all
+    are kept and the note says so, so a thin field is not emptied."""
+    label = lambda p: str(p.get("label") or p.get("_venue_label") or "")
+    aside = [p for p in papers if "venue not verified" in label(p) and not p.get("is_custom")]
+    kept = [p for p in papers if p not in aside]
+    if not aside:
+        return papers, [], ""
+    if len(kept) < min_keep:
+        return papers, [], (f"Fewer than {min_keep} papers come from verified venues, so {len(aside)} from unverified "
+                            "venues were kept; they are labelled 'venue not verified'.")
+    return kept, aside, f"{len(aside)} papers from unverified venues were set aside (they may be predatory or unreviewed)."
+
+
 def _merge_by_key(first: List[Any], second: List[Any], key: Callable[[Any], str]) -> List[Any]:
     """Concatenate two harvests, keeping the first occurrence of each key."""
     seen = {key(x) for x in first}
@@ -529,8 +544,17 @@ class MultiLaneResearchRunner:
         # S15: of the on-topic papers, carry the best `keep_papers` forward (relevance x venue-tier weight);
         # papers the operator added by URL are always kept.
         on_topic_count = len(academic_papers)
+        # S28: papers from unverified venues are set aside by default, before the best are kept.
+        research_cfg = (self.config or {}).get("research") or {}
+        venue_note, aside = "", []
+        if research_cfg.get("exclude_unverified_venues", True):
+            for p in academic_papers:
+                p["_venue_label"] = labelled_venue(p, self.grader)[1]
+            academic_papers, aside, venue_note = set_aside_unverified(
+                academic_papers, int(research_cfg.get("min_verified_papers", 3)))
         academic_papers = best_on_topic(academic_papers, keep_papers)
-        self._breadth = {"checked": checked, "on_topic": on_topic_count, "used": len(academic_papers)}
+        self._breadth = {"checked": checked, "on_topic": on_topic_count, "used": len(academic_papers),
+                         "unverified_set_aside": [p.get("title", "") for p in aside], "venue_note": venue_note}
         off_ids = {c.id for c in enterprise_claims if str(c.source_id) not in check_a.on_topic_ids}
         if off_ids:
             enterprise_claims = [c for c in enterprise_claims if c.id not in off_ids]
@@ -743,6 +767,12 @@ class MultiLaneResearchRunner:
         )
         result["check_a"] = self._check_a_summary(check_a)
         result["check_b"] = self._check_summary(check_b)
+        # S28: Check D judges each sentence against the quotes it cites; an unsupported sentence blocks publishing.
+        from src.engine.check_d_support import apply_check_d, run_check_d
+
+        lanes = {sid: src.lane for sid, src in (self._ephemeral_sources or {}).items()}
+        apply_check_d(result, run_check_d(sentences, {c.id: c for c in self._ephemeral_claims}, lanes,
+                                          getattr(self, "_reduce_llm", None)))
         reasons = (pub_res or {}).get("reasons") or []
         self._safe_set_run_status(run_id, result["status"], "; ".join(str(r) for r in reasons) or None)
         return result

@@ -3,6 +3,9 @@ project:
   environment: mac
 
 research:
+  # S28: set aside papers whose journal or conference venue is not verified (keep at least min_verified_papers)
+  exclude_unverified_venues: true
+  min_verified_papers: 3
   # S13: technology terms that name a question's subject. Search queries always keep them, and each
   # sub-question query gets the main question's, so every query searches the same subject.
   # S14: relevance is multiplied by these when ranking harvested papers, so verified venues lead

@@ -1475,6 +1475,12 @@ if results:
             # S15: how many candidates Check A judged, how many were on topic, and how many were used.
             st.caption(f"Checked {breadth['checked']} papers · {breadth.get('on_topic', 0)} on topic · "
                        f"used the best {breadth.get('used', 0)} by venue quality and relevance.")
+            if breadth.get("venue_note"):
+                st.caption(f"Venue check: {breadth['venue_note']}")
+                if breadth.get("unverified_set_aside"):
+                    with st.expander(f"Papers set aside for unverified venues ({len(breadth['unverified_set_aside'])})"):
+                        for t in breadth["unverified_set_aside"]:
+                            st.markdown(f"- {plain_html(t)}", unsafe_allow_html=True)
         if check_a_info.get("sources"):
             with st.expander("Check A: which sources were judged on-topic", expanded=results.get("stopped_at") == "check_a"):
                 st.table([
@@ -1682,6 +1688,26 @@ if results:
     # ==========================================================================
     with tab_checks:
         st.markdown("### Checks & publish")
+        # S28: Check D, citation support: each sentence judged against the exact quotes it cites.
+        cd = results.get("check_d")
+        if cd and cd.get("checked"):
+            rate = float(cd.get("rate") or 0) * 100
+            line = (f"**Citation support (Check D):** {cd['supported']} of {cd['checked']} sentences supported "
+                    f"({rate:.0f}%) · {cd.get('partial', 0)} partial · {cd.get('unsupported', 0)} unsupported"
+                    + (f" · {cd.get('unchecked', 0)} unchecked" if cd.get("unchecked") else "")
+                    + f" · judged by {'the model against the cited quotes' if cd.get('method') == 'model' else 'rule'}")
+            (st.success if not cd.get("unsupported") and rate >= 95 else st.warning)(line)
+            import pandas as pd
+
+            cd_df = pd.DataFrame([{"Verdict": i["verdict"], "Sentence": i["text"], "Why": i["reason"],
+                                   "Quotes": " | ".join(i.get("quotes") or [])[:600], "Verified by me": False}
+                                  for i in cd.get("items") or []])
+            with st.expander("Check each sentence against its quotes (unsupported and partial first)", expanded=bool(cd.get("unsupported"))):
+                edited_cd = st.data_editor(cd_df, key=f"check_d_{results.get('run_id', '')}", hide_index=True,
+                                           use_container_width=True, disabled=["Verdict", "Sentence", "Why", "Quotes"])
+                n_ver = int(edited_cd["Verified by me"].sum()) if not edited_cd.empty else 0
+                st.caption(f"You have verified {n_ver} of {len(cd_df)} sentences yourself. Tick each one you have read "
+                           "against its quotes before you share the brief.")
         audit_res = results.get("gates_audit", {})
         # A gate with no data counts as a fail (S6): only an audited PASS on all six is a pass.
         all_gates_pass = audit_res.get("passed", False)
