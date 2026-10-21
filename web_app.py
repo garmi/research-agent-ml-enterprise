@@ -1696,7 +1696,13 @@ if results:
                     f"({rate:.0f}%) · {cd.get('partial', 0)} partial · {cd.get('unsupported', 0)} unsupported"
                     + (f" · {cd.get('unchecked', 0)} unchecked" if cd.get("unchecked") else "")
                     + f" · judged by {'the model against the cited quotes' if cd.get('method') == 'model' else 'rule'}")
-            (st.success if not cd.get("unsupported") and rate >= 95 else st.warning)(line)
+            if cd.get("in_brief"):
+                brief_rate = float(cd.get("rate_in_brief") or 0) * 100
+                line += (f"  \n**In the brief:** {cd['supported_in_brief']} of {cd['in_brief']} sentences fully supported "
+                         f"({brief_rate:.0f}%), after one rewrite of partly supported sentences; "
+                         f"{len(cd.get('removed') or [])} removed.")
+                rate = brief_rate
+            (st.success if rate >= 95 else st.warning)(line)
             import pandas as pd
 
             cd_df = pd.DataFrame([{"Verdict": i["verdict"], "Sentence": i["text"], "Why": i["reason"],

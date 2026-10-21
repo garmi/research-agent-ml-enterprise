@@ -773,6 +773,10 @@ class MultiLaneResearchRunner:
         lanes = {sid: src.lane for sid, src in (self._ephemeral_sources or {}).items()}
         all_claims = {c.id: c for c in self._ephemeral_claims}
         apply_check_d(result, run_check_d(sentences, all_claims, lanes, getattr(self, "_reduce_llm", None)))
+        # S28c: one repair pass for partly supported sentences; what still is not supported leaves the brief.
+        from src.engine.check_d_support import repair_partials
+
+        repair_partials(result, all_claims, lanes, getattr(self, "_reduce_llm", None), self.checker)
         # S28b: the share post's takeaways are checked too; unsupported ones are dropped.
         from src.engine.check_d_support import check_takeaways
 
