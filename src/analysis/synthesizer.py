@@ -88,6 +88,7 @@ class SynthesisEngine:
         tone: str = "executive",
         length: str = "detailed",
         package: Optional[Dict[str, Any]] = None,
+        evidence_limits: Optional[Dict[str, Dict[str, List[str]]]] = None,
     ) -> Dict[str, Any]:
         paper_list = list(papers)
         if not paper_list:
@@ -98,6 +99,9 @@ class SynthesisEngine:
             return self.empty_output(topic)
 
         compact = [self._compact(s) for s in summaries]
+        # S27: each paper's allowed verbs and figures, from its claims, so the draft meets G4 and G2 as written.
+        for c in compact:
+            c.update((evidence_limits or {}).get(c["paper_id"], {}))
         valid_ids = {s["paper_id"] for s in summaries}
 
         sub_questions = [str(q).strip() for q in (package or {}).get("sub_questions") or [] if str(q).strip()]

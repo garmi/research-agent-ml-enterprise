@@ -1258,12 +1258,12 @@ class MultiLaneResearchRunner:
             arxiv = ArxivClient()
             semantic = SemanticScholarClient()
 
-            batches: List[List[Dict[str, Any]]] = []
-            for q in queries[:query_limit]:
-                batches.append(openalex.search(q, max_results=max_per_query))
-                batches.append(crossref.search(q, max_results=max_per_query))
-                batches.append(arxiv.search(q, max_results=max_per_query))
-                batches.append(semantic.search(q, limit=max_per_query))
+            # S27: the four sources run side by side (each keeps its own pace), within a time budget.
+            from src.analysis.harvest import search_sources
+
+            research_cfg = (self.config or {}).get("research") or {}
+            batches = search_sources([openalex, crossref, arxiv, semantic], queries[:query_limit], max_per_query,
+                                     time_budget=float(research_cfg.get("search_time_budget_s", 240)))
 
             all_papers = merge_papers(batches)
             if not all_papers:
@@ -1273,7 +1273,8 @@ class MultiLaneResearchRunner:
             # Real abstracts only (S11): fetch a missing abstract by DOI, or set the paper aside.
             from src.analysis.abstracts import fill_abstracts
 
-            valid, set_aside = fill_abstracts([p for p in all_papers if p.get("title")], [openalex, semantic])
+            valid, set_aside = fill_abstracts([p for p in all_papers if p.get("title")], [openalex, semantic],
+                                              time_budget=float(research_cfg.get("abstract_time_budget_s", 90)), workers=4)
             self._papers_without_abstract.extend(set_aside)
 
             # S14: relevance weighed by venue tier, so verified venues lead among equally relevant papers.
@@ -1818,12 +1819,14 @@ class MultiLaneResearchRunner:
         from src.analysis.queries import subject_terms
         from src.analysis.synthesizer import REDUCE_SYSTEM, SynthesisEngine as AnalysisSynthesisEngine
         from src.prompts.research_prompts import ResearchPromptLibrary
+        from src.synth.limits import limits_lines
         from src.synth.thought_leadership import build_summary, evidence_profile
 
         profile = evidence_profile(report)
         try:
             raw = AnalysisSynthesisEngine(llm, max_retries=0)._call_json(
-                llm, ResearchPromptLibrary.thought_leadership(question, self._report_lines(report), profile),
+                llm, ResearchPromptLibrary.thought_leadership(question, self._report_lines(report), profile,
+                                                              limits_lines(getattr(self, "_evidence_limits", {}) or {})),
                 REDUCE_SYSTEM, temperature=0.5)
         except Exception as e:  # a failed summary call never fails the run
             logger.warning("Summary call failed: %s", type(e).__name__)
@@ -1869,7 +1872,11 @@ class MultiLaneResearchRunner:
             reduce_llm = map_llm if reduce_provider == map_provider else build_llm(reduce_provider, cfg)
             synthesizer = AnalysisSynthesisEngine(map_llm, reduce_llm, on_progress=lambda _: None)
             # S19: the approved package (sub-questions) shapes the report.
-            synth = synthesizer.analyze(topic, papers, tone=tone_key, length="detailed", package=approved_package)
+            from src.synth.limits import paper_evidence_limits
+
+            self._evidence_limits = paper_evidence_limits(papers, academic_claims, self.checker)
+            synth = synthesizer.analyze(topic, papers, tone=tone_key, length="detailed", package=approved_package,
+                                        evidence_limits=self._evidence_limits)
             if map_provider == "stub" or reduce_provider == "stub":
                 generation_mode = "extractive_fallback"
                 if not synth.get("executive_summary") and not synth.get("key_findings"):
