@@ -126,3 +126,37 @@ def test_checks_tab_shows_brief_rate():
     web = Path("web_app.py").read_text(encoding="utf-8")
     tab = web[web.index("with tab_checks:"):]
     assert "supported_in_brief" in tab and "In the brief" in tab
+
+
+# ------------------------------------------------------------------------------
+# S28e: uncited "no evidence" sentences (live run job_5ab130593406 failed G1 on two of them)
+# ------------------------------------------------------------------------------
+def test_uncited_absence_sentences_dropped(tmp_path):
+    from src.ledger.migrations import apply_migrations
+    from src.ledger.models import Question, Run, Source
+    from src.ledger.repository import LedgerRepository
+    from src.synth.generator import SynthesisEngine, is_absence_statement
+
+    assert is_absence_statement("The reviewed papers say nothing on defect escape rates.")
+    assert is_absence_statement("No study in this set addresses test coverage.")
+    assert not is_absence_statement("Teams reported fewer defects.")
+
+    db = str(tmp_path / "l.db")
+    apply_migrations(db_path=db)
+    repo = LedgerRepository(db_path=db)
+    repo.insert_question(Question(id="q", text="Does AI review cut defects?"))
+    repo.insert_run(Run(id="r", question_ids=["q"]))
+    repo.insert_source(Source(id="s1", lane="academic", source_type="preprint", title="s1"))
+    c = Claim(id="c1", question_id="q", source_id="s1", text="The study reports that individual job satisfaction rose.",
+              source_excerpt="individual job satisfaction rose", grade="moderate")
+    repo.insert_claim(c)
+    synth = {"executive_summary": "Satisfaction rose [P1].",
+             "sections": [{"sub_question": "Defects?", "synthesis": [],
+                           "evidence": ["The reviewed papers say nothing on defect escape rates."]},
+                          {"sub_question": "Satisfaction?", "synthesis": [], "evidence": ["One study reports satisfaction rose [P1]."]}],
+             "gaps": ["No study in this set addresses test coverage."]}
+    _, sentences, summary = SynthesisEngine(db_path=db).build_field_note(
+        question_id="q", run_id="r", executive_synthesis=synth, papers=[{"id": "s1"}], claims_override=[repo.get_claim("c1")])
+    assert not any("say nothing" in s.text or "addresses test coverage" in s.text for s in sentences)
+    g1 = (summary.get("gate_results") or {}).get("violations", {}).get("G1") or []
+    assert not any("lacks citation" in v for v in g1)
