@@ -37,7 +37,7 @@ _COUNT_CLAIM = re.compile(r"\bI\s+(reviewed|read|analy[sz]ed|looked at|went thro
 _NUMBER_WORDS = {w: i for i, w in enumerate("zero one two three four five six seven eight nine ten eleven twelve".split())}
 _STATED_COUNT = re.compile(r"\b(\d+|" + "|".join(_NUMBER_WORDS) + r")\s+(?:[a-z-]+\s+){0,2}(studies|papers|reports|sources)\b",
                            re.IGNORECASE)
-_TAG = re.compile(r"\s*\[(?:P\d+(?:[,;\s]+P\d+)*)\]")
+_TAG = re.compile(r"\s*\[(?:[PE]\d+(?:[,;\s]+[PE]\d+)*)\]")
 _EMPIRICAL_WORDS = re.compile(r"conceptual|framework|propos|self-report|not state|early|limited|few", re.IGNORECASE)
 _SENTENCES = re.compile(r"(?<=[.!?])\s+")
 
@@ -134,7 +134,7 @@ def build_summary(raw: Any, report: Optional[Dict[str, Any]], papers: List[Dict[
     if not isinstance(raw, dict):
         return None
     profile = evidence_profile(report)
-    key_of = {f"P{i}": p for i, p in enumerate(papers or [], 1)}
+    key_of = {p.get("key") or f"P{i}": p for i, p in enumerate(papers or [], 1)}
     dropped: List[str] = []
     takeaways: List[Dict[str, Any]] = []
     for text in _as_list(raw.get("takeaways")):
@@ -142,7 +142,7 @@ def build_summary(raw: Any, report: Optional[Dict[str, Any]], papers: List[Dict[
         if why:
             dropped.append(f"Takeaway dropped ({why}): {strip_tags(text)}")
             continue
-        keys = [k for k in dict.fromkeys(re.findall(r"P\d+", " ".join(re.findall(r"\[[^\]]+\]", text)))) if k in key_of]
+        keys = [k for k in dict.fromkeys(re.findall(r"[PE]\d+", " ".join(re.findall(r"\[[^\]]+\]", text)))) if k in key_of]
         takeaways.append({"text": text, "papers": keys, "basis": _basis(keys, profile["methods"])})
         if len(takeaways) == MAX_TAKEAWAYS:
             break

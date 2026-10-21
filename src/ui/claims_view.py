@@ -54,7 +54,7 @@ _OUTCOMES = {
     "na": ("Practice not checked", "Research was reviewed, but enterprise practice sources were not searched."),
 }
 _RULE_GAP = re.compile(r"^Section \d+ (has no evidence|rests on one paper)")
-_TAGS = re.compile(r"\s*\[(?:P\d+(?:[,;\s]+P\d+)*)\]")
+_TAGS = re.compile(r"\s*\[(?:[PE]\d+(?:[,;\s]+[PE]\d+)*)\]")
 
 
 def grade_label(grade: Any) -> Tuple[str, str]:

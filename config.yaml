@@ -134,3 +134,15 @@ output:
 
 logging:
   level: "INFO"
+
+# S22: enterprise and practice evidence found with Gemini's Google Search grounding. Only the grounding metadata is
+# used (source URLs, queries, Search Suggestions); the app reads each page itself. Grounded calls are billed
+# separately from normal Gemini calls (a free daily allowance, then per request): about max_calls per run.
+enterprise:
+  grounded_search:
+    enabled: true
+    max_calls: 5          # main question + up to 4 sub-questions
+    max_per_call: 5       # sources kept from each call
+    max_docs: 15          # pages read per run
+    max_claims_per_doc: 8
+    recency_months: 24    # older pages are kept but marked and ranked last

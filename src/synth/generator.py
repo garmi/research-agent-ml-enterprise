@@ -60,6 +60,7 @@ def resolve_citations(
     papers: List[Dict[str, Any]],
     eligible_claims: List[Claim],
     claims_by_id: Dict[str, Claim],
+    enterprise: Optional[List[Dict[str, Any]]] = None,
 ) -> List[str]:
     """Claim ids a sentence cites through its own tags, in order: [P#] means the claims from that
     paper that support the sentence (best_supporting_claims), [c_...] means that claim. No tag, or
@@ -73,7 +74,13 @@ def resolve_citations(
     for sentence, group in pairs:
         for token in re.split(r"[,;\s]+", group.strip()):
             p = re.fullmatch(r"P(\d+)", token)
-            if p:
+            e = re.fullmatch(r"E\d+", token)
+            if e:
+                # S22: [E#] is an enterprise document, found by key among the enterprise entries (or the papers list).
+                entry = next((d for d in list(enterprise or []) + list(papers) if d.get("key") == token), None)
+                sid = entry.get("id") if entry else None
+                ids = best_supporting_claims(sentence, [c for c in eligible_claims if sid is not None and c.source_id == sid])
+            elif p:
                 idx = int(p.group(1)) - 1
                 pid = papers[idx].get("id") if 0 <= idx < len(papers) else None
                 ids = best_supporting_claims(sentence, [c for c in eligible_claims if pid is not None and c.source_id == pid])
@@ -251,7 +258,8 @@ class SynthesisEngine:
         thin_claims = [c for c in eligible_claims if c.grade in ("weak", "vendor_claim", "anecdote")]
 
         def bind(text: str) -> Tuple[List[str], Optional[Dict[str, Any]]]:
-            cids = resolve_citations(text, papers or [], eligible_claims, claims_by_id)
+            cids = resolve_citations(text, papers or [], eligible_claims, claims_by_id,
+                                     enterprise=(executive_synthesis or {}).get("enterprise_docs"))
             return cids, (None if cids else {"binding": "unbound"})
 
         output_id = f"out_{uuid.uuid4().hex[:12]}"

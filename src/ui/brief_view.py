@@ -122,7 +122,8 @@ def _confidence_badge(conf: Dict[str, Any]) -> str:
         return ""
     level = str(conf.get("level") or "low")
     return (f'<span class="conf-badge conf-{plain_html(level)}">Confidence: {plain_html(level)} · '
-            f'{int(conf.get("papers") or 0)} papers · {int(conf.get("empirical") or 0)} empirical</span>')
+            f'{int(conf.get("papers") or 0)} papers · {int(conf.get("empirical") or 0)} empirical'
+            + (f' · {int(conf["practice"])} practice' if conf.get("practice") else "") + "</span>")
 
 
 def _evidence_table_html(rows: List[Dict[str, Any]]) -> str:

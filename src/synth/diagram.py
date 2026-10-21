@@ -22,8 +22,8 @@ def _cites(raw: Any) -> List[str]:
     """[P#] keys named by a node, in order, from a list or a string ("P1", "[P2][P3]", "P1, P4")."""
     text = " ".join(str(x) for x in raw) if isinstance(raw, (list, tuple)) else str(raw or "")
     out: List[str] = []
-    for n in re.findall(r"P(\d+)", text):
-        key = f"P{int(n)}"
+    for kind, n in re.findall(r"([PE])(\d+)", text):
+        key = f"{kind}{int(n)}"
         if key not in out:
             out.append(key)
     return out
@@ -49,7 +49,7 @@ def validate_diagram(raw: Any, papers: List[Dict[str, Any]], claims_by_id: Dict[
 
     # A cite counts only when its paper has a claim in this run.
     with_claims = {c.source_id for c in claims_by_id.values()}
-    key_ok = {f"P{i}" for i, p in enumerate(papers or [], 1) if p.get("id") in with_claims}
+    key_ok = {p.get("key") or f"P{i}" for i, p in enumerate(papers or [], 1) if p.get("id") in with_claims}
     nodes: List[Dict[str, Any]] = []
     for i, n in enumerate(nodes_raw):
         label = str(n.get("label") or "").strip()

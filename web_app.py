@@ -57,7 +57,7 @@ from src.ui.safe_page import safe_page, format_error_payload, render_safe_error
 from src.ui.brand import buddha_svg
 from src.ui.claims_view import claims_overview_html
 from src.ui.experience_view import observations_by_section, practitioner_inputs
-from src.ui.evidence_view import evidence_map_html, finding_card_html, paper_card_html, render_sentence
+from src.ui.evidence_view import enterprise_card_html, evidence_map_html, finding_card_html, paper_card_html, render_sentence
 from src.output.share_pack import image_card_svg, post_text
 from src.ui.summary_view import card_preview_html, png_download_html, summary_html, summary_missing_reason
 from src.ui.intake_view import approved_question_text, effective_provider, render_intake_view
@@ -1285,7 +1285,7 @@ elif current_job and current_job["state"] == "failed":
 results = st.session_state.get("research_results")
 
 if results:
-    paper_map = {p["key"]: p for p in results.get("papers", [])}
+    paper_map = {p["key"]: p for p in results.get("papers", []) + results.get("enterprise_docs", [])}
     claims_by_id_map = {c["id"]: c for c in results.get("claims", [])}
     gap_info = results.get("gap_matrix") or {}
     status = status_code(results)
@@ -1435,7 +1435,7 @@ if results:
             elif not share_published:
                 st.caption("Draft until the brief is published on **Checks & publish**: the post opens with a draft line "
                            "and the card carries a watermark.")
-            post = post_text(summary, results.get("papers", []), published=share_published)
+            post = post_text(summary, results.get("papers", []) + results.get("enterprise_docs", []), published=share_published)
             st.caption("The post, ready to paste (copy button at the top right). The sources go in the first comment.")
             st.code(post, language=None, wrap_lines=True)
             card_svg = image_card_svg(summary, results.get("diagram"), published=share_published)
@@ -1459,7 +1459,7 @@ if results:
     # ==========================================================================
     with tab_evidence:
         st.markdown("### Evidence")
-        _map_html = evidence_map_html(results.get("report"), results.get("papers", []))
+        _map_html = evidence_map_html(results.get("report"), results.get("papers", []) + results.get("enterprise_docs", []))
         if _map_html:
             # S19b: which paper backs which sub-question, before the full paper list.
             st.markdown("#### Evidence map")
@@ -1499,27 +1499,17 @@ if results:
         st.markdown("---")
         ent_sources = results.get("enterprise_sources", [])
         st.markdown(f"#### 🏢 Lane B: Enterprise Literature & Benchmarks ({len(ent_sources)})")
+        # S22: grounded results are shown with Google's Search Suggestions, as its terms require.
+        if results.get("search_entry_point"):
+            st.caption("Enterprise sources were found with Google Search (via Gemini) and read by this app; "
+                       "Gemini's own answer is not used. Search suggestions:")
+            components.html(results.get("search_entry_point"), height=90, scrolling=True)
+        for line in results.get("enterprise_coverage") or []:
+            st.caption(f"Coverage: {line}")
+        ent_docs_by_id = {d.get("id"): d for d in results.get("enterprise_docs") or []}
         if ent_sources:
             for es in ent_sources:
-                es_date = es.get("pub_date")
-                es_date_str = es_date if (es_date and str(es_date).lower() not in ("none", "null")) else "Date unknown"
-                st.markdown(
-                    f"""
-                    <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px; padding: 0.9rem 1.15rem; margin-bottom: 0.65rem;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
-                            <span style="font-size: 0.78rem; font-weight: 700; color: #6D28D9; background: #F5F3FF; padding: 0.15rem 0.5rem; border-radius: 4px;">{es.get('source_type', 'enterprise').upper()}</span>
-                            <span style="font-size: 0.74rem; color: #64748B;">Commercial Stake: <strong>{es.get('commercial_stake', 'vendor').upper()}</strong></span>
-                        </div>
-                        <div style="font-weight: 700; font-size: 0.94rem; color: #0F172A; margin-bottom: 0.25rem;">
-                            <a href="{es.get('url', '#')}" target="_blank" style="color: #0F172A; text-decoration: none;">{es.get('title')} ↗</a>
-                        </div>
-                        <div style="font-size: 0.8rem; color: #64748B;">
-                            Org/Venue: <strong>{es.get('venue')}</strong> &nbsp;•&nbsp; Date: <strong>{es_date_str}</strong>
-                        </div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
+                st.markdown(enterprise_card_html(es, ent_docs_by_id.get(es.get("id"))), unsafe_allow_html=True)
         else:
             st.caption("No enterprise claims recorded for this question.")
 
@@ -1866,7 +1856,7 @@ if results:
     with export_col4:
         st.download_button(
             label="📱 Share post (.md)" if results.get("summary") else "📱 LinkedIn Pack (.md)",
-            data=post_text(results["summary"], results.get("papers", []), published=str(status).upper() == "PUBLISHED")
+            data=post_text(results["summary"], results.get("papers", []) + results.get("enterprise_docs", []), published=str(status).upper() == "PUBLISHED")
             if results.get("summary") else linkedin_pack,
             file_name="share_post.md" if results.get("summary") else "LinkedIn_Executive_Pack.md",
             mime="text/markdown",

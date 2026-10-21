@@ -47,7 +47,10 @@ def group_by_sub_question(sentences: List[str], sub_questions: List[str]) -> Lis
     return sections
 
 
-def _confidence(paper_ids: List[str], methods: Dict[str, str], tiers: Dict[str, str]) -> Dict[str, Any]:
+def _confidence(paper_ids: List[str], methods: Dict[str, str], tiers: Dict[str, str],
+                practice_ids: Optional[set] = None) -> Dict[str, Any]:
+    practice = [p for p in paper_ids if p in (practice_ids or set())]
+    paper_ids = [p for p in paper_ids if p not in (practice_ids or set())]
     n = len(paper_ids)
     empirical = sum(1 for p in paper_ids if methods.get(p) == "empirical")
     conceptual = sum(1 for p in paper_ids if methods.get(p) == "conceptual")
@@ -58,7 +61,8 @@ def _confidence(paper_ids: List[str], methods: Dict[str, str], tiers: Dict[str, 
         level = "moderate"
     else:
         level = "low"
-    return {"level": level, "papers": n, "empirical": empirical, "conceptual": conceptual, "verified": verified}
+    return {"level": level, "papers": n, "empirical": empirical, "conceptual": conceptual, "verified": verified,
+            "practice": len(practice)}
 
 
 def build_report(
@@ -75,8 +79,10 @@ def build_report(
     by_source = {p.get("id"): p for p in papers}
     key_of = {p.get("id"): p.get("key") for p in papers}
     method_of_key = {s.get("paper_id"): classify_method(s.get("research_method")) for s in summaries or []}
-    methods = {pid: method_of_key.get(key, "not stated") for pid, key in key_of.items()}
+    methods = {pid: (by_source[pid].get("label") or "practice source") if by_source[pid].get("lane") == "enterprise"
+               else method_of_key.get(key, "not stated") for pid, key in key_of.items()}
     tiers = {pid: tier_of(p) for pid, p in by_source.items()}
+    practice_ids = {pid for pid, p in by_source.items() if p.get("lane") == "enterprise"}
 
     def sources_of(s: Any) -> List[str]:
         out: List[str] = []
@@ -108,7 +114,7 @@ def build_report(
                           "finding": re.sub(r"\s*\[[^\]]+\]", "", finding).strip(), "grade": weakest,
                           "venue": by_source[sid].get("venue", ""), "type": by_source[sid].get("type", "")})
         sections.append({"index": idx, "sub_question": h.text, "sentences": [sentence_dict(s) for s in members],
-                         "table": table, "confidence": _confidence(cited, methods, tiers)})
+                         "table": table, "confidence": _confidence(cited, methods, tiers, practice_ids)})
 
     summary = next((s for s in sentences if s.type == "summary"), None)
     # The answer's confidence rests on the papers the answer itself cites.
@@ -122,7 +128,7 @@ def build_report(
             gaps.append({"type": "gap", "text": f"Section {sec['index']} rests on one paper.", "claim_ids": [], "papers": []})
     return {
         "answer": {"text": summary.text if summary else "", "papers": [key_of[sid] for sid in sources_of(summary)] if summary else [],
-                   "confidence": _confidence(answer_ids, methods, tiers)},
+                   "confidence": _confidence(answer_ids, methods, tiers, practice_ids)},
         "sections": sections,
         "tensions": [sentence_dict(s) for s in sentences if s.type == "tension"],
         "gaps": gaps,
