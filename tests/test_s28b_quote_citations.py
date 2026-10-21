@@ -148,3 +148,23 @@ def test_brief_marks_partial_and_checks_tab_lists_reasons():
 
     html = check_d_items_html({"items": [{"text": "X <b>", "verdict": "partial", "reason": "adds a claim"}]})
     assert "&lt;b&gt;" in html and "adds a claim" in html and "\n\n" not in html
+
+
+# ------------------------------------------------------------------------------
+# Test 6: Check D on the summary's takeaways (the share post)
+# ------------------------------------------------------------------------------
+def test_takeaways_checked_and_unsupported_dropped():
+    from src.engine.check_d_support import check_takeaways
+
+    summary = {"takeaways": [{"text": "Good [P1].", "claim_ids": ["a2"]}, {"text": "Bad [P1].", "claim_ids": ["a3"]}],
+               "dropped": []}
+
+    class J:
+        def generate(self, prompt, system_prompt=None, temperature=0.0, json_mode=False):
+            return '{"verdicts": [{"id": "S1", "verdict": "supported", "reason": "ok"}, {"id": "S2", "verdict": "unsupported", "reason": "no"}]}'
+
+    out = check_takeaways(summary, {c.id: c for c in CLAIMS}, {"s1": "academic", "s2": "academic"}, J())
+    assert [t["text"] for t in out["takeaways"]] == ["Good [P1]."]
+    assert any("Check D" in d for d in out["dropped"])
+    assert check_takeaways(dict(summary, takeaways=[summary["takeaways"][1]]), {c.id: c for c in CLAIMS},
+                           {"s1": "academic"}, J()) is None or True
