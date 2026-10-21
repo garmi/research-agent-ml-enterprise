@@ -4,7 +4,7 @@ short gets its real abstract by DOI (OpenAlex, then Semantic Scholar), or is set
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, List, Sequence, Tuple
+from typing import Optional, Any, Dict, List, Sequence, Tuple
 
 MIN_ABSTRACT_CHARS = 60
 _FETCHER_LABEL = {"openalex": "OpenAlex", "semantic_scholar": "Semantic Scholar"}
@@ -16,24 +16,44 @@ def bare_doi(value: Any) -> str:
     return m.group(0).rstrip(".,;)") if m else ""
 
 
-def fill_abstracts(papers: List[Dict[str, Any]], fetchers: Sequence[Any]) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-    """(kept, set_aside). Each fetcher has .name and .fetch_abstract(doi) -> str ('' when not found)."""
-    kept: List[Dict[str, Any]] = []
-    set_aside: List[Dict[str, Any]] = []
+def fill_abstracts(papers: List[Dict[str, Any]], fetchers: Sequence[Any], time_budget: Optional[float] = None,
+                   workers: int = 1) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    """(kept, set_aside). Each fetcher has .name and .fetch_abstract(doi) -> str ('' when not found).
+    S27: lookups run on `workers` threads; papers not looked up within `time_budget` seconds are set aside."""
+    from concurrent.futures import ThreadPoolExecutor, wait
+
     tried = " or ".join(_FETCHER_LABEL.get(getattr(f, "name", ""), getattr(f, "name", "")) for f in fetchers)
-    for p in papers:
+    results: Dict[int, Tuple[str, Dict[str, Any]]] = {}
+
+    def lookup(p: Dict[str, Any], doi: str) -> Tuple[str, Dict[str, Any]]:
+        for f in fetchers:
+            try:
+                text = (f.fetch_abstract(doi) or "").strip()
+            except Exception:
+                text = ""
+            if len(text) >= MIN_ABSTRACT_CHARS:
+                return "kept", {**p, "abstract": text, "abstract_source": f.name}
+        return "aside", {"title": p.get("title", ""), "reason": f"No abstract available from {tried}."}
+
+    pool = ThreadPoolExecutor(max_workers=max(1, workers))
+    futures = {}
+    for i, p in enumerate(papers):
         if len((p.get("abstract") or "").strip()) >= MIN_ABSTRACT_CHARS:
-            kept.append(p)
+            results[i] = ("kept", p)
             continue
         doi = bare_doi(p.get("doi") or p.get("url"))
         if not doi:
-            set_aside.append({"title": p.get("title", ""), "reason": "No abstract and no DOI to look one up."})
+            results[i] = ("aside", {"title": p.get("title", ""), "reason": "No abstract and no DOI to look one up."})
             continue
-        for f in fetchers:
-            text = (f.fetch_abstract(doi) or "").strip()
-            if len(text) >= MIN_ABSTRACT_CHARS:
-                kept.append({**p, "abstract": text, "abstract_source": f.name})
-                break
+        futures[pool.submit(lookup, p, doi)] = i
+    done, _ = wait(list(futures), timeout=time_budget)
+    for fut, i in futures.items():
+        if fut in done:
+            results[i] = fut.result()
         else:
-            set_aside.append({"title": p.get("title", ""), "reason": f"No abstract available from {tried}."})
+            results[i] = ("aside", {"title": papers[i].get("title", ""),
+                                    "reason": "Abstract lookup ran out of time for this run."})
+    pool.shutdown(wait=False, cancel_futures=True)
+    kept = [results[i][1] for i in sorted(results) if results[i][0] == "kept"]
+    set_aside = [results[i][1] for i in sorted(results) if results[i][0] == "aside"]
     return kept, set_aside

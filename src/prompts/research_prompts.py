@@ -125,9 +125,11 @@ Return valid JSON with exactly these keys:
 Rules:
 - Every sentence ends with the [P#] tags of the papers it rests on. Use only the paper ids given.
 - A synthesis sentence combines two or more papers. If a point rests on one paper, put it under evidence and say "one study reports".
-- Use only figures that appear in the summaries. Never invent numbers, organisations or studies.
-- Match the strength of your verbs to the evidence: prefer "suggests", "reports", "indicates" over "shows" or "proves"
-  unless several strong studies agree. Avoid "significantly" and "substantially" unless a paper uses those words.
+- Each paper lists its "allowed_verbs" and "figures", set by the strength of its evidence. A sentence citing a paper
+  uses only that paper's allowed verbs; a sentence citing several papers uses only verbs allowed for the weakest of
+  them (the shortest list). Use only figures listed in a cited paper's "figures"; never take a number from elsewhere.
+- Never invent numbers, organisations or studies. Avoid "significantly" and "substantially" unless a paper uses
+  those words.
 - Sections answer only their own sub-question. If the papers say nothing on a sub-question, give it no synthesis and
   one gap sentence saying so.
 - The answer and sections describe the evidence. Only implications may recommend actions; give 3-5, each naming the
@@ -169,7 +171,8 @@ Checked findings:
 """
 
     @classmethod
-    def thought_leadership(cls, question: str, report_lines: List[str], profile: Dict[str, Any]) -> str:
+    def thought_leadership(cls, question: str, report_lines: List[str], profile: Dict[str, Any],
+                           limits_lines: List[str] = ()) -> str:
         """The thought-leadership summary (S21): an executive post in the first person, drafted from the checked
         report. Rules keep or drop each part; the reviewed-studies count is added by rule. Domain-neutral."""
         lines = "\n".join(report_lines)
@@ -200,6 +203,11 @@ Rules:
   "we found", "our company", "in my experience" or anything like it. Do not state how many studies you read.
 - The nuance must reflect the evidence profile: if few papers measured outcomes, say so.
 - No [P#] tags outside the takeaways.
+- Each takeaway uses only the allowed verbs and figures of the papers it cites (the weakest paper's verbs when it
+  cites several), as listed under Evidence limits.
+
+Evidence limits per paper:
+{chr(10).join(limits_lines) or "none given"}
 
 Checked findings:
 {lines}

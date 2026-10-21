@@ -140,6 +140,20 @@ def _split_sentences_preserving_abbreviations(text: str) -> List[str]:
     return sentences
 
 
+# S27: sentences that set the scene or describe what a study will do are not findings, so they are not claims.
+_PROTOCOL = re.compile(r"\b(will|shall)\s+(be|remain|use|measure|assess|evaluate|compare|test|examine|collect|include|report)\b",
+                       re.IGNORECASE)
+_BACKGROUND = re.compile(
+    r"\b(is|are|remains?|has become|have become)\s+(an?\s+)?(significant|major|key|growing|critical|persistent|ongoing|open)\s+"
+    r"(challenge|problem|concern|issue|need)s?\b|\b(is|are)\s+increasingly\s+(used|adopted|deployed|applied|popular|common)\b",
+    re.IGNORECASE)
+
+
+def is_finding_sentence(sentence: str) -> bool:
+    """False for protocol sentences (what a study will do) and background sentences (a field's challenge or trend)."""
+    return not (_PROTOCOL.search(sentence or "") or _BACKGROUND.search(sentence or ""))
+
+
 def extract_claims_from_paper(
     paper: Dict[str, Any],
     question_id: Optional[str] = None,
@@ -164,6 +178,8 @@ def extract_claims_from_paper(
     extracted_claims: List[Claim] = []
 
     for idx, sentence in enumerate(sentences):
+        if not is_finding_sentence(sentence):
+            continue
         # Identify numeric claims
         num_match = re.search(r"(\d+(?:\.\d+)?%|\d+x|\$\d+)", sentence)
         value_data = None

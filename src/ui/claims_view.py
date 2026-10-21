@@ -63,8 +63,14 @@ def grade_label(grade: Any) -> Tuple[str, str]:
     return (g[0], g[1]) if g else ("Not graded", "This claim has no grade.")
 
 
-def outcome_plain(outcome: Any) -> Tuple[str, str]:
+def outcome_plain(outcome: Any, rationale: Any = "") -> Tuple[str, str]:
+    """Title and meaning of the gap-matrix outcome. Outcome 2 reached by the vendor-only cap (research is there,
+    but every practice source is a vendor) says so instead of 'practice ahead of research' (S27)."""
     key = str(outcome or "").strip().lower()
+    if key == "2" and "solely from vendor" in str(rationale or "").lower():
+        return ("Only vendors describe practice",
+                "Research is there, but the only practice evidence is vendors describing their own tools; "
+                "independent practice reports are missing.")
     return _OUTCOMES.get(key) or (_OUTCOMES["na"] if "practice" in key else _OUTCOMES["4"])
 
 
@@ -159,7 +165,8 @@ def claims_overview_html(results: Dict[str, Any]) -> str:
         f'<div class="cg-lane"><div class="cg-lane-name">{esc(l["name"])}</div>'
         f'<div class="cg-lane-count">{esc(l["count"])}</div><div class="cg-lane-meaning">{esc(l["meaning"])}</div></div>'
         for l in lane_summary(results))
-    title, meaning = outcome_plain((results.get("gap_matrix") or {}).get("outcome"))
+    gm = results.get("gap_matrix") or {}
+    title, meaning = outcome_plain(gm.get("outcome"), gm.get("rationale"))
     missing = "".join(f"<li>{esc(m)}</li>" for m in missing_plain(results)) or "<li>Nothing flagged.</li>"
     groups = []
     for g in claims_by_question(results):
