@@ -57,7 +57,8 @@ from src.ui.safe_page import safe_page, format_error_payload, render_safe_error
 from src.ui.brand import buddha_svg
 from src.ui.claims_view import check_d_items_html, claims_overview_html
 from src.ui.experience_view import observations_by_section, practitioner_inputs
-from src.ui.evidence_view import enterprise_card_html, evidence_map_html, finding_card_html, paper_card_html, render_sentence
+from src.ui.evidence_view import (enterprise_card_html, evidence_map_html, finding_card_html, labels_for, paper_card_html,
+                                  render_sentence)
 from src.output.share_pack import image_card_svg, post_text
 from src.ui.summary_view import card_preview_html, png_download_html, summary_html, summary_missing_reason
 from src.ui.intake_view import DEPTH_OPTIONS, TONE_OPTIONS, approved_question_text, effective_provider, render_intake_view
@@ -453,6 +454,27 @@ st.markdown(
     .cite-pill:hover {
         background: #DBEAFE;
         color: #1E40AF;
+    }
+
+    /* S29b: named source chips, coloured by kind, and lines that open to their quotes */
+    .src-chip {
+        display: inline-block; font-size: 0.76rem; font-weight: 600; line-height: 1.35;
+        padding: 0.05rem 0.5rem; margin: 0 0.12rem; border-radius: 6px; white-space: nowrap;
+        text-decoration: none !important; vertical-align: 0.05em;
+    }
+    .src-study { background: #E1F5EE; color: #085041 !important; border: 1px solid #9FE1CB; }
+    .src-report { background: #EEEDFE; color: #3C3489 !important; border: 1px solid #CECBF6; }
+    .src-vendor { background: #FAEEDA; color: #633806 !important; border: 1px solid #FAC775; }
+    .src-note { background: #F1EFE8; color: #444441 !important; border: 1px solid #D3D1C7; }
+    .src-legend { font-size: 0.78rem; color: #64748B; margin: 0.2rem 0 0.9rem 0; }
+    details.cite-details > summary { cursor: pointer; list-style: none; }
+    details.cite-details > summary::-webkit-details-marker { display: none; }
+    .cite-hint { font-size: 0.72rem; color: #94A3B8; white-space: nowrap; }
+    details.cite-details[open] .cite-hint { color: #2563EB; }
+    .cite-quotes { margin: 0.35rem 0 0.2rem 0.4rem; }
+    .cite-quote {
+        font-size: 0.84rem; color: #334155; background: #F8FAFC; border-left: 3px solid #CBD5E1;
+        padding: 0.35rem 0.6rem; margin-bottom: 0.3rem; line-height: 1.5;
     }
 
     /* Empirical Findings and Risk Cards */
@@ -1346,6 +1368,7 @@ if results and page in RESULT_STEPS:
             findings_by_text = {str(f.get("text", "")).strip(): f for f in results.get("findings") or []}
             # One st.markdown per block (see report_blocks); report_html joins the same blocks for exports.
             for block in report_blocks(report, paper_map, findings_by_text, meta=brief_meta_line(results),
+                                       claims_by_id=claims_by_id_map,
                                        negatives=results.get("negative_findings"), diagram=results.get("diagram"),
                                        observations=observations_by_section(report, results.get("claims", []))):
                 st.markdown(block, unsafe_allow_html=True)
@@ -1442,8 +1465,8 @@ if results and page in RESULT_STEPS:
         if _map_html:
             # S19b: which paper backs which sub-question, before the full paper list.
             st.markdown("#### Evidence map")
-            st.caption("Each row is a paper; a dot means that question's section cites it. Hover a Q heading to see "
-                       "the question. Papers marked 'not cited' were found but not used in the brief.")
+            st.caption("Each row is a source by name; 'used · N' means N lines of that question's section rest on it. "
+                       "Hover a Q heading to see the question. Sources marked 'not cited' were found but not used.")
             st.markdown(_map_html, unsafe_allow_html=True)
         # Check A: on-topic evidence (DEC-016)
         check_a_info = results.get("check_a") or {}
@@ -1479,7 +1502,7 @@ if results and page in RESULT_STEPS:
 
         st.markdown(f"#### 🎓 Lane A: Academic Papers Ingested ({len(results.get('papers', []))})")
         for p in results.get("papers", []):
-            st.markdown(paper_card_html(p), unsafe_allow_html=True)
+            st.markdown(paper_card_html(p, labels_for(paper_map)), unsafe_allow_html=True)
 
         st.markdown("---")
         ent_sources = results.get("enterprise_sources", [])
@@ -1494,7 +1517,8 @@ if results and page in RESULT_STEPS:
         ent_docs_by_id = {d.get("id"): d for d in results.get("enterprise_docs") or []}
         if ent_sources:
             for es in ent_sources:
-                st.markdown(enterprise_card_html(es, ent_docs_by_id.get(es.get("id"))), unsafe_allow_html=True)
+                st.markdown(enterprise_card_html(es, ent_docs_by_id.get(es.get("id")), labels_for(paper_map)),
+                            unsafe_allow_html=True)
         else:
             st.caption("No enterprise claims recorded for this question.")
 

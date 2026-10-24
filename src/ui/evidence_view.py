@@ -19,19 +19,143 @@ def safe_url(url: Any) -> str:
     return u if re.match(r"^https?://", u, re.IGNORECASE) else "#"
 
 
-def render_sentence(text: str, paper_map: Optional[Dict[str, Any]] = None) -> str:
-    """Escape the sentence, then turn [P#] tags into citation pills linking to their paper."""
+# ------------------------------------------------------------------------------
+# S29b: readable source names in place of [P#] / [E#] on screen (the ledger and the gates keep the codes)
+# ------------------------------------------------------------------------------
+_TITLE_STOP = {"a", "an", "the", "of", "on", "in", "for", "to", "and", "or", "with", "by", "from", "at", "as", "is",
+               "are", "how", "what", "why", "when", "does", "do", "can", "its", "their", "into", "via", "towards",
+               "toward", "using", "study", "studies", "analysis", "evidence"}
+KIND_LABELS = {"study": "study", "report": "report / practice", "vendor": "vendor says", "note": "your note"}
+TAG_RE = re.compile(r"\[([PE]\d+)(?:\.\d+)?\]")
+
+
+def _year(value: Any) -> str:
+    m = re.match(r"(\d{4})", str(value or "").strip())
+    return m.group(1) if m else ""
+
+
+def _surname(authors: Any) -> str:
+    first = authors[0] if isinstance(authors, list) and authors else (str(authors).split(",")[0] if authors else "")
+    if isinstance(first, dict):
+        first = first.get("name") or first.get("display_name") or ""
+    words = [w for w in re.split(r"\s+", str(first or "").strip()) if w]
+    return words[-1].strip(".,") if words else ""
+
+
+def _site(url: Any) -> str:
+    host = re.sub(r"^https?://", "", str(url or "")).split("/")[0].split(":")[0].lower()
+    host = re.sub(r"^www\.", "", host)
+    parts = [p for p in host.split(".") if p]
+    name = parts[-2] if len(parts) >= 2 else (parts[0] if parts else "")
+    return name[:1].upper() + name[1:]
+
+
+def _title_words(title: Any, n: int = 3) -> str:
+    words = [w for w in re.findall(r"[A-Za-z][A-Za-z0-9\-]+", str(title or "")) if w.lower() not in _TITLE_STOP]
+    text = " ".join(words[:n]).lower()
+    return text[:1].upper() + text[1:] if text else "Source"
+
+
+def source_kind(src: Dict[str, Any]) -> str:
+    if str(src.get("key") or "").startswith("E") or src.get("lane") == "enterprise":
+        return "vendor" if str(src.get("label") or src.get("type") or "") == "Vendor says" else "report"
+    return "study"
+
+
+def source_labels(sources: List[Dict[str, Any]]) -> Dict[str, Dict[str, str]]:
+    """Each source's on-screen name and kind, by rule: a paper is its first author's surname + year (or its first
+    content words + year); an enterprise source is its organisation (or site name) + year. Repeats get a/b."""
+    out: Dict[str, Dict[str, str]] = {}
+    for src in sources or []:
+        key = str(src.get("key") or "")
+        if not key:
+            continue
+        kind = source_kind(src)
+        if kind == "study":
+            base = _surname(src.get("authors")) or _title_words(src.get("title"))
+        else:
+            base = str(src.get("venue") or src.get("organisation") or "").strip() or _site(src.get("url")) \
+                or _title_words(src.get("title"))
+        year = _year(src.get("year"))
+        out[key] = {"name": f"{base} {year}".strip(), "kind": kind, "title": str(src.get("title") or ""),
+                    "year": year, "url": str(src.get("url") or src.get("link") or src.get("doi") or "")}
+    counts: Dict[str, int] = {}
+    for lab in out.values():
+        counts[lab["name"]] = counts.get(lab["name"], 0) + 1
+    seen: Dict[str, int] = {}
+    for lab in out.values():
+        if counts[lab["name"]] > 1:
+            n = seen.get(lab["name"], 0)
+            seen[lab["name"]] = n + 1
+            lab["name"] = lab["name"] + "abcdefghijklmnopqrstuvwxyz"[min(n, 25)]
+    return out
+
+
+def labels_for(paper_map: Optional[Dict[str, Any]]) -> Dict[str, Dict[str, str]]:
+    return source_labels([{**(v or {}), "key": k} for k, v in (paper_map or {}).items()])
+
+
+def source_chip(key: str, labels: Dict[str, Dict[str, str]]) -> str:
+    """One named, colour-coded source chip linking to the source; an unknown key stays as plain text."""
+    lab = labels.get(key)
+    if not lab:
+        return html.escape(f"[{key}]")
+    url = html.escape(safe_url(lab["url"]), quote=True)
+    tip = html.escape(f"{lab['title']} ({lab['year'] or 'n.d.'}) · {KIND_LABELS[lab['kind']]}", quote=True)
+    return (f'<a href="{url}" target="_blank" title="{tip}" class="src-chip src-{lab["kind"]}">'
+            f'{html.escape(lab["name"])}</a>')
+
+
+def render_sentence(text: str, paper_map: Optional[Dict[str, Any]] = None,
+                    labels: Optional[Dict[str, Dict[str, str]]] = None) -> str:
+    """Escape the sentence, then turn its [P#] / [E#] / [P#.n] tags into named source chips (S29b)."""
     escaped = html.escape(str(text or ""))
-    papers = paper_map or {}
+    labs = labels if labels is not None else labels_for(paper_map)
+    out = TAG_RE.sub(lambda m: " " + source_chip(m.group(1), labs), escaped)
+    return re.sub(r"\s+(<a [^>]*class=\"src-chip)", r" \1", out).strip()
 
-    def pill(m: "re.Match[str]") -> str:
-        key = m.group(1)
-        paper = papers.get(key) or {}
-        url = html.escape(safe_url(paper.get("url") or paper.get("link") or paper.get("doi")), quote=True)
-        title = html.escape(f"{paper.get('title') or 'Academic Paper'} ({paper.get('year', '')})", quote=True)
-        return f'<a href="{url}" target="_blank" title="{title}" class="cite-pill">[{key}]</a>'
 
-    return re.sub(r"\[([PE]\d+)\]", pill, escaped)
+def _claim_field(c: Any, *names: str) -> str:
+    for n in names:
+        v = c.get(n) if isinstance(c, dict) else getattr(c, n, None)
+        if v:
+            return str(v)
+    return ""
+
+
+def quotes_html(claim_ids: List[str], claims_by_id: Optional[Dict[str, Any]], paper_map: Dict[str, Any],
+                labels: Dict[str, Dict[str, str]]) -> str:
+    """The exact quotes a sentence rests on, each under its source's chip."""
+    key_of_id = {str(v.get("id")): k for k, v in (paper_map or {}).items() if isinstance(v, dict) and v.get("id")}
+    rows = []
+    for cid in claim_ids or []:
+        c = (claims_by_id or {}).get(cid)
+        if c is None:
+            continue
+        key = _claim_field(c, "source_key") or key_of_id.get(_claim_field(c, "source_id"), "")
+        quote = LOCATION_TAG.sub("", _claim_field(c, "excerpt", "source_excerpt")).strip()
+        if quote:
+            rows.append(f'<div class="cite-quote">{source_chip(key, labels)} “{html.escape(quote)}”</div>')
+    return "".join(rows)
+
+
+def cited_line_html(text: str, claim_ids: Optional[List[str]], paper_map: Dict[str, Any],
+                    claims_by_id: Optional[Dict[str, Any]], css: str = "", tag_html: str = "",
+                    labels: Optional[Dict[str, Dict[str, str]]] = None) -> str:
+    """A brief line; when it cites claims, clicking it opens the quotes it rests on (S29b)."""
+    labs = labels if labels is not None else labels_for(paper_map)
+    body = tag_html + render_sentence(text, paper_map, labs)
+    quotes = quotes_html(list(claim_ids or []), claims_by_id, paper_map, labs) if claims_by_id else ""
+    if not quotes:
+        return f'<div class="{css}">{body}</div>'
+    return (f'<details class="cite-details {css}"><summary>{body} <span class="cite-hint">quotes ▾</span></summary>'
+            f'<div class="cite-quotes">{quotes}</div></details>')
+
+
+def source_legend_html() -> str:
+    return ('<div class="src-legend">Sources: '
+            + " ".join(f'<span class="src-chip src-{k}">{html.escape(v)}</span>' for k, v in KIND_LABELS.items() if k != "note")
+            + " · click a line to see the quotes it rests on</div>")
 
 
 def _chip(text: str, bg: str, fg: str) -> str:
@@ -41,7 +165,7 @@ def _chip(text: str, bg: str, fg: str) -> str:
     )
 
 
-def _trace_html(tr: Dict[str, Any]) -> str:
+def _trace_html(tr: Dict[str, Any], labels: Optional[Dict[str, Dict[str, str]]] = None) -> str:
     grade = str(tr.get("grade") or "WEAK").upper()
     grade_bg, grade_fg = {"STRONG": ("#DCFCE7", "#166534"), "MODERATE": ("#DBEAFE", "#1E40AF")}.get(grade, ("#F1F5F9", "#475569"))
     raw_excerpt = str(tr.get("excerpt") or "")
@@ -57,7 +181,7 @@ def _trace_html(tr: Dict[str, Any]) -> str:
     <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:6px;padding:0.55rem 0.75rem;margin-top:0.45rem;font-size:0.8rem;">
         <div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:0.4rem;margin-bottom:0.3rem;">
             <div>
-                <a href="{url}" target="_blank" class="cite-pill">[{html.escape(str(tr.get('source_key') or 'SRC'))}]</a>
+                {source_chip(str(tr.get('source_key') or 'SRC'), labels or {})}
                 <a href="{url}" target="_blank" style="font-weight:700;color:#0F172A;text-decoration:none;margin-left:0.3rem;">{html.escape(str(tr.get('source_title') or 'Source'))} ↗</a>
             </div>
             <div style="display:flex;gap:0.35rem;align-items:center;">
@@ -97,7 +221,8 @@ def finding_card_html(
     else:
         n = len(traces)
         badge = _chip(f"{n} cited quote{'' if n == 1 else 's'}", "#EFF6FF", "#1D4ED8")
-        body = "".join(_trace_html(tr) for tr in traces)
+        labs = labels_for(paper_map)
+        body = "".join(_trace_html(tr, labs) for tr in traces)
     return f"""
     <details class="finding-item" style="padding:0.9rem 1.2rem;margin-bottom:0.9rem;">
         <summary style="cursor:pointer;list-style:none;">
@@ -112,7 +237,7 @@ def finding_card_html(
     </details>"""
 
 
-def paper_card_html(p: Dict[str, Any]) -> str:
+def paper_card_html(p: Dict[str, Any], labels: Optional[Dict[str, Dict[str, str]]] = None) -> str:
     """One Evidence-tab paper card (S11). Built without blank lines (a blank line ends Markdown's HTML
     block and the rest shows as raw code), with escaped text and http(s)-only links."""
     esc = lambda v: html.escape(str(v or ""))
@@ -123,7 +248,7 @@ def paper_card_html(p: Dict[str, Any]) -> str:
     parts = [
         '<div class="paper-card">',
         '<div class="paper-card-head">',
-        f'<a href="{url}" target="_blank" class="cite-pill">[{esc(p.get("key"))}]</a>',
+        source_chip(str(p.get("key") or ""), labels or source_labels([p])),
         f'<div>{custom}<span class="paper-tag">{esc(p.get("type"))}</span></div>',
         "</div>",
         f'<div class="paper-card-title"><a href="{url}" target="_blank">{esc(p.get("title"))} ↗</a></div>',
@@ -137,29 +262,38 @@ def paper_card_html(p: Dict[str, Any]) -> str:
 
 
 def evidence_map(report: Optional[Dict[str, Any]], papers: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """Which sub-question sections cite which papers (S19b), derived by rule from the report's tables.
+    """Which sub-question sections use which sources (S19b), derived by rule from the report.
 
-    One row per paper (in the run's order) with a cited flag per section, the paper's method, and a
-    "not cited" note when no section uses it; `thin` lists sections backed by fewer than two papers."""
+    One row per source (in the run's order) with, per section, whether it is cited (in the section's table or its
+    sentences' tags) and how many of the section's sentences cite it (S29b), plus its method and a "not cited" note.
+    `thin` lists sections backed by fewer than two sources; `unbacked` those no source backs."""
     sections = list((report or {}).get("sections") or [])
-    cited_by = [{row.get("paper") for row in sec.get("table") or []} for sec in sections]
+    tags = [[{m.group(1) for m in TAG_RE.finditer(str(x.get("text") or ""))} for x in sec.get("sentences") or []]
+            for sec in sections]
+    cited_by = [{row.get("paper") for row in sec.get("table") or []}.union(*t) for sec, t in zip(sections, tags)]
     method_of: Dict[str, str] = {}
     for sec in sections:
         for row in sec.get("table") or []:
             method_of.setdefault(row.get("paper"), row.get("method") or "not stated")
+    labels = source_labels(papers or [])
     rows = []
     for p in papers or []:
         key = p.get("key")
         cited = [key in keys for keys in cited_by]
-        rows.append({"paper": key, "title": p.get("title", ""), "method": method_of.get(key, ""),
-                     "cited": cited, "note": "" if any(cited) else "not cited"})
+        counts = [sum(1 for ks in t if key in ks) for t in tags]
+        rows.append({"paper": key, "name": (labels.get(key) or {}).get("name", key), "kind": source_kind(p),
+                     "title": p.get("title", ""), "method": method_of.get(key, ""), "cited": cited, "counts": counts,
+                     "note": "" if any(cited) else "not cited"})
     thin = [sec.get("index", i + 1) for i, (sec, keys) in enumerate(zip(sections, cited_by)) if len(keys) < 2]
+    unbacked = [sec.get("index", i + 1) for i, (sec, keys) in enumerate(zip(sections, cited_by)) if not keys]
     return {"sections": [{"index": s.get("index", i + 1), "sub_question": s.get("sub_question", "")}
-                         for i, s in enumerate(sections)], "rows": rows, "thin": thin}
+                         for i, s in enumerate(sections)], "rows": rows, "thin": thin, "unbacked": unbacked,
+            "labels": labels}
 
 
 def evidence_map_html(report: Optional[Dict[str, Any]], papers: List[Dict[str, Any]]) -> str:
-    """The evidence map as one HTML table (no blank lines, escaped text); empty when the run has no sections."""
+    """The evidence map as one HTML table (no blank lines, escaped text): sources down the side by name,
+    sub-questions across; empty when the run has no sections."""
     m = evidence_map(report, papers)
     if not m["sections"]:
         return ""
@@ -171,34 +305,41 @@ def evidence_map_html(report: Optional[Dict[str, Any]], papers: List[Dict[str, A
         for s in m["sections"])
     body = []
     for r in m["rows"]:
-        marks = "".join(f'<td style="{cell}text-align:center;color:#047857;font-weight:700;">{"●" if c else ""}</td>'
-                        for c in r["cited"])
+        marks = "".join(
+            f'<td style="{cell}text-align:center;color:#047857;font-weight:700;white-space:nowrap;">'
+            + (f"used · {n}" if n else ("in table" if c else "")) + "</td>"
+            for c, n in zip(r["cited"], r["counts"]))
         note = f' <span style="color:#94A3B8;font-style:italic;">({esc(r["note"])})</span>' if r["note"] else ""
-        body.append(f'<tr><td style="{cell}font-weight:700;">{esc(r["paper"])}</td>'
+        body.append(f'<tr><td style="{cell}">{source_chip(r["paper"], m["labels"])}</td>'
                     f'<td style="{cell}color:#334155;">{esc(r["title"])}{note}</td>'
                     f'<td style="{cell}color:#475569;">{esc(r["method"])}</td>{marks}</tr>')
+    if m["unbacked"]:
+        gaps = "".join(f'<td style="{cell}text-align:center;color:#B45309;font-weight:700;">'
+                       + ("no source" if s["index"] in m["unbacked"] else "") + "</td>" for s in m["sections"])
+        body.append(f'<tr><td style="{cell}color:#94A3B8;" colspan="3">Not backed</td>{gaps}</tr>')
     legend = "".join(
         f'<li><b>Q{esc(s["index"])}</b>: {esc(s["sub_question"])}'
-        + (' <span style="color:#B45309;">· thin: fewer than two papers</span>' if s["index"] in m["thin"] else "")
+        + (' <span style="color:#B45309;">· thin: fewer than two sources</span>' if s["index"] in m["thin"] else "")
         + "</li>" for s in m["sections"])
     return (
-        '<div class="evidence-map" style="margin:0.4rem 0 1.2rem 0;">'
+        '<div class="evidence-map" style="margin:0.4rem 0 1.2rem 0;overflow-x:auto;">'
         '<table style="width:100%;border-collapse:collapse;background:#FFFFFF;">'
-        f'<thead><tr><th style="{cell}text-align:left;">Paper</th><th style="{cell}text-align:left;">Title</th>'
+        f'<thead><tr><th style="{cell}text-align:left;">Source</th><th style="{cell}text-align:left;">Title</th>'
         f'<th style="{cell}text-align:left;">Method</th>{head}</tr></thead>'
         f'<tbody>{"".join(body)}</tbody></table>'
         f'<ul style="margin:0.5rem 0 0 1rem;font-size:0.84rem;color:#475569;">{legend}</ul></div>'
     )
 
 
-def enterprise_card_html(es: Dict[str, Any], doc: Optional[Dict[str, Any]] = None) -> str:
+def enterprise_card_html(es: Dict[str, Any], doc: Optional[Dict[str, Any]] = None,
+                         labels: Optional[Dict[str, Dict[str, str]]] = None) -> str:
     """One Evidence-tab enterprise source (S22): escaped text (titles come from web pages), http(s)-only links,
     its E# key and reader label when the brief can cite it, and an 'older than 24 months' mark."""
     esc = lambda v: html.escape(str(v or ""))
     doc = doc or {}
     date = es.get("pub_date")
     date_str = date if (date and str(date).lower() not in ("none", "null")) else "Date unknown"
-    key = f'<b style="margin-right:0.4rem;">[{esc(doc.get("key"))}]</b>' if doc.get("key") else ""
+    key = (source_chip(str(doc["key"]), labels or source_labels([doc])) + " ") if doc.get("key") else ""
     label = doc.get("label") or str(es.get("source_type") or "enterprise").replace("_", " ")
     older = ' <span style="color:#B45309;font-weight:700;">· older than 24 months</span>' if doc.get("older") else ""
     return (

@@ -260,7 +260,7 @@ def test_paper_card_html():
                                "year": "Date unknown", "venue": "arXiv", "doi": "", "is_custom": True})
     assert "Date unknown" in no_year and "Custom URL" in no_year
     src = Path("web_app.py").read_text(encoding="utf-8")
-    assert "paper_card_html(p)" in src
+    assert "paper_card_html(p, labels_for(paper_map))" in src  # S29b: cards use the same source names
 
 
 # ------------------------------------------------------------------------------

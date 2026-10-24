@@ -220,4 +220,4 @@ def test_export_lists_diagram_and_evidence_map():
                          papers=[{"key": "P1", "title": "One"}, {"key": "P2", "title": "Two"}])
     assert "## From pilot to scale" in md
     assert "Pilot with one team [P1] → Shared review steps [P2]" in md
-    assert "## Evidence map" in md and "| P1 | One | empirical | ● |" in md
+    assert "## Evidence map" in md and "| One | One | empirical | ● |" in md  # S29b: sources by name
