@@ -46,8 +46,9 @@ def _layers(spec: Dict[str, Any]) -> Dict[str, List[int]]:
 
 
 def diagram_svg(spec: Optional[Dict[str, Any]], marker_id: str = "dg-arrow",
-                frame: Optional[Tuple[int, int, int, int]] = None) -> str:
-    """The diagram as an SVG; `frame` (x, y, width, height) places it inside another SVG, such as the share card."""
+                frame: Optional[Tuple[int, int, int, int]] = None, labels: Optional[Dict[str, str]] = None) -> str:
+    """The diagram as an SVG; `frame` (x, y, width, height) places it inside another SVG, such as the share card.
+    `labels` (S29b) maps a P#/E# key to the source name shown under each box."""
     if not spec or not spec.get("nodes"):
         return ""
     esc = lambda v: html.escape(str(v or ""), quote=True)
@@ -88,6 +89,6 @@ def diagram_svg(spec: Optional[Dict[str, Any]], marker_id: str = "dg-arrow",
             parts.append(f'<text x="{x + NODE_W / 2:.0f}" y="{top + i * 17}" text-anchor="middle" font-size="14" '
                          f'font-weight="600" fill="{_TEXT}">{esc(line)}</text>')
         parts.append(f'<text x="{x + NODE_W / 2:.0f}" y="{y + NODE_H - 10}" text-anchor="middle" font-size="11" '
-                     f'fill="{_MUTED}">{esc(" · ".join(n["cites"]))}</text>')
+                     f'fill="{_MUTED}">{esc(" · ".join((labels or {}).get(c, c) for c in n["cites"]))}</text>')
     parts.append("</svg>")
     return "".join(parts)

@@ -946,6 +946,9 @@ class MultiLaneResearchRunner:
                 "url": p.get("url") or p.get("link") or "https://scholar.google.com",
                 "relevance_score": float(p.get("relevance_score", 0.0)),
                 "is_custom": bool(p.get("is_custom", False) or "[Custom User Source]" in p.get("title", "")),
+                # S29b: the first authors name the paper on screen ("Chen 2024").
+                "authors": [str(a.get("name") if isinstance(a, dict) else a) for a in (p.get("authors") or [])[:3]
+                            if a] if isinstance(p.get("authors"), list) else [],
             }
             papers_formatted.append(p_entry)
             if p.get("id"):

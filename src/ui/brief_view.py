@@ -140,22 +140,28 @@ def _evidence_table_html(rows: List[Dict[str, Any]]) -> str:
 
 def report_blocks(report: Dict[str, Any], paper_map: Dict[str, Any], findings_by_text: Dict[str, Dict[str, Any]],
                   meta: str = "", negatives: Optional[List[str]] = None, diagram: Optional[Dict[str, Any]] = None,
-                  observations: Optional[Dict[int, List[str]]] = None) -> List[str]:
+                  observations: Optional[Dict[int, List[str]]] = None,
+                  claims_by_id: Optional[Dict[str, Any]] = None) -> List[str]:
     """The Brief tab for a question-shaped report, as separate HTML blocks (one st.markdown each: finding cards
     contain blank lines, which end a Markdown HTML block, so they cannot share one call). Model text is escaped by
-    render_sentence; evidence sentences keep their click-to-see-the-quotes cards."""
-    from src.ui.evidence_view import finding_card_html, render_sentence
+    render_sentence; evidence sentences keep their click-to-see-the-quotes cards. S29b: sources show as named chips,
+    and every line with `claims_by_id` opens to the quotes it rests on."""
+    from src.ui.evidence_view import cited_line_html, finding_card_html, labels_for, source_legend_html
 
+    labels = labels_for(paper_map)
+    line = lambda item, css="", tag="": cited_line_html(item.get("text", ""), item.get("claim_ids"), paper_map,
+                                                        claims_by_id, css=css, tag_html=tag, labels=labels)
     answer = report.get("answer") or {}
     blocks = [
         '<div class="report-answer"><div class="report-answer-head"><h3>Answer in brief</h3>'
         f'{_confidence_badge(answer.get("confidence") or {})}</div>'
-        f'<p>{render_sentence(answer.get("text", ""), paper_map)}</p>'
+        f'{line(answer, "answer-line")}'
         + ('<p class="line-tag" style="color:#B45309;">Check D: this answer is only partly supported by the quotes it cites.</p>'
            if answer.get("support") == "partial" else "")
         + ('<p class="line-tag" style="color:#991B1B;">Check D: this answer is not supported by the quotes it cites.</p>'
            if answer.get("support") == "unsupported" else "")
-        + '</div>'
+        + '</div>',
+        source_legend_html(),
     ]
     if meta:
         blocks.append(f'<div class="brief-meta">{plain_html(meta)}</div>')
@@ -163,8 +169,8 @@ def report_blocks(report: Dict[str, Any], paper_map: Dict[str, Any], findings_by
         # S20: the validated diagram sits right after the answer; each box names the papers it rests on.
         from src.ui.diagrams import diagram_svg
 
-        blocks.insert(1, f'<div class="report-diagram"><h3>{plain_html(diagram.get("title"))}</h3>{diagram_svg(diagram)}'
-                         '<div class="line-tag" style="font-size:0.78rem;">Each box names the papers it rests on.</div></div>')
+        blocks.insert(1, f'<div class="report-diagram"><h3>{plain_html(diagram.get("title"))}</h3>{diagram_svg(diagram, labels={k: v["name"] for k, v in labels.items()})}'
+                         '<div class="line-tag" style="font-size:0.78rem;">Each box names the sources it rests on.</div></div>')
     card_no = 0
     for sec in report.get("sections") or []:
         blocks.append(f'<div class="report-section-head"><h3>{int(sec.get("index") or 0)}. '
@@ -180,8 +186,8 @@ def report_blocks(report: Dict[str, Any], paper_map: Dict[str, Any], findings_by
                 label = "Synthesis" if s.get("type") == "synthesis" else "Evidence"
                 partial = ('<span class="line-tag" style="color:#B45309;">Partly supported</span>'
                            if s.get("support") == "partial" else "")
-                blocks.append(f'<div class="{"sy-line" if label == "Synthesis" else "ev-line"}"><span class="line-tag">{label}</span>'
-                              f'{partial}{render_sentence(s.get("text", ""), paper_map)}</div>')
+                blocks.append(line(s, "sy-line" if label == "Synthesis" else "ev-line",
+                                   f'<span class="line-tag">{label}</span>{partial}'))
         if sec.get("table"):
             blocks.append(_evidence_table_html(sec["table"]))
         # S26: your field notes that match this section, by rule; shown in the app only, never in exports.
@@ -190,16 +196,17 @@ def report_blocks(report: Dict[str, Any], paper_map: Dict[str, Any], findings_by
                           f'{plain_html(obs)}</div>')
     if report.get("tensions"):
         blocks.append('<h3 class="report-h">Where studies disagree</h3>' + "".join(
-            f'<div class="sy-line">{render_sentence(t.get("text", ""), paper_map)}</div>' for t in report["tensions"]))
+            line(t, "sy-line") for t in report["tensions"]))
     gaps = list(report.get("gaps") or []) + [{"text": n} for n in negatives or []]
     if gaps:
         blocks.append('<h3 class="report-h">What we don\'t know</h3><ul class="report-list">' + "".join(
-            f'<li>{render_sentence(g.get("text", ""), paper_map)}</li>' for g in gaps) + "</ul>")
+            f'<li>{line(g)}</li>' for g in gaps) + "</ul>")
     if report.get("implications"):
-        blocks.append('<h3 class="report-h">Implications</h3><ol class="report-list">' + "".join(
-            f'<li>{render_sentence(i.get("text", ""), paper_map)}'
-            + (f' <span class="line-tag">From section {int(i["section"])}</span>' if i.get("section") else "")
-            + "</li>" for i in report["implications"]) + "</ol>")
+        items = []
+        for i in report["implications"]:
+            tag = f'<span class="line-tag">From section {int(i["section"])}</span> ' if i.get("section") else ""
+            items.append(f"<li>{line(i, tag=tag)}</li>")
+        blocks.append('<h3 class="report-h">Implications</h3><ol class="report-list">' + "".join(items) + "</ol>")
     return blocks
 
 
@@ -210,11 +217,30 @@ def report_html(*args: Any, **kwargs: Any) -> str:
 
 def report_markdown(report: Dict[str, Any], question: str = "", diagram: Optional[Dict[str, Any]] = None,
                     papers: Optional[List[Dict[str, Any]]] = None) -> str:
-    """The brief download for a question-shaped report, in the same order as the Brief tab."""
+    """The brief download for a question-shaped report, in the same order as the Brief tab. With `papers` (S29b),
+    tags read as source names ("(Chen 2024)") and the brief ends with a numbered source list."""
+    import re
+
+    from src.ui.evidence_view import source_labels
+
+    labels = source_labels(papers or [])
+
+    def T(text: Any) -> str:
+        if not labels:
+            return str(text or "")
+
+        def names(m: "re.Match[str]") -> str:
+            keys = re.findall(r"\[([PE]\d+)(?:\.\d+)?\]", m.group(0))
+            known = [labels[k]["name"] for k in dict.fromkeys(keys) if k in labels]
+            return f" ({'; '.join(known)})" if known else m.group(0)
+
+        return re.sub(r"\s*(?:\[[PE]\d+(?:\.\d+)?\])+", names, str(text or ""))
+
+    name = lambda key: labels.get(str(key), {}).get("name", key)
     lines = [f"# {question}" if question else "# Research brief", ""]
     answer = report.get("answer") or {}
     conf = answer.get("confidence") or {}
-    lines += ["## Answer in brief", answer.get("text", "")]
+    lines += ["## Answer in brief", T(answer.get("text", ""))]
     if conf:
         lines.append(f"_Confidence: {conf.get('level')} · {conf.get('papers', 0)} papers · {conf.get('empirical', 0)} empirical_")
     lines.append("")
@@ -226,20 +252,21 @@ def report_markdown(report: Dict[str, Any], question: str = "", diagram: Optiona
         lines += [f"## {sec.get('index')}. {sec.get('sub_question')}", ""]
         for s in sec.get("sentences") or []:
             prefix = "**Synthesis.** " if s.get("type") == "synthesis" else ""
-            lines.append(f"- {prefix}{s.get('text', '')}")
+            lines.append(f"- {prefix}{T(s.get('text', ''))}")
         rows = sec.get("table") or []
         if rows:
-            lines += ["", "| Paper | Title | Method | What it found | Grade |", "|---|---|---|---|---|"]
-            lines += [f"| {_md_cell(r.get('paper'))} | {_md_cell(r.get('title'))} | {_md_cell(r.get('method'))} | "
+            lines += ["", "| Source | Title | Method | What it found | Grade |" if labels else
+                      "| Paper | Title | Method | What it found | Grade |", "|---|---|---|---|---|"]
+            lines += [f"| {_md_cell(name(r.get('paper')))} | {_md_cell(r.get('title'))} | {_md_cell(r.get('method'))} | "
                       f"{_md_cell(r.get('finding'))} | {_md_cell(r.get('grade'))} |" for r in rows]
         lines.append("")
     if report.get("tensions"):
-        lines += ["## Where studies disagree"] + [f"- {t.get('text', '')}" for t in report["tensions"]] + [""]
+        lines += ["## Where studies disagree"] + [f"- {T(t.get('text', ''))}" for t in report["tensions"]] + [""]
     if report.get("gaps"):
-        lines += ["## What we don't know"] + [f"- {g.get('text', '')}" for g in report["gaps"]] + [""]
+        lines += ["## What we don't know"] + [f"- {T(g.get('text', ''))}" for g in report["gaps"]] + [""]
     if report.get("implications"):
         lines += ["## Implications"] + [
-            f"{n}. {i.get('text', '')}" + (f" _(from section {i['section']})_" if i.get("section") else "")
+            f"{n}. {T(i.get('text', ''))}" + (f" _(from section {i['section']})_" if i.get("section") else "")
             for n, i in enumerate(report["implications"], 1)] + [""]
     if papers:
         from src.ui.evidence_view import evidence_map
@@ -247,10 +274,20 @@ def report_markdown(report: Dict[str, Any], question: str = "", diagram: Optiona
         m = evidence_map(report, papers)
         if m["sections"]:
             qs = [f"Q{sec['index']}" for sec in m["sections"]]
-            lines += ["## Evidence map", "", "| Paper | Title | Method | " + " | ".join(qs) + " |",
+            lines += ["## Evidence map", "", "| Source | Title | Method | " + " | ".join(qs) + " |",
                       "|---|---|---|" + "---|" * len(qs)]
-            lines += [f"| {_md_cell(r['paper'])} | {_md_cell(r['title'])} | {_md_cell(r['method'] or r['note'])} | "
+            lines += [f"| {_md_cell(r['name'])} | {_md_cell(r['title'])} | {_md_cell(r['method'] or r['note'])} | "
                       + " | ".join("●" if c else "" for c in r["cited"]) + " |" for r in m["rows"]]
             lines += [""] + [f"- Q{sec['index']}: {sec['sub_question']}" + (" (thin: fewer than two papers)" if sec["index"] in m["thin"] else "")
                              for sec in m["sections"]] + [""]
+    if labels:
+        lines += ["## Sources", ""]
+        for n, p in enumerate(papers or [], 1):
+            lab = labels.get(str(p.get("key")))
+            if not lab:
+                continue
+            bits = [str(b) for b in (p.get("venue") or p.get("label"), lab["year"]) if b]
+            lines.append(f"{n}. {lab['name']} — {p.get('title', '')}" + (f". {', '.join(bits)}" if bits else "")
+                         + (f". {lab['url']}" if lab["url"].startswith("http") else ""))
+        lines.append("")
     return "\n".join(lines)
