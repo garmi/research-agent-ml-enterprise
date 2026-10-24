@@ -34,7 +34,8 @@ PAPER_MAP = {"P1": {"title": 'Study "A" <1>', "url": "https://doi.org/a", "year"
 def test_sentence_escaped_before_pills():
     out = render_sentence('Gains <img src=x onerror=alert(1)> seen [P1].', PAPER_MAP)
     assert "<img" not in out and "&lt;img" in out
-    assert 'href="https://doi.org/a"' in out and ">[P1]</a>" in out
+    # S29b: the tag became a named chip linking to the paper.
+    assert 'href="https://doi.org/a"' in out and "src-chip" in out and "Study 2024" in out
     assert "<1>" not in out
     card = finding_card_html({"id": "s", "text": "x <b>y</b> [P1]", "binding": "unbound", "sources_trace": []}, 1,
                              "x <b>y</b> [P1]", paper_map=PAPER_MAP)
