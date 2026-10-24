@@ -125,8 +125,8 @@ def test_web_app_uses_one_banner_and_step_tabs():
     for gone in ("Active Feedback Loops", "sidebar_phase_selector", "PUBLICATION BLOCKED (G1–G6", "Phase 4B:",
                  "Phase 4 • Active Output", "Draft Mode — Below Publication Threshold"):
         assert gone not in src, gone
-    tabs = src[src.index("st.tabs(["):src.index("])", src.index("st.tabs(["))]
-    order = [tabs.index(t) for t in ('"Brief"', '"Evidence"', '"Claims & gaps"', '"Checks & publish"')]
+    # S29a: the tabs became pages; their order in the page is unchanged.
+    order = [src.index(t) for t in ('if page == "brief":', '### Evidence', '### Claims & gaps', '### Checks & publish')]
     assert order == sorted(order)
     assert "@media (max-width: 640px)" in src
     assert "brief_meta_line(results)" in src and "stat_cols = st.columns(4)" not in src

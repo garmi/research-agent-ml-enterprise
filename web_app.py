@@ -60,7 +60,9 @@ from src.ui.experience_view import observations_by_section, practitioner_inputs
 from src.ui.evidence_view import enterprise_card_html, evidence_map_html, finding_card_html, paper_card_html, render_sentence
 from src.output.share_pack import image_card_svg, post_text
 from src.ui.summary_view import card_preview_html, png_download_html, summary_html, summary_missing_reason
-from src.ui.intake_view import approved_question_text, effective_provider, render_intake_view
+from src.ui.intake_view import DEPTH_OPTIONS, TONE_OPTIONS, approved_question_text, effective_provider, render_intake_view
+from src.ui.stepper import (RESULT_STEPS, available_steps, go_to, page_from_state, render_nav, render_stepper,
+                            scroll_to_top_on_change)
 from src.ui.rerun import board_editor_key, export_view, papers_for_rerun
 from src.ui.publish_view import gate_rows, gates_summary, publish_eligibility
 from src.ui.run_status import run_status, status_banner_html, status_code, step_rail, step_rail_html
@@ -946,6 +948,9 @@ def resume_run_from_url() -> Optional[Dict[str, Any]]:
         st.session_state["current_question"] = job["meta"].get("topic", "")
         if job["meta"].get("last_lane_urls") is not None:
             st.session_state["last_lane_urls"] = job["meta"]["last_lane_urls"]
+        # S29a: a finished run opens on Brief, unless the URL already names a results page (a reload).
+        if st.query_params.get("step") not in RESULT_STEPS:
+            go_to("brief")
     return job
 
 
@@ -989,7 +994,7 @@ with st.sidebar:
     )
 
     # 1. STEPS: where this run is, the same states the status banner reports (S8)
-    st.markdown('<div class="sidebar-pod-title">Steps</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sidebar-pod-title">Run progress</div>', unsafe_allow_html=True)
     st.markdown(step_rail_html(step_rail(results)), unsafe_allow_html=True)
 
     # 2. SYSTEM STATUS POD
@@ -1035,6 +1040,7 @@ with st.sidebar:
             if st.button(f"📋 {run_title}", key=f"hist_{item['job_id']}", use_container_width=True):
                 st.query_params["run"] = item["job_id"]
                 st.session_state["loaded_job"] = None
+                go_to("brief")
                 st.rerun()
 
     if st.session_state["research_results"] is not None:
@@ -1044,6 +1050,11 @@ with st.sidebar:
             st.session_state["current_question"] = ""
             st.session_state["loaded_job"] = None
             st.query_params.pop("run", None)
+            # S29a: back to Ask with a clean scope, so the later steps lock again.
+            for k in ("s2_active_package", "s2_proposals", "s2_draft", "s2_current_package",
+                      "_last_approved_id", "_last_approved_package_sha256"):
+                st.session_state.pop(k, None)
+            go_to("ask")
             st.rerun()
 
 
@@ -1106,113 +1117,134 @@ def render_question_register() -> None:
 
 
 # ==============================================================================
-# PHASE 1: QUESTION FRAMING & SIMPLIFIED CONFIGURATION
+# S29a: ONE STEP PER PAGE (Ask, Scope, Sources & run, Brief, Evidence, Checks & share)
 # ==============================================================================
 is_stub_requested = is_stub_mode()
 
-# Once a run exists the question collapses to one line; open it to edit and run again.
-show_intake_expanded = results is None
+model_names = list(available_models.keys())
+if is_stub_requested and "Deterministic Offline Engine (Zero-API Fallback)" not in model_names:
+    available_models["Deterministic Offline Engine (Zero-API Fallback)"] = "stub"
+    model_names.append("Deterministic Offline Engine (Zero-API Fallback)")
+if is_stub_requested:
+    default_idx = next((i for i, k in enumerate(model_names) if available_models.get(k) == "stub"), 0)
+elif ollama_online:
+    default_idx = next((i for i, k in enumerate(model_names) if available_models.get(k) == "ollama"), 0)
+elif has_gemini_key:
+    default_idx = next((i for i, k in enumerate(model_names) if available_models.get(k) == "gemini"), 0)
+else:
+    default_idx = next((i for i, k in enumerate(model_names) if available_models.get(k) == "stub"), 0)
 
-with st.expander(
-    "1. Question"
-    + (f": {st.session_state.get('current_question', '')[:75]}" if results else ": frame it and approve the scope"),
-    expanded=show_intake_expanded,
-):
-    # Reasoning runs on the engine chosen in the Inference Model selector (rendered further down;
-    # its key holds the last choice), resolved the same way the run handler resolves it.
-    _sel_label = st.session_state.get("select_inference_model")
-    if _sel_label in available_models:
-        _sel_provider = available_models[_sel_label]
-    else:
-        _sel_provider = "stub" if is_stub_requested else ("ollama" if ollama_online else ("gemini" if has_gemini_key else "stub"))
-    st.session_state["selected_model_provider"] = effective_provider(
-        _sel_provider, has_gemini_key=bool(os.getenv("GEMINI_API_KEY", "").strip()), ollama_ok=ollama_online
+# The engine chosen on the Sources & run page (kept outside the widget, which is gone on the other pages).
+sel_model_label = st.session_state.get("chosen_model_label")
+if sel_model_label not in available_models:
+    sel_model_label = model_names[default_idx]
+# Reasoning (Ask and Scope) runs on the same engine, resolved the same way the run handler resolves it.
+st.session_state["selected_model_provider"] = effective_provider(
+    available_models[sel_model_label], has_gemini_key=bool(os.getenv("GEMINI_API_KEY", "").strip()), ollama_ok=ollama_online
+)
+
+steps_open = available_steps(
+    has_proposal=bool(st.session_state.get("s2_active_package")),
+    approved=bool(st.session_state.get("_last_approved_package_sha256")),
+    has_results=bool(results),
+    has_job=bool(current_job and current_job["state"] in ("running", "failed")),
+)
+page = page_from_state(st.session_state, st.query_params, steps_open)
+render_stepper(page, steps_open)
+scroll_to_top_on_change(page)
+
+# Values the run handler and the re-draft buttons need on every page; the Sources & run page updates them.
+custom_acad_input = st.session_state.get("custom_acad_urls", "")
+custom_ent_input = st.session_state.get("custom_ent_urls", "")
+custom_prac_input = "" if os.getenv("HOSTED_DEMO") == "1" else st.session_state.get("custom_prac_urls", "")
+prac_abs_confirmed = bool(st.session_state.get("prac_abs_confirmed_saved")) and os.getenv("HOSTED_DEMO") != "1"
+allow_remote_prac_synth = False
+intake_state: Dict[str, Any] = {
+    "question_text": st.session_state.get("current_question", ""),
+    "run_submitted": False,
+    "reasoned_package": None,
+    "depth": st.session_state.get("s3_depth", DEPTH_OPTIONS[1]),
+    "tone": st.session_state.get("s3_tone", TONE_OPTIONS[0]),
+}
+
+if page == "ask":
+    intake_state = render_intake_view(step="ask")
+    render_question_register()
+elif page == "scope":
+    intake_state = render_intake_view(step="scope")
+elif page == "run":
+    st.markdown("### Sources and engine")
+    st.caption(
+        "By default the engine searches academic repositories (arXiv, OpenAlex, Crossref, Semantic Scholar) and the web "
+        "for enterprise and practice sources. Add your own URLs or field notes, or switch the engine, only if you want to."
     )
-    intake_state = render_intake_view(before_run=render_question_register)
-    query_input = intake_state["question_text"]
-    run_submitted = intake_state["run_submitted"]
-    depth_option = intake_state["depth"]
-    tone_option = intake_state["tone"]
+    opt_col1, opt_col2 = st.columns([1.1, 1.4])
 
-    # SIMPLIFIED SINGLE OPTIONAL DRAWER (Replaces the 2 confusing hubs)
-    with st.expander("⚙️ Optional: Custom Source URLs & Synthesis Engine Settings (Automatic defaults active)", expanded=False):
-        st.caption(
-            "**How this works:** By default, the engine **automatically** searches Academic repositories (arXiv, OpenAlex, Crossref, Semantic Scholar) "
-            "and Enterprise feeds (DORA, SEC EDGAR, engineering blogs). Only use the fields below if you want to inject specific URLs or switch the LLM backend."
+    with opt_col1:
+        st.markdown("##### Engine")
+        sel_model_label = st.selectbox("Inference Model", model_names, index=model_names.index(sel_model_label),
+                                       key="select_inference_model")
+        st.session_state["chosen_model_label"] = sel_model_label
+
+        if os.getenv("HOSTED_DEMO") == "1":
+            st.info("API key override disabled on shared instance.")
+        else:
+            custom_key = st.text_input(
+                "Temporary Gemini API Key (Optional)",
+                value="",
+                type="password",
+                placeholder="Paste Gemini API key to use cloud synthesis...",
+                help="Kept in memory for this session only.",
+            )
+            if custom_key.strip():
+                os.environ["GEMINI_API_KEY"] = custom_key.strip()
+
+    with opt_col2:
+        st.markdown("##### Your own sources (optional)")
+        custom_acad_input = st.text_area(
+            "Academic Paper URLs / DOIs (Lane A — Optional, one per line):",
+            value=st.session_state.get("custom_acad_urls", ""),
+            key="custom_acad_urls_input",
+            placeholder="https://arxiv.org/abs/2401.05432\nhttps://doi.org/10.1145/3611643",
+            height=68,
         )
-        opt_col1, opt_col2 = st.columns([1.1, 1.4])
+        st.session_state["custom_acad_urls"] = custom_acad_input
 
-        with opt_col1:
-            st.markdown("##### 1. Synthesis Engine & API Key")
-            model_names = list(available_models.keys())
-            if is_stub_requested and "Deterministic Offline Engine (Zero-API Fallback)" not in model_names:
-                available_models["Deterministic Offline Engine (Zero-API Fallback)"] = "stub"
-                model_names.append("Deterministic Offline Engine (Zero-API Fallback)")
+        custom_ent_input = st.text_area(
+            "Enterprise Blog / Filing URLs (Lane B — Optional, one per line):",
+            value=st.session_state.get("custom_ent_urls", ""),
+            key="custom_ent_urls_input",
+            placeholder="https://netflixtechblog.com/...\nhttps://www.sec.gov/edgar/...",
+            height=68,
+        )
+        st.session_state["custom_ent_urls"] = custom_ent_input
 
-            if is_stub_requested:
-                default_idx = next((i for i, k in enumerate(model_names) if available_models.get(k) == "stub"), 0)
-            elif is_ollama_reachable():
-                default_idx = next((i for i, k in enumerate(model_names) if available_models.get(k) == "ollama"), 0)
-            elif has_gemini_key:
-                default_idx = next((i for i, k in enumerate(model_names) if available_models.get(k) == "gemini"), 0)
-            else:
-                default_idx = next((i for i, k in enumerate(model_names) if available_models.get(k) == "stub"), 0)
-
-            sel_model_label = st.selectbox("Inference Model", model_names, index=default_idx, key="select_inference_model")
-
-            if os.getenv("HOSTED_DEMO") == "1":
-                st.info("API key override disabled on shared instance.")
-            else:
-                custom_key = st.text_input(
-                    "Temporary Gemini API Key (Optional)",
-                    value="",
-                    type="password",
-                    placeholder="Paste Gemini API key to use cloud synthesis...",
-                    help="Kept in memory for this session only.",
-                )
-                if custom_key.strip():
-                    os.environ["GEMINI_API_KEY"] = custom_key.strip()
-
-        with opt_col2:
-            st.markdown("##### 2. Add Specific URLs or Field Notes (Optional)")
-            custom_acad_input = st.text_area(
-                "Academic Paper URLs / DOIs (Lane A — Optional, one per line):",
-                value=st.session_state.get("custom_acad_urls", ""),
-                key="custom_acad_urls_input",
-                placeholder="https://arxiv.org/abs/2401.05432\nhttps://doi.org/10.1145/3611643",
+        if os.getenv("HOSTED_DEMO") == "1":
+            st.warning("🔒 Practitioner lane is disabled in hosted demo mode. Demo: no private data is stored.")
+            custom_prac_input = ""
+            st.session_state["custom_prac_urls"] = ""
+            prac_abs_confirmed = False
+        else:
+            custom_prac_input = st.text_area(
+                "Local Practitioner Field Notes (Lane C — Optional, stays on this machine):",
+                value=st.session_state.get("custom_prac_urls", ""),
+                key="custom_prac_urls_input",
+                placeholder="Delivery note: Canary rollout verified 0-downtime...",
                 height=68,
             )
-            st.session_state["custom_acad_urls"] = custom_acad_input
-
-            custom_ent_input = st.text_area(
-                "Enterprise Blog / Filing URLs (Lane B — Optional, one per line):",
-                value=st.session_state.get("custom_ent_urls", ""),
-                key="custom_ent_urls_input",
-                placeholder="https://netflixtechblog.com/...\nhttps://www.sec.gov/edgar/...",
-                height=68,
+            st.session_state["custom_prac_urls"] = custom_prac_input
+            prac_abs_confirmed = st.checkbox(
+                "Confirm Practitioner Abstraction (No client names included)",
+                value=bool(st.session_state.get("prac_abs_confirmed_saved")),
             )
-            st.session_state["custom_ent_urls"] = custom_ent_input
+            st.session_state["prac_abs_confirmed_saved"] = prac_abs_confirmed
 
-            if os.getenv("HOSTED_DEMO") == "1":
-                st.warning("🔒 Practitioner lane is disabled in hosted demo mode. Demo: no private data is stored.")
-                custom_prac_input = ""
-                st.session_state["custom_prac_urls"] = ""
-                prac_abs_confirmed = False
-                allow_remote_prac_synth = False
-            else:
-                custom_prac_input = st.text_area(
-                    "Local Practitioner Field Notes (Lane C — Optional, stays on this machine):",
-                    value=st.session_state.get("custom_prac_urls", ""),
-                    key="custom_prac_urls_input",
-                    placeholder="Delivery note: Canary rollout verified 0-downtime...",
-                    height=68,
-                )
-                st.session_state["custom_prac_urls"] = custom_prac_input
-                prac_abs_confirmed = st.checkbox(
-                    "Confirm Practitioner Abstraction (No client names included)",
-                    value=False,
-                )
-                allow_remote_prac_synth = False
+    intake_state = render_intake_view(step="run")
+
+query_input = intake_state["question_text"]
+run_submitted = intake_state["run_submitted"]
+depth_option = intake_state["depth"]
+tone_option = intake_state["tone"]
 
 # S26: Lane C notes are the Step 3 field notes plus the Step 2 experience notes; confirmed only when every box with
 # notes was confirmed. Both stay on this machine.
@@ -1266,10 +1298,10 @@ if run_submitted:
             reasoned_package=intake_state.get("reasoned_package"),
         )
 
-# A background run in progress, or one that failed, is shown here (S9).
-if current_job and current_job["state"] == "running":
+# A background run in progress, or one that failed, is shown on the Sources & run page (S9, S29a).
+if page == "run" and current_job and current_job["state"] == "running":
     render_job_progress(current_job["job_id"])
-elif current_job and current_job["state"] == "failed":
+elif page == "run" and current_job and current_job["state"] == "failed":
     err = current_job.get("error") or {}
     st.error(
         f"**{err.get('title', 'Run failed')}**\n\n"
@@ -1284,7 +1316,7 @@ elif current_job and current_job["state"] == "failed":
 # ==============================================================================
 results = st.session_state.get("research_results")
 
-if results:
+if results and page in RESULT_STEPS:
     paper_map = {p["key"]: p for p in results.get("papers", []) + results.get("enterprise_docs", [])}
     claims_by_id_map = {c["id"]: c for c in results.get("claims", [])}
     gap_info = results.get("gap_matrix") or {}
@@ -1304,19 +1336,10 @@ if results:
             unsafe_allow_html=True,
         )
 
-    # One tab per step after the question
-    tab_brief, tab_summary, tab_evidence, tab_claims, tab_checks = st.tabs([
-        "Brief",
-        "Summary & share",
-        "Evidence",
-        "Claims & gaps",
-        "Checks & publish",
-    ])
-
     # ==========================================================================
     # BRIEF: the draft read as an executive brief
     # ==========================================================================
-    with tab_brief:
+    if page == "brief":
         report = results.get("report")
         if report:
             # S19: the question-shaped report (answer, a section per sub-question, tensions, gaps, implications).
@@ -1411,53 +1434,9 @@ if results:
                 st.markdown(roadmap_html(results.get("roadmap", [])), unsafe_allow_html=True)
 
     # ==========================================================================
-    # SUMMARY & SHARE (S21): the thought-leadership summary, the post to paste and the image card
-    # ==========================================================================
-    with tab_summary:
-        summary = results.get("summary")
-        if not summary:
-            st.info(summary_missing_reason(results))
-        else:
-            share_published = str(results.get("status", "")).upper() == "PUBLISHED"
-            share_blocked = str(results.get("status", "")).upper() == "BLOCKED"
-            st.markdown("### Thought-leadership summary")
-            st.caption(f"Drafted by the model from the checked brief; each takeaway passed the same checks as the brief. "
-                       f"{len(summary.get('dropped') or [])} draft line(s) were dropped by the rules.")
-            st.markdown(summary_html(summary, paper_map), unsafe_allow_html=True)
-            if summary.get("dropped"):
-                with st.expander("What the rules dropped, and why"):
-                    for why in summary["dropped"]:
-                        st.markdown(f"- {plain_html(why)}", unsafe_allow_html=True)
-            st.markdown("### Share pack")
-            if share_blocked:
-                st.warning("Downloads are off while the brief is blocked by the checks. Fix the failing gate on "
-                           "**Checks & publish** and re-draft; you can still read and copy the post below.")
-            elif not share_published:
-                st.caption("Draft until the brief is published on **Checks & publish**: the post opens with a draft line "
-                           "and the card carries a watermark.")
-            post = post_text(summary, results.get("papers", []) + results.get("enterprise_docs", []), published=share_published)
-            st.caption("The post, ready to paste (copy button at the top right). The sources go in the first comment.")
-            st.code(post, language=None, wrap_lines=True)
-            card_svg = image_card_svg(summary, results.get("diagram"), published=share_published)
-            st.markdown(card_preview_html(card_svg), unsafe_allow_html=True)
-            sp1, sp2, sp3, sp4 = st.columns(4)
-            with sp1:
-                st.download_button("📝 Post (.md)", data=post, file_name="share_post.md", mime="text/markdown",
-                                   disabled=share_blocked, use_container_width=True)
-            with sp2:
-                st.download_button("📄 Post (.txt)", data=post, file_name="share_post.txt", mime="text/plain",
-                                   disabled=share_blocked, use_container_width=True)
-            with sp3:
-                st.download_button("🖼️ Image card (.svg)", data=card_svg, file_name="share_card.svg", mime="image/svg+xml",
-                                   disabled=share_blocked, use_container_width=True)
-            with sp4:
-                if not share_blocked:
-                    components.html(png_download_html(card_svg), height=48)
-
-    # ==========================================================================
     # EVIDENCE: the three lanes' sources, Check A detail, exclude-and-re-draft
     # ==========================================================================
-    with tab_evidence:
+    if page == "evidence":
         st.markdown("### Evidence")
         _map_html = evidence_map_html(results.get("report"), results.get("papers", []) + results.get("enterprise_docs", []))
         if _map_html:
@@ -1570,7 +1549,7 @@ if results:
     # ==========================================================================
     # CLAIMS & GAPS: the claim ledger and the gap matrix
     # ==========================================================================
-    with tab_claims:
+    if page == "evidence":
         st.markdown("### Claims & gaps")
         # S24: plain words first (each lane, the outcome, what's missing, claims by question); the full ledger
         # with ids, rules and filters stays one click away for audit.
@@ -1686,7 +1665,7 @@ if results:
     # ==========================================================================
     # CHECKS & PUBLISH: gates G1-G6, scorecard, human publish, downloads
     # ==========================================================================
-    with tab_checks:
+    if page == "checks":
         st.markdown("### Checks & publish")
         # S28: Check D, citation support: each sentence judged against the exact quotes it cites.
         cd = results.get("check_d")
@@ -1781,6 +1760,50 @@ if results:
                 else:
                     c_pill = f" ➔ Cited Claims: `{', '.join(t['claims'])}`" if t.get("claims") else f" ➔ Type: `{t['type']}`"
                     st.markdown(f"- **[Ordinal {t['ordinal']}]** {t['text']}{c_pill}")
+
+    # ==========================================================================
+    # SUMMARY & SHARE (S21): the thought-leadership summary, the post to paste and the image card
+    # ==========================================================================
+    if page == "checks":
+        summary = results.get("summary")
+        if not summary:
+            st.info(summary_missing_reason(results))
+        else:
+            share_published = str(results.get("status", "")).upper() == "PUBLISHED"
+            share_blocked = str(results.get("status", "")).upper() == "BLOCKED"
+            st.markdown("### Thought-leadership summary")
+            st.caption(f"Drafted by the model from the checked brief; each takeaway passed the same checks as the brief. "
+                       f"{len(summary.get('dropped') or [])} draft line(s) were dropped by the rules.")
+            st.markdown(summary_html(summary, paper_map), unsafe_allow_html=True)
+            if summary.get("dropped"):
+                with st.expander("What the rules dropped, and why"):
+                    for why in summary["dropped"]:
+                        st.markdown(f"- {plain_html(why)}", unsafe_allow_html=True)
+            st.markdown("### Share pack")
+            if share_blocked:
+                st.warning("Downloads are off while the brief is blocked by the checks. Fix the failing gate on "
+                           "**Checks & publish** and re-draft; you can still read and copy the post below.")
+            elif not share_published:
+                st.caption("Draft until the brief is published on **Checks & publish**: the post opens with a draft line "
+                           "and the card carries a watermark.")
+            post = post_text(summary, results.get("papers", []) + results.get("enterprise_docs", []), published=share_published)
+            st.caption("The post, ready to paste (copy button at the top right). The sources go in the first comment.")
+            st.code(post, language=None, wrap_lines=True)
+            card_svg = image_card_svg(summary, results.get("diagram"), published=share_published)
+            st.markdown(card_preview_html(card_svg), unsafe_allow_html=True)
+            sp1, sp2, sp3, sp4 = st.columns(4)
+            with sp1:
+                st.download_button("📝 Post (.md)", data=post, file_name="share_post.md", mime="text/markdown",
+                                   disabled=share_blocked, use_container_width=True)
+            with sp2:
+                st.download_button("📄 Post (.txt)", data=post, file_name="share_post.txt", mime="text/plain",
+                                   disabled=share_blocked, use_container_width=True)
+            with sp3:
+                st.download_button("🖼️ Image card (.svg)", data=card_svg, file_name="share_card.svg", mime="image/svg+xml",
+                                   disabled=share_blocked, use_container_width=True)
+            with sp4:
+                if not share_blocked:
+                    components.html(png_download_html(card_svg), height=48)
 
     # EXPORT CENTER TOOLBAR
     st.markdown(
@@ -1909,3 +1932,6 @@ if results:
             disabled=not perm.can_download_deck,
             use_container_width=True,
         )
+
+# S29a: Back and Next at the end of every page.
+render_nav(page, steps_open)

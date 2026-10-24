@@ -110,19 +110,15 @@ def test_executive_studio_ui_smoke():
 
                 # 3. S9 removed the pre-run three-lane readiness cards; the step rail shows instead.
                 assert page.locator("text=Active Three-Lane Architecture & Ingestion Readiness").count() == 0
-                assert page.locator("text=1. Question").count() > 0
+                # S29a: one step per page; the stepper shows all six, the Ask page only the question.
+                assert page.locator('button:has-text("1 Ask")').count() > 0
+                assert page.locator('button:has-text("6 Checks & share")').count() > 0
 
                 # 4. Assert Intake Panel & Console
                 assert page.locator("text=Frame your question").count() > 0
                 assert page.locator('button:has-text("Reason about my question")').count() > 0
-
-                run_btn = page.locator('button:has-text("Run Research")')
-                assert run_btn.count() > 0
+                assert page.locator('button:has-text("Run Research")').count() == 0
                 assert page.locator("text=Strategic Technology Question").count() > 0
-
-                # 5. Assert Empty Topic Validation & Approval Flow
-                assert run_btn.is_disabled()
-                assert page.locator("text=Type a question in Step 1.").count() > 0
 
                 # Enter Q1 text
                 q1_text = "What empirical evidence exists regarding Amazon Kiro adoption, productivity gains, and delivery trade-offs in engineering teams?"
@@ -146,10 +142,9 @@ def test_executive_studio_ui_smoke():
                 approve_btn = page.locator('button:has-text("Approve this reasoned question")')
                 assert approve_btn.count() > 0
                 approve_btn.click()
-                time.sleep(1)
-
-                # Assert Run button is now enabled (do NOT click Run)
-                assert run_btn.is_enabled()
+                # S29a: approving moves on to Sources & run, where Run is enabled (do NOT click Run)
+                page.wait_for_selector('button:has-text("Run Research")', timeout=10000)
+                assert page.locator('button:has-text("Run Research")').is_enabled()
 
                 browser.close()
 

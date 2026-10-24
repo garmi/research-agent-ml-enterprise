@@ -33,7 +33,9 @@ def test_question_register_before_run():
     assert "def render_intake_view(before_run" in intake
     assert intake.index("before_run()") < intake.index('st.markdown("### 3. Run")')
     web = _web()
-    assert "render_intake_view(before_run=render_question_register)" in web
+    # S29a: the register sits on the Ask page, right under the question box.
+    ask = web[web.index('if page == "ask":'):web.index('elif page == "scope":')]
+    assert 'render_intake_view(step="ask")' in ask and "render_question_register()" in ask
     assert "def render_question_register()" in web
     assert "BEFORE A RUN: the question register" not in web
 

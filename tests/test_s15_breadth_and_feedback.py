@@ -101,7 +101,7 @@ def test_keeps_best_on_topic_papers(tmp_path):
 
 def test_labels_and_evidence_tab_report_breadth():
     intake = Path("src/ui/intake_view.py").read_text(encoding="utf-8")
-    block = intake[intake.index('"Research Depth"'):intake.index('key="select_research_depth"')]
+    block = intake[intake.index("DEPTH_OPTIONS = ["):intake.index("TONE_OPTIONS = [")]  # S29a
     assert "15 papers" in block and "30 checked" in block and "5 papers" in block and "12 checked" in block
     web = Path("web_app.py").read_text(encoding="utf-8")
     assert 'results.get("breadth")' in web
