@@ -58,6 +58,12 @@ def run_status(results: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
         return {"level": "error", "headline": "Stopped before drafting: too few usable claims",
                 "why": stop_why,
                 "next_step": "Add sources, or re-include claims on the Evidence tab, then re-draft."}
+    if results.get("is_fallback") and (results.get("error_details") or {}).get("error_class") == "GeminiQuotaExceeded":
+        # S29d: say plainly that the key's limit is used up, and how to keep going.
+        return {"level": "warn", "headline": "Gemini's limit is reached: this draft was built from extracted quotes only",
+                "why": ["Gemini answered 'limit reached' (HTTP 429), so the report was not written by a model."],
+                "next_step": "Switch to Ollama on the Sources & run page to run it again on your Mac, or try Gemini "
+                             "later. This draft cannot be published."}
     if results.get("is_fallback"):
         return {"level": "warn", "headline": "Draft built from extracted quotes only: the model was unavailable",
                 "why": [str(results.get("blocking_banner") or "The language model did not respond.")],

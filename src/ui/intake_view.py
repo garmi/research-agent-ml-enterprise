@@ -50,6 +50,7 @@ from src.ui.theme import (
 )
 from src.ui.components import disabled_reason, info_box
 from src.ui.experience_view import coverage_lines
+from src.llm.gemini_client import is_quota_error
 from src.ui.stepper import go_to
 
 ANGLE_OPTIONS = [
@@ -236,7 +237,11 @@ def render_intake_view(before_run: Optional[Callable[[], None]] = None, step: Op
                 except QuestionReasoningError as q_err:
                     st.error(f"**Reasoning Error:** {q_err}")
                 except Exception as exc:
-                    st.error(f"**Unexpected Error:** {exc}")
+                    if is_quota_error(exc):
+                        st.session_state["gemini_quota_hit"] = True  # S29d: the page offers the switch to Ollama
+                        st.error("**Gemini's limit is reached**, so the question could not be reasoned about.")
+                    else:
+                        st.error(f"**Unexpected Error:** {exc}")
 
     else:
         clean_text = st.session_state.get("current_question", "")
@@ -413,6 +418,8 @@ def render_intake_view(before_run: Optional[Callable[[], None]] = None, step: Op
                         _load_proposal(v2_pkg)
                         st.rerun()
                     except Exception as exc:
+                        if is_quota_error(exc):
+                            st.session_state["gemini_quota_hit"] = True
                         st.session_state["s2_feedback_review"] = {
                             "for_version": len(proposals_history),
                             "rows": review_feedback(points, current_package, None, blocked_reason=str(exc)),

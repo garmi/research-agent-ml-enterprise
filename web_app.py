@@ -63,6 +63,7 @@ from src.output.personal_copy import check_d_line, draft_reasons, is_cleared, pe
 from src.output.share_pack import image_card_svg, post_text
 from src.ui.summary_view import card_preview_html, png_download_html, summary_html, summary_missing_reason
 from src.ui.intake_view import DEPTH_OPTIONS, TONE_OPTIONS, approved_question_text, effective_provider, render_intake_view
+from src.ui.engine_switch import check_d_engine_note, ollama_label, quota_hit, switch_offer
 from src.ui.stepper import (RESULT_STEPS, available_steps, go_to, page_from_state, render_nav, render_stepper,
                             scroll_to_top_on_change)
 from src.ui.rerun import board_editor_key, export_view, papers_for_rerun
@@ -108,7 +109,7 @@ def get_available_models() -> Dict[str, str]:
 
     # Local-first engines listed first
     if ollama_ok:
-        options["Local Ollama Qwen 2.5 3B (Local Offline) [Active]"] = "ollama"
+        options[ollama_label()] = "ollama"
     options["Deterministic Offline Engine (Zero-API Fallback)"] = "stub"
 
     # Remote engines opt-in only
@@ -1116,6 +1117,29 @@ st.markdown(theme_css("dark" if dark_on else "light"), unsafe_allow_html=True)
 if os.getenv("HOSTED_DEMO") == "1":
     st.info("🔒 **Demo: no private data is stored** • Hosted demonstration instance. API key overrides, practitioner observations, and persistent ledger writes are disabled.")
 
+def _switch_to_ollama(label: str, run_again: bool) -> None:
+    st.session_state["chosen_model_label"] = label
+    st.session_state.pop("select_inference_model", None)  # the selectbox then starts from the new choice
+    st.session_state["gemini_quota_hit"] = False
+    if run_again:
+        st.session_state["auto_run_ollama"] = True
+
+
+def render_quota_switch(page: str) -> None:
+    """S29d: Gemini's limit is reached. Offer Ollama when it runs here; otherwise the local start command."""
+    if not quota_hit(st.session_state.get("research_results"), st.session_state):
+        return
+    if available_models.get(st.session_state.get("chosen_model_label")) == "ollama":
+        return  # already switched
+    offer = switch_offer(ollama_online)
+    st.warning(offer["text"])
+    label = next((k for k, v in available_models.items() if v == "ollama"), None)
+    if offer["action"] == "switch" and label:
+        run_again = page == "run"
+        st.button("🔁 Switch to Ollama and run again" if run_again else "🔁 Switch to Ollama", key="btn_switch_ollama",
+                  on_click=_switch_to_ollama, args=(label, run_again))
+
+
 def render_copy_bar(results: Dict[str, Any]) -> None:
     """S29c: your own copies on every results page. Always enabled; a run not cleared for publishing gives files
     marked DRAFT with the reasons and the Check D rate. Publishing itself stays on Checks & share."""
@@ -1213,10 +1237,13 @@ intake_state: Dict[str, Any] = {
 
 if page == "ask":
     intake_state = render_intake_view(step="ask")
+    render_quota_switch(page)
     render_question_register()
 elif page == "scope":
     intake_state = render_intake_view(step="scope")
+    render_quota_switch(page)
 elif page == "run":
+    render_quota_switch(page)
     st.markdown("### Sources and engine")
     st.caption(
         "By default the engine searches academic repositories (arXiv, OpenAlex, Crossref, Semantic Scholar) and the web "
@@ -1284,6 +1311,9 @@ elif page == "run":
             st.session_state["prac_abs_confirmed_saved"] = prac_abs_confirmed
 
     intake_state = render_intake_view(step="run")
+    # S29d: "Switch to Ollama and run again" re-runs the same approved question on the local engine.
+    if st.session_state.pop("auto_run_ollama", False) and not intake_state["run_disabled"]:
+        intake_state["run_submitted"] = True
 
 query_input = intake_state["question_text"]
 run_submitted = intake_state["run_submitted"]
@@ -1727,6 +1757,8 @@ if results and page in RESULT_STEPS:
                          f"({brief_rate:.0f}%), after one rewrite of partly supported sentences; "
                          f"{len(cd.get('removed') or [])} removed.")
                 rate = brief_rate
+            if check_d_engine_note(results):
+                line += "  \n" + check_d_engine_note(results)  # S29d: a local model judged these
             (st.success if rate >= 95 else st.warning)(line)
             import pandas as pd
 

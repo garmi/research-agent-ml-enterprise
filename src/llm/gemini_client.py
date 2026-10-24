@@ -9,6 +9,18 @@ import requests
 from src.llm.model_names import gemini_model_name
 
 
+QUOTA_MESSAGE = "Gemini's usage limit is reached (HTTP 429)"
+
+
+class GeminiQuotaExceeded(RuntimeError):
+    """S29d: Gemini answered 429 / RESOURCE_EXHAUSTED after the client's retries: the key's limit is used up."""
+
+
+def is_quota_error(exc: object) -> bool:
+    """True for a GeminiQuotaExceeded, also when another error carries its message."""
+    return isinstance(exc, GeminiQuotaExceeded) or "usage limit is reached" in str(exc)
+
+
 class GeminiClient:
     """Minimal Gemini REST client (Google AI Studio key). Same interface as OllamaClient."""
 
@@ -49,6 +61,8 @@ class GeminiClient:
             try:
                 response = requests.post(url, json=body, headers=headers, timeout=self.timeout)
                 if response.status_code == 429:
+                    if attempt == self.retries:
+                        raise GeminiQuotaExceeded(f"{QUOTA_MESSAGE}: {self.model}")
                     time.sleep(5 * (attempt + 1))
                     continue
                 if not response.ok:
@@ -58,6 +72,8 @@ class GeminiClient:
                 data = response.json()
                 parts = data["candidates"][0]["content"]["parts"]
                 return "".join(part.get("text", "") for part in parts)
+            except GeminiQuotaExceeded:
+                raise
             except Exception as exc:
                 last_exc = exc
                 time.sleep(2 ** attempt)
@@ -77,6 +93,8 @@ class GeminiClient:
         url = f"{self.base_url}/{self.model.strip()}:generateContent"
         headers = {"x-goog-api-key": self.api_key, "Content-Type": "application/json"}
         response = requests.post(url, json=body, headers=headers, timeout=self.timeout)
+        if response.status_code == 429:
+            raise GeminiQuotaExceeded(f"{QUOTA_MESSAGE}: grounded search")
         if not response.ok:
             err = re.sub(r"AIza[0-9A-Za-z-_]{35}", "[REDACTED_KEY]", response.text)
             raise requests.HTTPError(f"HTTP {response.status_code} ({response.reason}): {err[:300]}", response=response)

@@ -31,9 +31,11 @@ def draft_reasons(results: Dict[str, Any]) -> List[str]:
             # The summary only ("2 problems found"); the details are on Checks & share.
             reason = " ".join(str(g.get("reason_plain") or g.get("state") or "did not pass").split()).split(" First:")[0]
             out.append(f"{label}: {reason[:160] + ('…' if len(reason) > 160 else '')}")
+    listed = {line.split()[0] for line in out}  # gates already named above ("G1", "G2", ...)
     for r in (results.get("publish_res") or {}).get("reasons") or []:
-        if r and r not in out:
-            out.append(str(r))
+        r = " ".join(str(r or "").split()).split(" First:")[0]
+        if r and r not in out and r.split(":")[0] not in listed:
+            out.append(r)
     score = (results.get("quality_scorecard") or {}).get("total_score")
     if isinstance(score, (int, float)) and score < 70:
         out.append(f"Quality score {score:g} (below 70)")
@@ -51,7 +53,10 @@ def check_d_line(results: Dict[str, Any]) -> str:
 
 
 def header_lines(results: Dict[str, Any]) -> List[str]:
-    return [HEADER, "Why: " + "; ".join(draft_reasons(results)), check_d_line(results)]
+    from src.ui.engine_switch import engine_line
+
+    return [HEADER, "Why: " + "; ".join(draft_reasons(results)), check_d_line(results)] + \
+        ([engine_line(results)] if engine_line(results) else [])
 
 
 def _removed_texts(results: Dict[str, Any]) -> List[str]:
