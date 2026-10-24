@@ -107,7 +107,7 @@ def test_papers_carry_no_raw_record_and_exports_skip_rerun_copy(tmp_path):
     assert [p["id"] for p in papers_for_rerun(res, drop_keys={"P1"})] == ["p-2"]
     src = _web_app()
     assert '"raw"' not in src
-    assert "json.dumps(syn_raw or export_view(results)" in src
+    assert "export_view(results)" in Path("src/output/personal_copy.py").read_text(encoding="utf-8")  # S29c
 
 
 # ------------------------------------------------------------------------------

@@ -59,6 +59,7 @@ from src.ui.claims_view import check_d_items_html, claims_overview_html
 from src.ui.experience_view import observations_by_section, practitioner_inputs
 from src.ui.evidence_view import (enterprise_card_html, evidence_map_html, finding_card_html, labels_for, paper_card_html,
                                   render_sentence)
+from src.output.personal_copy import check_d_line, draft_reasons, is_cleared, personal_copy
 from src.output.share_pack import image_card_svg, post_text
 from src.ui.summary_view import card_preview_html, png_download_html, summary_html, summary_missing_reason
 from src.ui.intake_view import DEPTH_OPTIONS, TONE_OPTIONS, approved_question_text, effective_provider, render_intake_view
@@ -1115,6 +1116,27 @@ st.markdown(theme_css("dark" if dark_on else "light"), unsafe_allow_html=True)
 if os.getenv("HOSTED_DEMO") == "1":
     st.info("🔒 **Demo: no private data is stored** • Hosted demonstration instance. API key overrides, practitioner observations, and persistent ledger writes are disabled.")
 
+def render_copy_bar(results: Dict[str, Any]) -> None:
+    """S29c: your own copies on every results page. Always enabled; a run not cleared for publishing gives files
+    marked DRAFT with the reasons and the Check D rate. Publishing itself stays on Checks & share."""
+    st.markdown('<div class="export-box"><div class="export-title"><span>📦 Your copy</span></div>'
+                '<div class="export-subtitle">For your own use. Sentences Check D removed are never included.</div></div>',
+                unsafe_allow_html=True)
+    if not is_cleared(results):
+        st.warning("Not cleared for publishing: " + "; ".join(draft_reasons(results))[:400]
+                   + ". Your copies are marked **DRAFT** with these reasons. " + check_d_line(results) + ".")
+    kinds = [("brief_md", "📄 Brief .md"), ("claims_csv", "📋 Claims .csv"), ("ledger_json", "📊 Ledger .json"),
+             ("post_txt", "📝 Post .txt"), ("card_svg", "🖼️ Card .svg")]
+    copies = [(k, label, personal_copy(results, k)) for k, label in kinds]
+    copies = [c for c in copies if c[2]]
+    for col, (kind, label, (data, name, mime)) in zip(st.columns(len(copies)), copies):
+        with col:
+            st.download_button(label, data=data, file_name=name, mime=mime, key=f"copy_{kind}", use_container_width=True)
+    with st.expander("Copy the brief as text"):
+        st.caption("Use the copy button at the top right of the box.")
+        st.code(personal_copy(results, "brief_md")[0], language="markdown", wrap_lines=True)
+
+
 def _load_question(qid: str, text: str) -> None:
     """Load Question callback: runs before the rerun, so it can set the Step 1 box (a keyed widget)."""
     st.session_state["current_question"] = text
@@ -1794,7 +1816,6 @@ if results and page in RESULT_STEPS:
             st.info(summary_missing_reason(results))
         else:
             share_published = str(results.get("status", "")).upper() == "PUBLISHED"
-            share_blocked = str(results.get("status", "")).upper() == "BLOCKED"
             st.markdown("### Thought-leadership summary")
             st.caption(f"Drafted by the model from the checked brief; each takeaway passed the same checks as the brief. "
                        f"{len(summary.get('dropped') or [])} draft line(s) were dropped by the rules.")
@@ -1804,10 +1825,7 @@ if results and page in RESULT_STEPS:
                     for why in summary["dropped"]:
                         st.markdown(f"- {plain_html(why)}", unsafe_allow_html=True)
             st.markdown("### Share pack")
-            if share_blocked:
-                st.warning("Downloads are off while the brief is blocked by the checks. Fix the failing gate on "
-                           "**Checks & publish** and re-draft; you can still read and copy the post below.")
-            elif not share_published:
+            if not share_published:
                 st.caption("Draft until the brief is published on **Checks & publish**: the post opens with a draft line "
                            "and the card carries a watermark.")
             post = post_text(summary, results.get("papers", []) + results.get("enterprise_docs", []), published=share_published)
@@ -1818,144 +1836,19 @@ if results and page in RESULT_STEPS:
             sp1, sp2, sp3, sp4 = st.columns(4)
             with sp1:
                 st.download_button("📝 Post (.md)", data=post, file_name="share_post.md", mime="text/markdown",
-                                   disabled=share_blocked, use_container_width=True)
+                                   use_container_width=True)
             with sp2:
                 st.download_button("📄 Post (.txt)", data=post, file_name="share_post.txt", mime="text/plain",
-                                   disabled=share_blocked, use_container_width=True)
+                                   use_container_width=True)
             with sp3:
                 st.download_button("🖼️ Image card (.svg)", data=card_svg, file_name="share_card.svg", mime="image/svg+xml",
-                                   disabled=share_blocked, use_container_width=True)
+                                   use_container_width=True)
             with sp4:
-                if not share_blocked:
-                    components.html(png_download_html(card_svg), height=48)
+                components.html(png_download_html(card_svg), height=48)
 
-    # EXPORT CENTER TOOLBAR
-    st.markdown(
-        """
-        <div class="export-box">
-            <div class="export-title">
-                <span>📦 Export Deliverables</span>
-            </div>
-            <div class="export-subtitle">
-                Download verified executive briefings, structured data ledgers, and interactive presentations:
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    # S29c: YOUR COPY. Always downloadable for your own use; marked DRAFT (with the reasons) until cleared.
+    render_copy_bar(results)
 
-    is_allowed = results.get("publish_res", {}).get("allowed") is True
-    gate_violations = (results.get("gates_audit") or results.get("publish_res", {}).get("gate_results") or {}).get("violations", {})
-    pub_reasons = results.get("publish_res", {}).get("reasons", [])
-    quality_score = results.get("quality_scorecard", {}).get("total_score")
-
-    perm = evaluate_export_permissions(
-        status=status,
-        allowed=is_allowed,
-        gate_violations=gate_violations,
-        reasons=pub_reasons,
-        quality_score=quality_score,
-    )
-
-    if perm.is_blocked:
-        st.error(
-            f"🚫 **Export Prohibited (BLOCKED):** Hard governance gate violations prevent publication or draft generation. "
-            f"Failing gates: {', '.join(perm.failing_gates) if perm.failing_gates else 'Hard gate failures present'}. "
-            "No overrides are permitted."
-        )
-    elif not perm.can_download_full:
-        st.warning(
-            f"🔒 **Draft Export Only ({status}):** Output has not achieved `PUBLISH_READY` status. "
-            "Only watermarked draft deliverables (.md and .json) are available. "
-            "LinkedIn pack and presentation deck are disabled until publication gates pass."
-        )
-
-    export_col1, export_col2, export_col3, export_col4, export_col5 = st.columns(5)
-
-    builder = ReportBuilder()
-    syn_raw = results.get("synthesis", {})
-    topic_str = st.session_state.get("current_question", results.get("strategic_question", "Executive Briefing"))
-
-    if results.get("report") and (perm.can_download_full or perm.can_download_draft):
-        # S19: the brief download follows the report, built from the checked ledger sentences.
-        brief_content = report_markdown(results["report"], question=results.get("strategic_question", topic_str),
-                                        diagram=results.get("diagram"), papers=results.get("papers", []))
-        if not perm.can_download_full:
-            brief_content = "# DRAFT, NOT FOR PUBLICATION\n\n" + brief_content
-        json_content = json.dumps(export_view(results), indent=2, default=str)
-    elif perm.can_download_full:
-        brief_content = builder.build_markdown(topic_str, syn_raw) if syn_raw else f"# Executive Research Brief\n\n**Topic:** {topic_str}\n\n## Verdict\n{results.get('verdict', '')}\n"
-        json_content = json.dumps(syn_raw or export_view(results), indent=2)
-    elif perm.can_download_draft and results.get("stopped_at"):
-        # S13: nothing was drafted, so the download says why the run stopped instead of an empty template.
-        brief_content = stopped_run_markdown(results)
-        json_content = json.dumps({"watermark": "DRAFT, NOT FOR PUBLICATION", "status": status,
-                                   "failing_gates": perm.failing_gates, **export_view(results)}, indent=2)
-    elif perm.can_download_draft:
-        brief_content = builder.build_draft_markdown(topic_str, syn_raw, failing_gates=perm.failing_gates, status=status)
-        draft_json_obj = {
-            "watermark": "DRAFT, NOT FOR PUBLICATION",
-            "status": status,
-            "failing_gates": perm.failing_gates,
-        }
-        draft_json_obj.update(syn_raw or results)
-        json_content = json.dumps(draft_json_obj, indent=2)
-    else:
-        brief_content = ""
-        json_content = ""
-
-    papers_df = pd.DataFrame(results.get("papers", []))
-    csv_content = papers_df.to_csv(index=False)
-    linkedin_pack = builder.build_linkedin_pack(topic_str, syn_raw) if syn_raw else "# LinkedIn Executive Thought Leadership Pack\n\n"
-    deck_path = Path(default_outputs_dir()) / "reports" / "strategic_storyline.html"
-    deck_html = deck_path.read_text(encoding="utf-8") if deck_path.exists() else builder.build_html_storyline(topic_str, syn_raw)
-
-    with export_col1:
-        st.download_button(
-            label="📄 " + ("Executive Brief (.md)" if perm.can_download_full else "Draft Brief (.md)"),
-            data=brief_content,
-            file_name="Executive_Research_Brief.md" if perm.can_download_full else "Executive_Research_Brief_DRAFT.md",
-            mime="text/markdown",
-            disabled=not (perm.can_download_full or perm.can_download_draft),
-            use_container_width=True,
-        )
-    with export_col2:
-        st.download_button(
-            label="📊 " + ("JSON Ledger (.json)" if perm.can_download_full else "Draft Ledger (.json)"),
-            data=json_content,
-            file_name="evidence_ledger.json" if perm.can_download_full else "evidence_ledger_DRAFT.json",
-            mime="application/json",
-            disabled=not (perm.can_download_full or perm.can_download_draft),
-            use_container_width=True,
-        )
-    with export_col3:
-        st.download_button(
-            label="📦 Paper Index (.csv)",
-            data=csv_content,
-            file_name="paper_index.csv",
-            mime="text/csv",
-            disabled=not perm.can_download_csv,
-            use_container_width=True,
-        )
-    with export_col4:
-        st.download_button(
-            label="📱 Share post (.md)" if results.get("summary") else "📱 LinkedIn Pack (.md)",
-            data=post_text(results["summary"], results.get("papers", []) + results.get("enterprise_docs", []), published=str(status).upper() == "PUBLISHED")
-            if results.get("summary") else linkedin_pack,
-            file_name="share_post.md" if results.get("summary") else "LinkedIn_Executive_Pack.md",
-            mime="text/markdown",
-            disabled=(str(status).upper() == "BLOCKED") if results.get("summary") else not perm.can_download_linkedin,
-            use_container_width=True,
-        )
-    with export_col5:
-        st.download_button(
-            label="🏛️ Presentation Deck (.html)",
-            data=deck_html,
-            file_name="Executive_Deck.html",
-            mime="text/html",
-            disabled=not perm.can_download_deck,
-            use_container_width=True,
-        )
 
 # S29a: Back and Next at the end of every page.
 render_nav(page, steps_open)
