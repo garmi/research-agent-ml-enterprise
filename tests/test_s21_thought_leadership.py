@@ -209,9 +209,10 @@ def test_summary_tab_renders(tmp_path):
     results["summary"] = _summary()
     at = AppTest.from_file("web_app.py")
     at.session_state["research_results"] = results
+    at.session_state["page"] = "checks"  # S29a: the summary and share pack follow the checks on their page
     at.run(timeout=30)
     assert not at.exception, at.exception
-    assert any(t.label == "Summary & share" for t in at.tabs)
+    assert any("Thought-leadership summary" in str(m.value) for m in at.markdown)
     text = " ".join(str(m.value) for m in at.markdown)
     assert RAW["hook"] in text
     assert any("Shared review" in str(c.value) for c in at.code), "the post is in a copyable code block"
