@@ -482,6 +482,10 @@ def reason_question(
                 raise
             last_errors = [qre_msg]
         except Exception as exc:
+            from src.llm.gemini_client import is_quota_error
+
+            if is_quota_error(exc):
+                raise  # S29d: the limit is reached; the page offers the switch to Ollama
             msg = str(exc)
             msg = re.sub(r"\(?[/\\][^\s\)]+[\.\w]+\)?", "", msg)
             last_errors = [msg.strip()]

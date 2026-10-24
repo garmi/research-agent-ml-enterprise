@@ -767,6 +767,11 @@ class MultiLaneResearchRunner:
         )
         result["check_a"] = self._check_a_summary(check_a)
         result["check_b"] = self._check_summary(check_b)
+        # S29d: which engine wrote and checked this run (local runs are labelled as such).
+        from src.engine.reasoner import resolve_model_name
+
+        _prov = str(reduce_provider or map_provider or "").strip().lower()
+        result["engine"] = {"provider": _prov, "model": resolve_model_name(_prov)}
         # S28: Check D judges each sentence against the quotes it cites; an unsupported sentence blocks publishing.
         from src.engine.check_d_support import apply_check_d, run_check_d
 
@@ -1626,7 +1631,8 @@ class MultiLaneResearchRunner:
         )
 
         claims: List[Claim] = []
-        self._grounded = {"status": "not_searched", "queries": [], "entry_point": "", "coverage": [], "error": ""}
+        self._grounded = {"status": "not_searched", "queries": [], "entry_point": "", "coverage": [], "error": "",
+                          "provider": str(provider or "").lower()}
         searcher = self._build_grounded_search(provider) if enterprise_feed_override is None else None
         if searcher is not None:
             claims = self._harvest_grounded(searcher, topic, question_obj, run_id, grounded_package or {})
@@ -1711,6 +1717,9 @@ class MultiLaneResearchRunner:
         lines = list(g.get("coverage") or [])
         if g.get("status") == "searched_error":
             lines.append(f"Enterprise web search failed ({g.get('error') or 'error'}); only the fallback feeds were read.")
+        elif g.get("status") == "not_searched" and g.get("provider") == "ollama":
+            lines.append("Enterprise web search did not run (it needs Gemini; web search is not available on the local "
+                         "model); only your own URLs and the fallback feeds were read.")
         elif g.get("status") == "not_searched":
             lines.append("Enterprise web search did not run (it needs Gemini); only the fallback feeds were read.")
         return lines
