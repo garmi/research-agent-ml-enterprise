@@ -276,6 +276,6 @@ def test_e_tags_resolve_and_report_lists_them():
 # ------------------------------------------------------------------------------
 def test_evidence_tab_shows_suggestions_and_coverage():
     web = Path("web_app.py").read_text(encoding="utf-8")
-    ev = web[web.index("with tab_evidence:"):]
+    ev = web[web.index('if page == "evidence":'):]
     assert 'results.get("search_entry_point")' in ev and "components.html(" in ev
     assert 'results.get("enterprise_coverage")' in ev

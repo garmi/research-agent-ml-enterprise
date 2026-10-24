@@ -124,7 +124,7 @@ def test_partial_takeaways_dropped():
 # ------------------------------------------------------------------------------
 def test_checks_tab_shows_brief_rate():
     web = Path("web_app.py").read_text(encoding="utf-8")
-    tab = web[web.index("with tab_checks:"):]
+    tab = web[web.index('if page == "checks":'):]
     assert "supported_in_brief" in tab and "In the brief" in tab
 
 

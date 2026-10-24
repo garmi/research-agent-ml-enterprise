@@ -142,7 +142,7 @@ def test_brief_marks_partial_and_checks_tab_lists_reasons():
         "tensions": [], "gaps": [], "implications": []}
     assert "Partly supported" in "".join(report_blocks(rep, {}, {}))
     web = Path("web_app.py").read_text(encoding="utf-8")
-    tab = web[web.index("with tab_checks:"):]
+    tab = web[web.index('if page == "checks":'):]
     assert "check_d_items_html(" in tab and "Removed from the brief" in tab
     from src.ui.claims_view import check_d_items_html
 

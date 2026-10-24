@@ -138,6 +138,6 @@ def test_unsupported_blocks_publishing():
 
 def test_checks_tab_shows_support():
     web = Path("web_app.py").read_text(encoding="utf-8")
-    tab = web[web.index("with tab_checks:"):]
+    tab = web[web.index('if page == "checks":'):]
     assert 'results.get("check_d")' in tab and "Citation support" in tab
     assert "Verified by me" in tab

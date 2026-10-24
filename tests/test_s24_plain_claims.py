@@ -136,7 +136,7 @@ def test_overview_html_escaped_one_block():
 
 def test_claims_tab_shows_overview_first():
     web = Path("web_app.py").read_text(encoding="utf-8")
-    tab = web[web.index("with tab_claims:"):]
+    tab = web[web.index('if page == "evidence":'):]
     assert tab.index("claims_overview_html(") < tab.index("render_safe_table(claims_table_data")
     assert 'st.expander("Full claim ledger' in tab
     assert 'm_col1.metric("Academic Lane State"' not in web
