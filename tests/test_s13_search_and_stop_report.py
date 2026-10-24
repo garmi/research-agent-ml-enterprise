@@ -104,7 +104,8 @@ def test_stopped_run_downloads_a_stop_report():
 
 
 def test_web_app_uses_stop_report_for_stopped_runs():
-    src = Path("web_app.py").read_text(encoding="utf-8")
+    # S29c: the downloads are built by personal_copy.
+    src = Path("src/output/personal_copy.py").read_text(encoding="utf-8")
     assert "stopped_run_markdown(results)" in src
     block = src[src.index("stopped_run_markdown(results)") - 400:src.index("stopped_run_markdown(results)")]
     assert 'results.get("stopped_at")' in block
