@@ -127,6 +127,16 @@ ollama:
 gemini:
   model: "gemini-3.5-flash"
 
+# Prices for the per-run cost estimate on Checks & publish. Keep in step with
+# https://ai.google.dev/gemini-api/docs/pricing (USD per million tokens; output includes thinking tokens).
+# Model keys are name prefixes matched against the model Google reports in each reply.
+pricing:
+  usd_to_inr: 88.0
+  search_per_1000_queries_usd: 14.0
+  models:
+    gemini-3.5-flash: {input: 1.50, output: 9.00}
+    gemini-3-flash: {input: 0.50, output: 3.00}
+
 output:
   reports_dir: "outputs"
   json_dir: "outputs/json"

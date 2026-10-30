@@ -1,15 +1,23 @@
 from __future__ import annotations
 
 import os
+import re
 import time
 from typing import Optional
 
 import requests
 
+from src.llm import usage
 from src.llm.model_names import gemini_model_name
 
 
 QUOTA_MESSAGE = "Gemini's usage limit is reached (HTTP 429)"
+# Google API keys: the classic AIza… form and the newer AQ.… form.
+_KEY_PATTERN = re.compile(r"AIza[0-9A-Za-z_-]{35}|AQ\.[0-9A-Za-z_.-]{20,}")
+
+
+def redact_keys(text: str) -> str:
+    return _KEY_PATTERN.sub("[REDACTED_KEY]", str(text))
 
 
 class GeminiQuotaExceeded(RuntimeError):
@@ -50,8 +58,6 @@ class GeminiClient:
         if json_mode:
             body["generationConfig"]["responseMimeType"] = "application/json"
 
-        import re
-
         clean_model = self.model.strip()
         url = f"{self.base_url}/{clean_model}:generateContent"
         headers = {"x-goog-api-key": self.api_key, "Content-Type": "application/json"}
@@ -66,10 +72,10 @@ class GeminiClient:
                     time.sleep(5 * (attempt + 1))
                     continue
                 if not response.ok:
-                    err_text = response.text
-                    err_clean = re.sub(r"AIza[0-9A-Za-z-_]{35}", "[REDACTED_KEY]", err_text)
+                    err_clean = redact_keys(response.text)
                     raise requests.HTTPError(f"HTTP {response.status_code} ({response.reason}): {err_clean}", response=response)
                 data = response.json()
+                usage.record(data.get("modelVersion") or self.model, data.get("usageMetadata"))
                 parts = data["candidates"][0]["content"]["parts"]
                 return "".join(part.get("text", "") for part in parts)
             except GeminiQuotaExceeded:
@@ -86,8 +92,6 @@ class GeminiClient:
         ({"uri", "title"} from groundingChunks), the queries it ran (webSearchQueries) and the Search Suggestions
         markup (searchEntryPoint, which must be shown wherever grounded results are used). Gemini's answer text is
         discarded, so nothing it writes reaches the brief."""
-        import re
-
         body = {"contents": [{"role": "user", "parts": [{"text": prompt}]}], "tools": [{"google_search": {}}],
                 "generationConfig": {"temperature": 0.0}}
         url = f"{self.base_url}/{self.model.strip()}:generateContent"
@@ -96,9 +100,13 @@ class GeminiClient:
         if response.status_code == 429:
             raise GeminiQuotaExceeded(f"{QUOTA_MESSAGE}: grounded search")
         if not response.ok:
-            err = re.sub(r"AIza[0-9A-Za-z-_]{35}", "[REDACTED_KEY]", response.text)
+            err = redact_keys(response.text)
             raise requests.HTTPError(f"HTTP {response.status_code} ({response.reason}): {err[:300]}", response=response)
-        meta = ((response.json().get("candidates") or [{}])[0]).get("groundingMetadata") or {}
+        data = response.json()
+        meta = ((data.get("candidates") or [{}])[0]).get("groundingMetadata") or {}
+        # Gemini 3 bills grounding per search query Google runs.
+        usage.record(data.get("modelVersion") or self.model, data.get("usageMetadata"),
+                     search_queries=len(meta.get("webSearchQueries") or []))
         chunks = [{"uri": (c.get("web") or {}).get("uri", ""), "title": (c.get("web") or {}).get("title", "")}
                   for c in meta.get("groundingChunks") or [] if (c.get("web") or {}).get("uri")]
         return {"chunks": chunks, "queries": list(meta.get("webSearchQueries") or []),
