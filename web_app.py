@@ -63,6 +63,7 @@ from src.output.personal_copy import check_d_line, draft_reasons, is_cleared, pe
 from src.output.share_pack import image_card_svg, post_text
 from src.ui.summary_view import card_preview_html, png_download_html, summary_html, summary_missing_reason
 from src.ui.intake_view import DEPTH_OPTIONS, TONE_OPTIONS, approved_question_text, effective_provider, render_intake_view
+from src.llm import usage as gemini_usage
 from src.ui.engine_switch import check_d_engine_note, ollama_label, quota_hit, switch_offer
 from src.ui.stepper import (RESULT_STEPS, available_steps, go_to, page_from_state, render_nav, render_stepper,
                             scroll_to_top_on_change)
@@ -922,21 +923,25 @@ def run_production_pipeline(
         progress_box.progress(progress_val)
 
     q_id = resolve_question_id(topic)
-    results = start_run(
-        question_id=q_id,
-        question_text=topic,
-        depth=depth,
-        tone=tone,
-        map_provider=map_provider,
-        reduce_provider=reduce_provider,
-        on_progress=on_progress or box_progress,
-        academic_papers_override=papers_override,
-        custom_lane_urls=custom_lane_urls,
-        allow_remote_practitioner_synthesis=allow_remote_practitioner_synthesis,
-        practitioner_abstraction_confirmed=practitioner_abstraction_confirmed,
-        reasoned_package=reasoned_package,
-        excluded_claim_keys=excluded_claim_keys,
-    )
+    with gemini_usage.metering() as meter:
+        results = start_run(
+            question_id=q_id,
+            question_text=topic,
+            depth=depth,
+            tone=tone,
+            map_provider=map_provider,
+            reduce_provider=reduce_provider,
+            on_progress=on_progress or box_progress,
+            academic_papers_override=papers_override,
+            custom_lane_urls=custom_lane_urls,
+            allow_remote_practitioner_synthesis=allow_remote_practitioner_synthesis,
+            practitioner_abstraction_confirmed=practitioner_abstraction_confirmed,
+            reasoned_package=reasoned_package,
+            excluded_claim_keys=excluded_claim_keys,
+        )
+    # The run's Gemini tokens and search queries, priced from config.yaml (shown on Checks & publish).
+    if isinstance(results, dict):
+        results["usage"] = meter.summary(gemini_usage.pricing_from_config(config))
     if progress_box is not None:
         progress_box.empty()
     return results
@@ -1743,6 +1748,9 @@ if results and page in RESULT_STEPS:
     # ==========================================================================
     if page == "checks":
         st.markdown("### Checks & publish")
+        cost = gemini_usage.cost_lines(results.get("usage"))
+        if cost:
+            st.info("  \n".join(cost))
         # S28: Check D, citation support: each sentence judged against the exact quotes it cites.
         cd = results.get("check_d")
         if cd and cd.get("checked"):

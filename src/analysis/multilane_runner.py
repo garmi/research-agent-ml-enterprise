@@ -2106,7 +2106,9 @@ class MultiLaneResearchRunner:
         except Exception as e:
             exc_class = type(e).__name__
             raw_msg = str(e)
-            clean_msg = re.sub(r"AIza[0-9A-Za-z-_]{35}", "[REDACTED_KEY]", raw_msg)
+            from src.llm.gemini_client import redact_keys
+
+            clean_msg = redact_keys(raw_msg)
             logger.warning(
                 "Primary model '%s' synthesis encountered %s (%s). Executing graceful fallback to Extractive Claims Engine.",
                 map_provider,
